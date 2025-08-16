@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Vionex</title>
+    <meta name="description" content="Vionex" />
+    <meta name="author" content="Vionex" />
+
+    <meta property="og:title" content="Vionex" />
+    <meta property="og:description" content="Vionex" />
+    <meta property="og:type" content="website" />
+    <script>
+      window.EXCALIDRAW_ASSET_PATH = 
+        "/node_modules/@excalidraw/excalidraw/dist/excalidraw-assets/";
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      import * as ExcalidrawLib from "@excalidraw/excalidraw";
+      window.ExcalidrawLib = ExcalidrawLib;
+    </script>
+  </body>
+</html>
