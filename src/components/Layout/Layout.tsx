@@ -1,11 +1,17 @@
 import Footer from "../Footer";
 import Header from "../Header";
 
-const Layout = ({ children }: { children: React.ReactNode }) => {
+interface LayoutProps {
+    children: React.ReactNode;
+    requireAuth?: boolean; // Giữ lại prop này để backward compatibility
+    redirectTo?: string;
+}
+
+const Layout = ({ children }: LayoutProps) => {
     return (
-        <div className="flex flex-col min-h-screen bg-background text-foreground">
+        <div className='flex flex-col min-h-screen bg-background text-foreground'>
             <Header />
-            <main className="flex-1 overflow-y-auto bg-background">
+            <main className='flex-1 overflow-y-auto bg-background'>
                 {children}
             </main>
             <Footer />

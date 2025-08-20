@@ -405,7 +405,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
     const recvTransport = null;
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 relative">
+        <div className='flex h-screen bg-gray-50 dark:bg-gray-900 relative'>
             <SelectLayoutTemplate
                 isOpen={isOpenSelectLayoutTemplate}
                 onClose={() => setIsOpenSelectLayoutTemplate(false)}
@@ -443,40 +443,46 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                         : ""
                 }`}
             >
-                <div className="mb-2 md:mb-4 flex items-center justify-between relative">
-                    <div className="flex items-center gap-2">
-                        <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">
-                            Room ID: {roomId}
+                <div className='mb-2 md:mb-4 flex items-center justify-between relative'>
+                    <div className='flex items-center gap-2'>
+                        <h2 className='text-base md:text-lg font-semibold text-gray-900 dark:text-white'>
+                            {room.isOrganizationRoom ? (
+                                <>(Organization Room)</>
+                            ) : (
+                                <>Room ID: {roomId}</>
+                            )}
                         </h2>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            title="QR Code"
-                            onClick={() => setIsQRCodeOpen(true)}
-                            className=""
-                        >
-                            <QrCode className="h-5 w-5" />
-                        </Button>
+                        {!room.isOrganizationRoom && (
+                            <Button
+                                variant='outline'
+                                size='icon'
+                                title='QR Code'
+                                onClick={() => setIsQRCodeOpen(true)}
+                                className=''
+                            >
+                                <QrCode className='h-5 w-5' />
+                            </Button>
+                        )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className='flex items-center gap-2'>
                         {isRecording && !isProcessing && (
-                            <div className="flex items-center gap-1 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full">
+                            <div className='flex items-center gap-1 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full'>
                                 <Disc2
-                                    className="h-4 w-4 fill-white animate-pulse"
-                                    color="red"
+                                    className='h-4 w-4 fill-white animate-pulse'
+                                    color='red'
                                 />
-                                <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                                <span className='text-xs text-red-600 dark:text-red-400 font-medium'>
                                     Recording
                                 </span>
                             </div>
                         )}
                         {isProcessing && (
-                            <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
+                            <div className='flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full'>
                                 <Loader2
-                                    className="h-4 w-4 animate-spin"
-                                    color="#f59e0b"
+                                    className='h-4 w-4 animate-spin'
+                                    color='#f59e0b'
                                 />
-                                <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">
+                                <span className='text-xs text-yellow-600 dark:text-yellow-400 font-medium'>
                                     Processing
                                 </span>
                             </div>

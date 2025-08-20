@@ -15,6 +15,7 @@ import { VADDebugPage } from "./VADDebugPage";
 import { StandaloneVADTest } from "./StandaloneVADTest";
 import { RecordingsDebug } from "./RecordingsDebug";
 import { TranslationCabinSidebar } from "./TranslationCabin/TranslationCabinSidebar";
+import ProtectedRoute from "./ProtectedRoute";
 
 export {
     ParticipantsList,
@@ -34,4 +35,5 @@ export {
     StandaloneVADTest,
     RecordingsDebug,
     TranslationCabinSidebar,
+    ProtectedRoute,
 };
