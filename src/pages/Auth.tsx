@@ -12,8 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
+import useLogin from "@/hooks/auth/use-login";
+import useRegister from "@/hooks/auth/use-register";
 
-const Login = () => {
+const Auth = () => {
     const [isLogin, setIsLogin] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
@@ -22,6 +24,8 @@ const Login = () => {
         name: "",
         confirmPassword: "",
     });
+    const { login, isPending: isLoggingIn } = useLogin();
+    const { register, isPending: isRegistering } = useRegister();
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
@@ -32,8 +36,22 @@ const Login = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Handle form submission here
-        console.log("Form submitted:", formData);
+        if (isLogin) {
+            login({
+                email: formData.email,
+                password: formData.password
+            });
+        } else {
+            if (formData.password !== formData.confirmPassword) {
+                alert("Passwords do not match!");
+                return;
+            }
+            register({
+                name: formData.name,
+                email: formData.email,
+                password: formData.password
+            });
+        }
     };
 
     return (
@@ -55,7 +73,7 @@ const Login = () => {
                             className='inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-2'
                         >
                             <ArrowLeft className='h-4 w-4' />
-                            Quay lại trang chủ
+                            Back to Home
                         </Link>
                         <div className='w-20 h-20 mx-auto flex items-center justify-center mb-3'>
                             <img
@@ -66,12 +84,12 @@ const Login = () => {
                         </div>
                         <div>
                             <CardTitle className='text-2xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-purple-600 dark:from-blue-400 dark:via-blue-300 dark:to-purple-400 bg-clip-text text-transparent'>
-                                {isLogin ? "Đăng nhập" : "Đăng ký"}
+                                {isLogin ? "Sign In" : "Sign Up"}
                             </CardTitle>
                             <CardDescription className='mt-2 text-sm text-gray-600 dark:text-gray-300'>
                                 {isLogin
-                                    ? "Chào mừng bạn quay trở lại!"
-                                    : "Tạo tài khoản mới để bắt đầu."}
+                                    ? "Welcome back!"
+                                    : "Create a new account to get started."}
                             </CardDescription>
                         </div>
                     </CardHeader>
@@ -81,7 +99,7 @@ const Login = () => {
                             {!isLogin && (
                                 <div className='space-y-1'>
                                     <Label htmlFor='name' className='text-sm'>
-                                        Họ và tên
+                                        Full Name
                                     </Label>
                                     <div className='relative'>
                                         <User className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
@@ -89,7 +107,7 @@ const Login = () => {
                                             id='name'
                                             name='name'
                                             type='text'
-                                            placeholder='Nhập họ và tên'
+                                            placeholder='Enter your full name'
                                             value={formData.name}
                                             onChange={handleInputChange}
                                             className='pl-10 h-10'
@@ -109,7 +127,7 @@ const Login = () => {
                                         id='email'
                                         name='email'
                                         type='email'
-                                        placeholder='Nhập địa chỉ email'
+                                        placeholder='Enter your email address'
                                         value={formData.email}
                                         onChange={handleInputChange}
                                         className='pl-10 h-10'
@@ -120,7 +138,7 @@ const Login = () => {
 
                             <div className='space-y-1'>
                                 <Label htmlFor='password' className='text-sm'>
-                                    Mật khẩu
+                                    Password
                                 </Label>
                                 <div className='relative'>
                                     <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
@@ -130,7 +148,7 @@ const Login = () => {
                                         type={
                                             showPassword ? "text" : "password"
                                         }
-                                        placeholder='Nhập mật khẩu'
+                                        placeholder='Enter your password'
                                         value={formData.password}
                                         onChange={handleInputChange}
                                         className='pl-10 pr-10 h-10'
@@ -160,7 +178,7 @@ const Login = () => {
                                         htmlFor='confirmPassword'
                                         className='text-sm'
                                     >
-                                        Xác nhận mật khẩu
+                                        Confirm Password
                                     </Label>
                                     <div className='relative'>
                                         <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
@@ -168,7 +186,7 @@ const Login = () => {
                                             id='confirmPassword'
                                             name='confirmPassword'
                                             type='password'
-                                            placeholder='Nhập lại mật khẩu'
+                                            placeholder='Confirm your password'
                                             value={formData.confirmPassword}
                                             onChange={handleInputChange}
                                             className='pl-10 h-10'
@@ -184,23 +202,28 @@ const Login = () => {
                                         variant='link'
                                         className='p-0 h-auto text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300'
                                     >
-                                        Quên mật khẩu?
+                                        Forgot password?
                                     </Button>
                                 </div>
                             )}
 
                             <Button
                                 type='submit'
+                                disabled={isLoggingIn || isRegistering}
                                 className='w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-10'
                             >
-                                {isLogin ? "Đăng nhập" : "Đăng ký"}
+                                {isLoggingIn || isRegistering ? (
+                                    <>Loading...</>
+                                ) : (
+                                    <>{isLogin ? "Sign In" : "Sign Up"}</>
+                                )}
                             </Button>
                         </form>
 
                         <div className='relative py-2'>
                             <Separator />
                             <span className='absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-2 text-xs text-muted-foreground'>
-                                HOẶC
+                                OR
                             </span>
                         </div>
 
@@ -226,21 +249,21 @@ const Login = () => {
                                     d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
                                 />
                             </svg>
-                            Tiếp tục với Google
+                            Continue with Google
                         </Button>
 
                         <div className='text-center text-sm'>
                             <span className='text-muted-foreground'>
                                 {isLogin
-                                    ? "Chưa có tài khoản?"
-                                    : "Đã có tài khoản?"}
+                                    ? "Not a member?"
+                                    : "Already have an account?"}
                             </span>
                             <Button
                                 variant='link'
                                 className='p-0 h-auto ml-1 font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300'
                                 onClick={() => setIsLogin(!isLogin)}
                             >
-                                {isLogin ? "Đăng ký ngay" : "Đăng nhập"}
+                                {isLogin ? "Sign Up" : "Sign In"}
                             </Button>
                         </div>
                     </CardContent>
@@ -250,4 +273,4 @@ const Login = () => {
     );
 };
 
-export default Login;
+export default Auth;

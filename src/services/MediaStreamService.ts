@@ -142,7 +142,6 @@ class MediaStreamService {
 
     // Force cleanup - used when user leaves video call pages
     forceCleanup(): void {
-        console.log("[MediaService] Force cleaning up media stream");
         this.cleanup();
     }
 }

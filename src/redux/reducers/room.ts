@@ -6,6 +6,10 @@ const initialState = {
     isLocked: false,
     isCreator: false,
     pinnedUsers: [],
+    // Organization room context
+    isOrganizationRoom: false,
+    organizationId: null,
+    roomId: null,
 };
 
 const roomReducer = (state = initialState, action: ActionRoom) => {
@@ -23,6 +27,14 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                     action.payload?.isCreator !== undefined
                         ? action.payload?.isCreator
                         : state.isCreator,
+                // Organization room context
+                isOrganizationRoom:
+                    action.payload?.isOrganizationRoom !== undefined
+                        ? action.payload?.isOrganizationRoom
+                        : state.isOrganizationRoom,
+                organizationId:
+                    action.payload?.organizationId || state.organizationId,
+                roomId: action.payload?.roomId || state.roomId,
             };
             return state;
         case ActionRoomType.LEAVE_ROOM:
@@ -32,6 +44,10 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                 password: "",
                 isLocked: false,
                 isCreator: false,
+                // Reset organization context
+                isOrganizationRoom: false,
+                organizationId: null,
+                roomId: null,
             };
             return state;
         case ActionRoomType.SET_CREATOR:

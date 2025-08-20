@@ -9,11 +9,9 @@ import { StreamTile } from "./StreamTile";
 import { useVideoGrid } from "@/hooks/use-video-grid";
 import {
     calculateGridDimensions,
-    createBreakpoints,
     createDefaultLayout,
 } from "@/utils/gridLayout";
 import LAYOUT_TEMPLATES from "./Templates/LayoutTemplate";
-// import LAYOUT_TEMPLATES from "./Templates/LayoutTemplate";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -42,9 +40,6 @@ export const VideoGrid = ({
     const myPeerId = room.username || "local";
 
     const {
-        videoRefs,
-        streamMapRef,
-        attachMediaStream,
         layouts,
         setLayouts,
         currentBreakpoint,
@@ -61,7 +56,6 @@ export const VideoGrid = ({
         isUserScreenSharing,
         isUserPinned,
         isUserSpeaking,
-        hasUserStream,
         hasUserTranslation,
         isUserUsingTranslation,
         screenShareUsers,
@@ -145,7 +139,12 @@ export const VideoGrid = ({
 
     const { gridCols, rowHeight, gridHeight } = calculateGridDimensions(
         totalDisplayItems,
-        availableHeight
+        availableHeight,
+        16, // containerPadding
+        16, // marginSize
+        180, // minRowHeight
+        500, // maxRowHeightLimit
+        currentBreakpoint // Truyền current breakpoint
     );
 
     // Generate layouts
@@ -155,16 +154,39 @@ export const VideoGrid = ({
             return;
         }
 
-        const breakpoints = createBreakpoints(totalDisplayItems, gridCols);
         const newLayouts: { [key: string]: any[] } = {};
 
-        Object.entries(breakpoints).forEach(([key, cols]) => {
+        // Tạo layout cho từng breakpoint với logic riêng
+        const breakpointConfigs = {
+            lg: { cols: gridCols },
+            md: { cols: gridCols },
+            sm: {
+                cols:
+                    totalDisplayItems === 2
+                        ? 2
+                        : totalDisplayItems === 3
+                        ? 3
+                        : Math.min(gridCols, 2),
+            },
+            xs: {
+                cols:
+                    totalDisplayItems === 2 || totalDisplayItems === 3
+                        ? 1
+                        : Math.min(gridCols, 2),
+            },
+            xxs: {
+                cols:
+                    totalDisplayItems === 2 || totalDisplayItems === 3 ? 1 : 1,
+            },
+        };
+
+        Object.entries(breakpointConfigs).forEach(([key, config]) => {
+            const cols = config.cols;
             let layout = createDefaultLayout(usersToShow, cols);
             if (selectedLayoutTemplate) {
-                layout = LAYOUT_TEMPLATES.find((template) => template.id === selectedLayoutTemplate)?.layout(
-                    usersToShow,
-                    cols,
-                );
+                layout = LAYOUT_TEMPLATES.find(
+                    (template) => template.id === selectedLayoutTemplate
+                )?.layout(usersToShow, cols);
             }
 
             // Add remaining users slot if needed
@@ -195,6 +217,7 @@ export const VideoGrid = ({
         isLocalOnlyMode,
         totalDisplayItems,
         setLayouts,
+        selectedLayoutTemplate,
     ]);
 
     const createOccupancyMap = (
@@ -348,9 +371,9 @@ export const VideoGrid = ({
                 return (
                     <div
                         key={user.peerId}
-                        className="participant-container h-full w-full"
+                        className='participant-container h-full w-full'
                     >
-                        <div className="h-full w-full relative">
+                        <div className='h-full w-full relative'>
                             <StreamTile
                                 stream={screenStream}
                                 userName={`${originalUser} - Screen Share`}
@@ -415,9 +438,9 @@ export const VideoGrid = ({
             return (
                 <div
                     key={user.peerId}
-                    className="participant-container h-full w-full"
+                    className='participant-container h-full w-full'
                 >
-                    <div className="h-full w-full relative">
+                    <div className='h-full w-full relative'>
                         {userStream ? (
                             <StreamTile
                                 stream={userStream}
@@ -450,16 +473,16 @@ export const VideoGrid = ({
                                 onToggleTranslation={handleToggleTranslation}
                             />
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-800 rounded-lg shadow-md">
-                                <div className="w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-2 shadow-sm">
+                            <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-800 rounded-lg shadow-md'>
+                                <div className='w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-2 shadow-sm'>
                                     {user.peerId[0].toUpperCase()}
                                 </div>
-                                <span className="text-white">
+                                <span className='text-white'>
                                     {isLocalUser
                                         ? `${user.peerId} (You)`
                                         : user.peerId}
                                 </span>
-                                <span className="text-xs text-gray-400 dark:text-gray-300 mt-1">
+                                <span className='text-xs text-gray-400 dark:text-gray-300 mt-1'>
                                     {isLocalUser
                                         ? "Camera/Mic turn off"
                                         : "No camera/mic"}
@@ -491,17 +514,17 @@ export const VideoGrid = ({
     if (isLocalOnlyMode) {
         return (
             <div
-                id="video-grid"
-                className="video-grid flex flex-col gap-4 relative"
+                id='video-grid'
+                className='video-grid flex flex-col gap-4 relative'
             >
                 <div
-                    className="w-full flex items-center justify-center"
+                    className='w-full flex items-center justify-center'
                     style={{
                         height: availableHeight,
                         maxHeight: availableHeight,
                     }}
                 >
-                    <div className="relative w-full h-full rounded-xl overflow-hidden bg-black dark:bg-gray-900">
+                    <div className='relative w-full h-full rounded-xl overflow-hidden bg-black dark:bg-gray-900'>
                         {localUser && getUserStream(localUser.peerId) ? (
                             (() => {
                                 const stream = getUserStream(localUser.peerId)!;
@@ -537,17 +560,17 @@ export const VideoGrid = ({
                                 );
                             })()
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-950 rounded-lg">
-                                <div className="w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-4">
+                            <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-950 rounded-lg'>
+                                <div className='w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-4'>
                                     {(localUser?.peerId ||
                                         "B")[0].toUpperCase()}
                                 </div>
-                                <span className="text-white text-2xl">
+                                <span className='text-white text-2xl'>
                                     {localUser?.peerId || "Bạn"}
                                 </span>
                             </div>
                         )}
-                        <span className="absolute top-4 left-4 bg-blue-600 dark:bg-blue-700 text-white text-xs px-4 py-2 rounded shadow">
+                        <span className='absolute top-4 left-4 bg-blue-600 dark:bg-blue-700 text-white text-xs px-4 py-2 rounded shadow'>
                             Bạn
                         </span>
                     </div>
@@ -557,17 +580,31 @@ export const VideoGrid = ({
     }
 
     // Main grid layout
-    const breakpoints = createBreakpoints(totalDisplayItems, gridCols);
+    const breakpointCols = {
+        lg: gridCols,
+        md: gridCols,
+        sm:
+            totalDisplayItems === 2
+                ? 2
+                : totalDisplayItems === 3
+                ? 3
+                : Math.min(gridCols, 2),
+        xs:
+            totalDisplayItems === 2 || totalDisplayItems === 3
+                ? 1
+                : Math.min(gridCols, 2),
+        xxs: totalDisplayItems === 2 || totalDisplayItems === 3 ? 1 : 1,
+    };
 
     return (
         <div
-            id="video-grid"
-            className="video-grid flex flex-col gap-4 relative dark:bg-gray-950"
+            id='video-grid'
+            className='video-grid flex flex-col gap-4 relative dark:bg-gray-950'
         >
             <div style={{ height: gridHeight, maxHeight: gridHeight }}>
                 {layouts.lg && layouts.lg.length > 0 && (
                     <ResponsiveGridLayout
-                        className="layout"
+                        className='layout'
                         layouts={layouts}
                         breakpoints={{
                             lg: 1200,
@@ -576,7 +613,7 @@ export const VideoGrid = ({
                             xs: 480,
                             xxs: 0,
                         }}
-                        cols={breakpoints}
+                        cols={breakpointCols}
                         rowHeight={rowHeight}
                         isResizable={true}
                         isDraggable={true}
@@ -595,15 +632,15 @@ export const VideoGrid = ({
 
                         {remainingUsers.length > 0 && (
                             <div
-                                key="remaining"
-                                className="participant-container h-full w-full"
+                                key='remaining'
+                                className='participant-container h-full w-full'
                             >
-                                <div className="h-full w-full">
-                                    <div className="flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-800 rounded-lg shadow-md">
-                                        <div className="w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-2 shadow-sm">
-                                            <Users className="h-7 w-7" />
+                                <div className='h-full w-full'>
+                                    <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-800 rounded-lg shadow-md'>
+                                        <div className='w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-2 shadow-sm'>
+                                            <Users className='h-7 w-7' />
                                         </div>
-                                        <span className="text-white">
+                                        <span className='text-white'>
                                             +{remainingUsers.length} other users
                                         </span>
                                     </div>

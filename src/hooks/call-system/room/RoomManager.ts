@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { Device } from "mediasoup-client";
 import { ActionRoomType } from "@/interfaces/action";
 import { CallSystemContext } from "../types";
+import { isOrganizationRoomToken } from "@/utils/roomSecurity";
 
 /**
  * Room Manager Module
@@ -27,7 +28,7 @@ export class RoomManager {
      * Join room
      */
     joinRoom = async (password?: string): Promise<boolean> => {
-                        if (
+        if (
             !this.context.refs.apiServiceRef.current ||
             !this.context.room.username
         ) {
@@ -47,7 +48,7 @@ export class RoomManager {
         }
 
         try {
-                        this.context.refs.isJoiningRef.current = true;
+            this.context.refs.isJoiningRef.current = true;
             this.context.setters.setJoining(true);
             this.context.setters.setLoading(true);
             this.context.setters.setError(null);
@@ -57,32 +58,64 @@ export class RoomManager {
                 this.context.room.username
             );
 
-                        const joinResult =
-                await this.context.refs.apiServiceRef.current.joinRoom(
-                    this.context.roomId,
-                    this.context.room.username,
-                    password
-                );
+            // Check if this is an organization room (starts with org_)
+            const isOrgRoom = this.context.roomId.startsWith("org_");
+            let joinResult: any;
 
-                        if (joinResult.success) {
-                                if (!this.context.refs.deviceRef.current) {
+            if (isOrgRoom) {
+                // Join organization room - verification happens on backend
+                joinResult =
+                    await this.context.refs.apiServiceRef.current.joinOrgRoom(
+                        this.context.roomId, // direct room ID (org_xxxx)
+                        this.context.room.username
+                    );
+
+                console.log(
+                    `[RoomManager] Org room join attempt. RoomId: ${this.context.roomId}`
+                );
+            } else {
+                // Join regular room
+                joinResult =
+                    await this.context.refs.apiServiceRef.current.joinRoom(
+                        this.context.roomId,
+                        this.context.room.username,
+                        password
+                    );
+            }
+
+            if (joinResult.success) {
+                if (!this.context.refs.deviceRef.current) {
                     this.context.refs.deviceRef.current = new Device();
+                }
+
+                // Get router capabilities
+                let rtpCapabilities;
+                if (isOrgRoom) {
+                    // Get router capabilities using the room ID
+                    const routerResult =
+                        await this.context.refs.apiServiceRef.current.getRouterRtpCapabilities(
+                            this.context.roomId
+                        );
+                    if (routerResult.success) {
+                        rtpCapabilities = routerResult.data;
+                    }
+                } else {
+                    rtpCapabilities = joinResult.rtpCapabilities;
                 }
 
                 if (
                     !this.context.refs.deviceRef.current.loaded &&
-                    joinResult.rtpCapabilities
+                    rtpCapabilities
                 ) {
-                                        await this.context.refs.deviceRef.current.load({
-                        routerRtpCapabilities: joinResult.rtpCapabilities,
+                    await this.context.refs.deviceRef.current.load({
+                        routerRtpCapabilities: rtpCapabilities,
                     });
 
                     // Verify that device capabilities are compatible with router
                     const deviceCodecs =
                         this.context.refs.deviceRef.current.rtpCapabilities
                             .codecs || [];
-                    const routerCodecs =
-                        joinResult.rtpCapabilities.codecs || [];
+                    const routerCodecs = rtpCapabilities.codecs || [];
 
                     // Check for common codecs
                     const commonCodecs = deviceCodecs.filter((deviceCodec) =>
@@ -98,18 +131,17 @@ export class RoomManager {
                             "Device and router have no compatible codecs"
                         );
                     }
+                }
 
-                                    }
-
-                                this.context.setters.setIsJoined(true);
+                this.context.setters.setIsJoined(true);
 
                 // Connect WebSocket and wait for connection
-                                this.context.refs.socketRef.current?.connect();
+                this.context.refs.socketRef.current?.connect();
 
                 // Wait for WebSocket connection to be established before proceeding
-                                await this.waitForConnection();
+                await this.waitForConnection();
 
-                                this.context.refs.socketRef.current?.emit("sfu:join", {
+                this.context.refs.socketRef.current?.emit("sfu:join", {
                     roomId: this.context.roomId,
                     peerId: this.context.room.username,
                     password: password,
@@ -121,7 +153,7 @@ export class RoomManager {
                 // Auto-initialize local media after joining (like old logic)
                 setTimeout(async () => {
                     if (!this.context.refs.localStreamRef.current) {
-                                                if (this.mediaManager) {
+                        if (this.mediaManager) {
                             await this.mediaManager.initializeLocalMedia();
                         } else {
                             console.warn("[RoomManager] MediaManager not set!");
@@ -312,9 +344,9 @@ export class RoomManager {
                 streams.length > 0
             ) {
                 for (const stream of streams) {
-                                        // Skip own streams
+                    // Skip own streams
                     if (stream.publisherId === this.context.room.username) {
-                                                continue;
+                        continue;
                     }
 
                     // Validate streamId - filter out non-stream objects
@@ -409,7 +441,7 @@ export class RoomManager {
                         this.context.refs.apiServiceRef.current.setPeerId(
                             this.context.room.username
                         );
-                                            }
+                    }
                     resolve();
                 } else {
                     setTimeout(checkConnection, 100);

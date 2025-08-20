@@ -32,18 +32,34 @@ class ApiService {
 
     private async request<T>(
         endpoint: string,
-        options?: RequestInit
+        options?: RequestInit,
+        requireAuth: boolean = false
     ): Promise<T> {
         const headers: HeadersInit = {
             "Content-Type": "application/json",
             ...options?.headers,
         };
 
-        // Add authorization header if peerId is available
+        // Add JWT authorization header only when required (for org rooms)
+        if (requireAuth) {
+            const accessToken = localStorage.getItem("accessToken");
+            if (accessToken) {
+                headers["Authorization"] = `Bearer ${accessToken}`;
+                console.log(
+                    "[SignalService] Using access token:",
+                    accessToken.substring(0, 20) + "..."
+                );
+            } else {
+                throw new Error(
+                    "Authentication required but no access token found"
+                );
+            }
+        }
+
+        // Add peerId header for all requests (backward compatibility)
         if (this.peerId) {
-            // URL encode the peerId to handle non-ASCII characters (like Vietnamese characters)
             const encodedPeerId = encodeURIComponent(this.peerId);
-            headers["Authorization"] = `Bearer ${encodedPeerId}`;
+            headers["X-Peer-Id"] = encodedPeerId;
         }
 
         const response = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -58,7 +74,7 @@ class ApiService {
             try {
                 errorData = errorText ? JSON.parse(errorText) : {};
             } catch {}
-            throw new Error(errorData.message || `HTTP ${response.status}`);
+            throw new Error(errorData.message || `Token validation failed`);
         }
 
         // Defensive: handle empty or invalid JSON response
@@ -81,6 +97,39 @@ class ApiService {
             method: "POST",
             body: JSON.stringify({ peerId, password }),
         });
+    }
+
+    // Organization Room API - Requires Authentication
+    async joinOrgRoom(roomId: string, peerId: string) {
+        return this.request<{
+            success: boolean;
+            message: string;
+            roomId: string;
+            participant: any;
+            user: any;
+        }>(
+            `/api/room/org/join`,
+            {
+                method: "POST",
+                body: JSON.stringify({ roomId, peerId }),
+            },
+            true
+        ); // requireAuth = true
+    }
+
+    async verifyOrgRoomAccess(roomId: string) {
+        return this.request<{
+            success: boolean;
+            message: string;
+            roomId: string;
+        }>(
+            `/api/room/org/verify`,
+            {
+                method: "POST",
+                body: JSON.stringify({ roomId }),
+            },
+            true
+        ); // requireAuth = true
     }
 
     // Updated endpoints to match new gateway.controller.ts

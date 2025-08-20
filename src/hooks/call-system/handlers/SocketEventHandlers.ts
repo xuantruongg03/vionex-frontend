@@ -119,26 +119,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             data.publisherId || data.publisher_id || data.peerId;
         const metadata = data.metadata || {};
 
-        console.log(`[SocketEventHandlers] Stream added:`, {
-            streamId,
-            publisherId,
-            metadata,
-        });
-
-        // Check if this is a translation stream
-        if (streamId && streamId.startsWith("translated_")) {
-            console.log(
-                `[SocketEventHandlers] 🎯 TRANSLATION STREAM DETECTED:`,
-                {
-                    streamId,
-                    publisherId,
-                    targetUserId: metadata?.targetUserId,
-                    sourceLanguage: metadata?.sourceLanguage,
-                    targetLanguage: metadata?.targetLanguage,
-                }
-            );
-        }
-
         // Skip own streams - but allow own screen share streams to be added
         const isOwnStream = publisherId === this.context.room.username;
         const isScreenShare =
@@ -149,10 +129,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             streamId.includes("_screen_audio_");
 
         if (isOwnStream && !isScreenShare) {
-            console.log(
-                `[SocketEventHandlers] ❌ Skipping own stream:`,
-                streamId
-            );
             return;
         }
 
