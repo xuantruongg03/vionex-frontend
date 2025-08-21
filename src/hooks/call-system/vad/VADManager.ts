@@ -1,14 +1,3 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
 
 import { CallSystemContext } from "../types";
 import {
@@ -168,7 +157,6 @@ export class VADManager {
 
         this.vadInstance.setMicrophoneEnabled(true);
         this.vadInstance.startListening();
-        console.log("[VADManager] Started VAD listening");
     }
 
     /**
@@ -177,7 +165,6 @@ export class VADManager {
     stopListening(): void {
         if (this.vadInstance) {
             this.vadInstance.stopListening();
-            console.log("[VADManager] Stopped VAD listening");
         }
     }
 
@@ -185,8 +172,6 @@ export class VADManager {
      * Update microphone state for VAD
      */
     updateMicrophoneState(enabled: boolean): void {
-        console.log(`[VADManager] Updating microphone state: ${enabled}`);
-
         if (this.vadInstance) {
             // Update VAD's internal microphone state
             this.vadInstance.setMicrophoneEnabled(enabled);
@@ -195,16 +180,10 @@ export class VADManager {
             // If enabled, start listening again
             if (enabled) {
                 this.vadInstance.startListening();
-                console.log(
-                    `[VADManager] Microphone enabled - VAD listening started`
-                );
             } else {
                 this.vadInstance.stopListening();
                 // Also stop any periodic sending
                 this.stopPeriodicSending();
-                console.log(
-                    `[VADManager] Microphone disabled - VAD listening stopped`
-                );
             }
         }
     }
@@ -213,6 +192,9 @@ export class VADManager {
      * Store recording for debugging purposes
      */
     private storeRecording(audioBuffer: Uint8Array, duration: number): void {
+        if (this.recordings.length >= 5) {
+            this.recordings.shift();
+        }
         const recording = {
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             timestamp: Date.now(),
@@ -223,14 +205,13 @@ export class VADManager {
         };
 
         // Keep only last 10 recordings to prevent memory issues
-        this.recordings.push(recording);
-        if (this.recordings.length > 10) {
-            this.recordings.shift();
+        // this.recordings.push(recording);
+        if (audioBuffer.length > 1000 && duration > 500) {
+            this.recordings.push(recording);
         }
-
-        console.log(
-            `[VADManager] Stored recording ${recording.id} for debugging, total: ${this.recordings.length}`
-        );
+        // if (this.recordings.length > 10) {
+        //     this.recordings.shift();
+        // }
     }
 
     /**
@@ -263,11 +244,6 @@ export class VADManager {
      * Handle speech end event and send final audio buffer
      */
     private handleSpeechEnd(audioBuffer: Uint8Array, duration: number): void {
-        console.log(
-            `[VADManager] Sending final speech buffer - Size: ${
-                audioBuffer.length
-            } bytes, Duration: ${duration}ms, Mic: ${this.getCurrentMicrophoneState()}`
-        );
         this.sendAudioBuffer(audioBuffer, duration, true); // true = final chunk
     }
 
@@ -318,36 +294,19 @@ export class VADManager {
             ((audioBuffer.length - nonZeroBytes) / audioBuffer.length) * 100;
 
         // Check for clipped audio (255, 127 pattern indicates clipping)
-        const clippedBytes = audioBuffer.filter(
-            (b) => b === 255 || b === 127
-        ).length;
-        const clippingPercentage = (clippedBytes / audioBuffer.length) * 100;
+        // const clippedBytes = audioBuffer.filter(
+        //     (b) => b === 255 || b === 127
+        // ).length;
+        // const clippingPercentage = (clippedBytes / audioBuffer.length) * 100;
 
         if (silencePercentage > 95) {
-            console.log(
-                `[VADManager] Audio buffer is ${silencePercentage.toFixed(
-                    1
-                )}% silence, not sending`
-            );
             return;
-        }
-
-        if (clippingPercentage > 80) {
-            console.warn(
-                `[VADManager] Audio buffer is ${clippingPercentage.toFixed(
-                    1
-                )}% clipped - gain may be too high!`
-            );
-            // Still send clipped audio, but warn about it
         }
 
         // Check buffer size - prevent sending extremely large buffers
         // 16kHz * 2 bytes/sample * 15 seconds = 480,000 bytes max
         const MAX_BUFFER_SIZE = 480000; // ~15 seconds at 16kHz (16-bit PCM)
         if (audioBuffer.length > MAX_BUFFER_SIZE) {
-            console.warn(
-                `[VADManager] Audio buffer too large (${audioBuffer.length} bytes), truncating to ${MAX_BUFFER_SIZE} bytes`
-            );
             audioBuffer = audioBuffer.slice(0, MAX_BUFFER_SIZE);
         }
 
@@ -361,31 +320,8 @@ export class VADManager {
             sampleRate: 16000,
             channels: 1,
             isFinal, // Indicate if this is the final chunk or periodic chunk
+            orgId: room.organizationId || null
         };
-
-        console.log("[VADManager] Sending audio buffer to server:", {
-            userId: room.username,
-            roomId,
-            bufferSize: audioBuffer.length,
-            duration,
-            calculatedDuration:
-                ((audioBuffer.length / 2 / 16000) * 1000).toFixed(0) + "ms", // bytes ÷ 2 ÷ sampleRate * 1000
-            timestamp: audioData.timestamp,
-            isFinal,
-            // Audio quality metrics (safe versions)
-            nonZeroSamples: nonZeroBytes,
-            silencePercentage: silencePercentage.toFixed(1) + "%",
-            clippingPercentage: clippingPercentage.toFixed(1) + "%",
-            microphoneState: this.getCurrentMicrophoneState(), // Add microphone state info
-            maxValue: Math.max(...Array.from(audioBuffer.slice(0, 1000))), // Only check first 1000 bytes
-            minValue: Math.min(...Array.from(audioBuffer.slice(0, 1000))), // Only check first 1000 bytes
-            firstBytes: Array.from(audioBuffer.slice(0, 10))
-                .map((b) => b.toString(16))
-                .join(" "),
-            lastBytes: Array.from(audioBuffer.slice(-10))
-                .map((b) => b.toString(16))
-                .join(" "),
-        });
 
         // Listen for audio errors from server
         socket.once("audio:error", (errorData) => {
@@ -526,13 +462,14 @@ export class VADManager {
     cleanup(): void {
         // Stop periodic sending
         this.stopPeriodicSending();
+        this.clearRecordings();
 
         if (this.vadInstance) {
             this.vadInstance.cleanup();
             this.vadInstance = null;
-            this.isInitialized = false;
             console.log("[VADManager] Cleaned up VAD");
         }
+        this.isInitialized = false;
     }
 
     /**
