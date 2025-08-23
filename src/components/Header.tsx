@@ -28,7 +28,7 @@ const Header = () => {
                         className='flex items-center space-x-2 hover:opacity-80 transition-opacity'
                     >
                         <img
-                            src='src/assets/logo.png'
+                            src='/logo.png'
                             alt='Vionext Logo'
                             className='h-14 w-14'
                         />
