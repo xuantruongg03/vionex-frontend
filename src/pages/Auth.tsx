@@ -77,7 +77,7 @@ const Auth = () => {
                         </Link>
                         <div className='w-20 h-20 mx-auto flex items-center justify-center mb-3'>
                             <img
-                                src='/src/assets/logo.png'
+                                src='/logo.png'
                                 alt='Vionex Logo'
                                 className='w-full h-full object-contain'
                             />
