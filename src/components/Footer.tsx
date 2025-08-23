@@ -14,7 +14,7 @@ const Footer = () => {
                             className="flex items-center space-x-2 mb-4"
                         >
                             <img
-                                src="src/assets/logo.png"
+                                src='/logo.png'
                                 alt="Vionext Logo"
                                 className="h-14 w-14"
                             />
