@@ -3,7 +3,7 @@ const CONSTANT = {
     PASSWORD: "password",
     ROOM_ID: "roomId",
     IS_LOCKED: "isLocked",
-    TIME_FORMAT: "HH:mm:ss",
+    TIME_FORMAT: "HH:mm",
     DATE_FORMAT: "DD/MM/YYYY",
     ROOM_ID_LENGTH: 6,
     USER_NAME_MAX_LENGTH: 20,
