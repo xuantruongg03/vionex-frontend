@@ -1,5 +1,4 @@
 import { Device, types as mediasoupTypes } from "mediasoup-client";
-import { toast } from "sonner";
 import { CallSystemContext } from "../types";
 
 /**
@@ -101,9 +100,14 @@ export class TransportManager {
 
             // Log ICE servers for debugging
             if (actualTransportInfo.iceServers) {
-                console.log("[TransportManager] Using ICE servers:", actualTransportInfo.iceServers);
+                console.log(
+                    "[TransportManager] Using ICE servers:",
+                    actualTransportInfo.iceServers
+                );
             } else {
-                console.warn("[TransportManager] No ICE servers provided in transport info");
+                console.warn(
+                    "[TransportManager] No ICE servers provided in transport info"
+                );
             }
 
             const transport = isProducer
@@ -125,12 +129,16 @@ export class TransportManager {
     };
 
     /**
-     * Setup send transport with event handlers
+     * Common transport connection handler
      */
-    private setupSendTransport = (transport: mediasoupTypes.Transport) => {
-        this.context.refs.sendTransportRef.current = transport;
-
-        transport.on("connect", ({ dtlsParameters }, callback, errback) => {
+    private createTransportConnectionHandler = (
+        transport: mediasoupTypes.Transport
+    ) => {
+        return (
+            { dtlsParameters }: any,
+            callback: () => void,
+            errback: (error: any) => void
+        ) => {
             dtlsParameters.role = "client";
             this.context.refs.socketRef.current?.emit("sfu:connect-transport", {
                 transportId: transport.id,
@@ -170,7 +178,19 @@ export class TransportManager {
                 handleTransportConnected
             );
             this.context.refs.socketRef.current?.on("sfu:error", handleError);
-        });
+        };
+    };
+
+    /**
+     * Setup send transport with event handlers
+     */
+    private setupSendTransport = (transport: mediasoupTypes.Transport) => {
+        this.context.refs.sendTransportRef.current = transport;
+
+        transport.on(
+            "connect",
+            this.createTransportConnectionHandler(transport)
+        );
 
         transport.on("produce", async (parameters, callback, errback) => {
             try {
@@ -217,7 +237,7 @@ export class TransportManager {
                         handleProduceError
                     );
 
-                                        callback({ id: producerId });
+                    callback({ id: producerId });
                 };
 
                 const handleProduceError = (error: any) => {
@@ -263,22 +283,19 @@ export class TransportManager {
 
         // Initialize local media when send transport is ready
         transport.on("connectionstatechange", (state) => {
-                        if (state === "connected") {
+            if (state === "connected") {
                 if (!this.context.refs.localStreamRef.current) {
                     setTimeout(async () => {
-                                                if (this.mediaManager) {
+                        if (this.mediaManager) {
                             await this.mediaManager.initializeLocalMedia();
                         }
                     }, 1000);
-                } else {
-                    // Check if we have media but no producers yet
-                    if (this.context.refs.producersRef.current.size === 0) {
-                        setTimeout(async () => {
-                                                        if (this.producerManager) {
-                                await this.producerManager.publishTracks();
-                            }
-                        }, 500);
-                    }
+                } else if (this.context.refs.producersRef.current.size === 0) {
+                    setTimeout(async () => {
+                        if (this.producerManager) {
+                            await this.producerManager.publishTracks();
+                        }
+                    }, 500);
                 }
             }
         });
@@ -290,47 +307,10 @@ export class TransportManager {
     private setupReceiveTransport = (transport: mediasoupTypes.Transport) => {
         this.context.refs.recvTransportRef.current = transport;
 
-        transport.on("connect", ({ dtlsParameters }, callback, errback) => {
-            dtlsParameters.role = "client";
-            this.context.refs.socketRef.current?.emit("sfu:connect-transport", {
-                transportId: transport.id,
-                dtlsParameters,
-            });
-
-            const handleTransportConnected = (data: {
-                transportId: string;
-            }) => {
-                if (data.transportId === transport.id) {
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:transport-connected",
-                        handleTransportConnected
-                    );
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:error",
-                        handleError
-                    );
-                    callback();
-                }
-            };
-
-            const handleError = (error: any) => {
-                this.context.refs.socketRef.current?.off(
-                    "sfu:transport-connected",
-                    handleTransportConnected
-                );
-                this.context.refs.socketRef.current?.off(
-                    "sfu:error",
-                    handleError
-                );
-                errback(error);
-            };
-
-            this.context.refs.socketRef.current?.on(
-                "sfu:transport-connected",
-                handleTransportConnected
-            );
-            this.context.refs.socketRef.current?.on("sfu:error", handleError);
-        });
+        transport.on(
+            "connect",
+            this.createTransportConnectionHandler(transport)
+        );
 
         transport.on("connectionstatechange", (state) => {
             if (state === "connected") {
@@ -340,11 +320,6 @@ export class TransportManager {
                         this.context.refs.isInitializedRef.current = true;
                     }
                 }, 500);
-
-                // Process pending streams - will be handled by stream manager
-                setTimeout(() => {
-                    // Stream manager will handle this
-                }, 1000);
 
                 // Also request existing streams as fallback
                 setTimeout(() => {
@@ -397,7 +372,7 @@ export class TransportManager {
      * Handle transport connection confirmation
      */
     handleTransportConnected = (data: { transportId: string }) => {
-                // Check if this is our send transport and we have local media ready
+        // Check if this is our send transport and we have local media ready
         if (
             this.context.refs.sendTransportRef.current &&
             this.context.refs.sendTransportRef.current.id ===
@@ -410,10 +385,9 @@ export class TransportManager {
                     this.context.refs.localStreamRef.current &&
                     this.context.refs.producersRef.current.size === 0
                 ) {
-                                        if (this.producerManager) {
-                        const result =
-                            await this.producerManager.publishTracks();
-                                            } else {
+                    if (this.producerManager) {
+                        await this.producerManager.publishTracks();
+                    } else {
                         console.warn(
                             "[TransportManager] ProducerManager not set!"
                         );
