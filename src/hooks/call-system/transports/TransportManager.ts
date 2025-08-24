@@ -98,18 +98,6 @@ export class TransportManager {
                 throw new Error("Transport info missing required 'id' field");
             }
 
-            // Log ICE servers for debugging
-            if (actualTransportInfo.iceServers) {
-                console.log(
-                    "[TransportManager] Using ICE servers:",
-                    actualTransportInfo.iceServers
-                );
-            } else {
-                console.warn(
-                    "[TransportManager] No ICE servers provided in transport info"
-                );
-            }
-
             const transport = isProducer
                 ? this.context.refs.deviceRef.current.createSendTransport(
                       actualTransportInfo
