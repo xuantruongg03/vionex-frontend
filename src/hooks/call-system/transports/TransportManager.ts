@@ -132,13 +132,6 @@ export class TransportManager {
 
         transport.on("connect", ({ dtlsParameters }, callback, errback) => {
             dtlsParameters.role = "client";
-            
-            // Add ICE debugging for send transport
-            console.log("[ICE Debug] Send transport connecting:", {
-                transportId: transport.id,
-                connectionState: transport.connectionState
-            });
-            
             this.context.refs.socketRef.current?.emit("sfu:connect-transport", {
                 transportId: transport.id,
                 dtlsParameters,
@@ -270,12 +263,10 @@ export class TransportManager {
 
         // Initialize local media when send transport is ready
         transport.on("connectionstatechange", (state) => {
-            console.log("[ICE Debug] Send transport connection state:", state);
-            
-            if (state === "connected") {
+                        if (state === "connected") {
                 if (!this.context.refs.localStreamRef.current) {
                     setTimeout(async () => {
-                        if (this.mediaManager) {
+                                                if (this.mediaManager) {
                             await this.mediaManager.initializeLocalMedia();
                         }
                     }, 1000);
@@ -283,14 +274,12 @@ export class TransportManager {
                     // Check if we have media but no producers yet
                     if (this.context.refs.producersRef.current.size === 0) {
                         setTimeout(async () => {
-                            if (this.producerManager) {
+                                                        if (this.producerManager) {
                                 await this.producerManager.publishTracks();
                             }
                         }, 500);
                     }
                 }
-            } else if (state === "failed" || state === "disconnected") {
-                console.error("[ICE Debug] Send transport connection failed/disconnected:", state);
             }
         });
     };
@@ -303,13 +292,6 @@ export class TransportManager {
 
         transport.on("connect", ({ dtlsParameters }, callback, errback) => {
             dtlsParameters.role = "client";
-            
-            // Add ICE debugging for receive transport
-            console.log("[ICE Debug] Receive transport connecting:", {
-                transportId: transport.id,
-                connectionState: transport.connectionState
-            });
-            
             this.context.refs.socketRef.current?.emit("sfu:connect-transport", {
                 transportId: transport.id,
                 dtlsParameters,
@@ -351,8 +333,6 @@ export class TransportManager {
         });
 
         transport.on("connectionstatechange", (state) => {
-            console.log("[ICE Debug] Receive transport connection state:", state);
-            
             if (state === "connected") {
                 // Mark transport as ready
                 setTimeout(() => {
