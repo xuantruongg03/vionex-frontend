@@ -57,7 +57,7 @@ export const PinOverlay = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute top-1 left-1 z-20"
+            className='absolute top-1 left-1 z-20'
         >
             <button
                 onClick={(e) => {
@@ -76,9 +76,9 @@ export const PinOverlay = ({
                 title={isPinned ? "Bỏ ghim" : "Ghim người dùng này"}
             >
                 {isPinned ? (
-                    <PinOff className="h-3.5 w-3.5" />
+                    <PinOff className='h-3.5 w-3.5' />
                 ) : (
-                    <Pin className="h-3.5 w-3.5" />
+                    <Pin className='h-3.5 w-3.5' />
                 )}
             </button>
         </motion.div>
@@ -190,12 +190,12 @@ export const StreamTile = ({
                 )}
 
                 {videoOff && !isScreen && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900 dark:bg-gray-800 z-10">
-                        <div className="text-center">
-                            <div className="w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 mx-auto flex items-center justify-center text-white text-xl font-semibold mb-1 shadow-sm">
+                    <div className='absolute inset-0 flex items-center justify-center bg-gray-900 dark:bg-gray-800 z-10'>
+                        <div className='text-center'>
+                            <div className='w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 mx-auto flex items-center justify-center text-white text-xl font-semibold mb-1 shadow-sm'>
                                 {userName.charAt(0).toUpperCase()}
                             </div>
-                            <p className="text-white text-base font-medium">
+                            <p className='text-white text-base font-medium'>
                                 {userName}
                             </p>
                         </div>
@@ -203,25 +203,19 @@ export const StreamTile = ({
                 )}
             </div>
 
-            <span className="absolute bottom-2 left-2 text-xs text-white bg-black/60 dark:bg-black/75 px-1.5 py-0.5 rounded-md shadow-sm">
-                {isScreen ? (
-                    <span className="flex items-center gap-1">
-                        {userName} - Share Screen
-                    </span>
-                ) : (
-                    <span>{userName}</span>
-                )}
+            <span className='absolute bottom-2 left-2 text-xs text-white bg-black/60 dark:bg-black/75 px-1.5 py-0.5 rounded-md shadow-sm'>
+                <span>{userName}</span>
             </span>
 
-            <div className="absolute top-1 right-1 flex gap-1">
+            <div className='absolute top-1 right-1 flex gap-1'>
                 {videoOff && !isScreen && (
-                    <div className="bg-black/60 dark:bg-black/75 p-1 rounded-md shadow-sm">
-                        <VideoOff className="h-4 w-4 text-white" />
+                    <div className='bg-black/60 dark:bg-black/75 p-1 rounded-md shadow-sm'>
+                        <VideoOff className='h-4 w-4 text-white' />
                     </div>
                 )}
                 {micOff && (
-                    <div className="bg-black/60 dark:bg-black/75 p-1 rounded-md z-20 shadow-sm">
-                        <MicOff className="h-4 w-4 text-white" />
+                    <div className='bg-black/60 dark:bg-black/75 p-1 rounded-md z-20 shadow-sm'>
+                        <MicOff className='h-4 w-4 text-white' />
                     </div>
                 )}
             </div>
@@ -244,7 +238,7 @@ export const StreamTile = ({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute top-1 left-12 z-20"
+                        className='absolute top-1 left-12 z-20'
                     >
                         <button
                             onClick={(e) => {
@@ -267,17 +261,17 @@ export const StreamTile = ({
                             }
                         >
                             {isUsingTranslation ? (
-                                <Volume2 className="h-3.5 w-3.5" />
+                                <Volume2 className='h-3.5 w-3.5' />
                             ) : (
-                                <Languages className="h-3.5 w-3.5" />
+                                <Languages className='h-3.5 w-3.5' />
                             )}
                         </button>
                     </motion.div>
                 )}
 
             {isPinned && (
-                <div className="absolute top-1 right-1 bg-blue-500 dark:bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                    <Pin className="h-3 w-3" />
+                <div className='absolute top-1 right-1 bg-blue-500 dark:bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm'>
+                    <Pin className='h-3 w-3' />
                     <span>Pinned</span>
                 </div>
             )}

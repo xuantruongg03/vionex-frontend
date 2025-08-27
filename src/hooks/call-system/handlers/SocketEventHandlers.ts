@@ -199,14 +199,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         }
 
         try {
-            // Validate streamId before consuming
-            if (
-                !streamId ||
-                streamId === "undefined" ||
-                typeof streamId !== "string"
-            ) {
-                return;
-            }
             // Mark as consuming
             this.streamManager.markStreamAsConsuming(streamId);
 
@@ -244,9 +236,20 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
     // Transport handlers
     handleRouterCapabilities = async (data: { routerRtpCapabilities: any }) => {
-        await this.transportManager.initializeDevice(
+        if (!data.routerRtpCapabilities) {
+            console.warn("No router RTP capabilities in data");
+            return;
+        }
+
+        const deviceInitialized = await this.transportManager.initializeDevice(
             data.routerRtpCapabilities
         );
+
+        if (deviceInitialized) {
+            this.transportManager.createTransports();
+        } else {
+            console.error("Device initialization failed");
+        }
 
         // Add timeout fallback in case sfu:rtp-capabilities-set is not received
         setTimeout(() => {
@@ -269,6 +272,14 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
     handleTransportConnected = (data: { transportId: string }) => {
         this.transportManager.handleTransportConnected(data);
+
+        // Process pending streams when receive transport is connected
+        if (
+            this.context.refs.recvTransportRef.current &&
+            this.context.refs.recvTransportRef.current.id === data.transportId
+        ) {
+            this.streamManager.processPendingStreams();
+        }
 
         // Also trigger auto-publish if we have media ready
         if (

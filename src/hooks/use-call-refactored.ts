@@ -1,20 +1,9 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
-
 import ApiService from "@/services/signalService";
 import { Device, types as mediasoupTypes } from "mediasoup-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
+import { useSocket } from "@/contexts/SocketContext";
 
 // Import all modules from our call system
 import {
@@ -34,7 +23,7 @@ import {
 } from "./call-system";
 
 // Constants
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
+
 
 /**
  * Refactored Call Hook
@@ -43,6 +32,7 @@ const API_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
 export function useCallRefactored(roomId: string, password?: string) {
     // State
     const [streams, setStreams] = useState<StreamInfo[]>([]);
+    const [screenStreams, setScreenStreams] = useState<StreamInfo[]>([]);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [speakingPeers, setSpeakingPeers] = useState<Set<string>>(new Set());
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -56,6 +46,14 @@ export function useCallRefactored(roomId: string, password?: string) {
     // Redux
     const room = useSelector((state: any) => state.room);
     const dispatch = useDispatch();
+
+    // Use Socket Context instead of creating new socket
+    const {
+        socket: contextSocket,
+        isConnected: socketConnected,
+        connect: connectSocket,
+        disconnect: disconnectSocket,
+    } = useSocket();
 
     // Refs - organize all refs into our refs interface
     const refs: CallSystemRefs = {
@@ -80,6 +78,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     // Setters - organize all state setters
     const setters: CallSystemSetters = {
         setStreams,
+        setScreenStreams,
         setIsScreenSharing,
         setSpeakingPeers,
         setIsSpeaking,
@@ -94,6 +93,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     // Current state values - create state object for context
     const currentState: CallSystemState = {
         streams,
+        screenStreams,
         isScreenSharing,
         speakingPeers,
         isSpeaking,
@@ -132,6 +132,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     // Set manager references for cross-dependencies
     transportManager.setManagers(producerManager, mediaManager);
     roomManager.setMediaManager(mediaManager);
+    roomManager.setTransportManager(transportManager);
     mediaManager.setVADManager(vadManager);
 
     const eventHandlerManager = new SocketEventHandlerManager(
@@ -147,25 +148,16 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Initialize services
     useEffect(() => {
-        refs.apiServiceRef.current = new ApiService(API_BASE_URL);
+        refs.apiServiceRef.current = new ApiService();
 
-        // Create Socket.IO connection
-        refs.socketRef.current = io(API_BASE_URL, {
-            transports: ["websocket"],
-            reconnection: true,
-            reconnectionAttempts: 10,
-            reconnectionDelay: 1000,
-            autoConnect: false,
-        });
-
-        // Set global socket reference for other hooks
-        setGlobalSocket(refs.socketRef.current);
+        // Use socket from context instead of creating new one
+        refs.socketRef.current = contextSocket;
 
         return () => {
-            refs.socketRef.current?.disconnect();
-            setGlobalSocket(null);
+            // Don't disconnect context socket here, let context manage it
+            refs.socketRef.current = null;
         };
-    }, []);
+    }, [contextSocket]);
 
     // Set up WebSocket event handlers using our event handler manager
     useEffect(() => {
@@ -179,9 +171,22 @@ export function useCallRefactored(roomId: string, password?: string) {
         return () => {
             eventHandlerManager.unregisterHandlers(socket);
         };
-    }, [room.username, roomId]);
+    }, [contextSocket]); // Changed: depend on contextSocket to ensure handlers are registered when socket changes
 
-    // Periodic check for pending streams - fallback mechanism
+    // Monitor transport connection and process pending streams
+    useEffect(() => {
+        if (
+            refs.recvTransportRef.current &&
+            refs.socketRef.current &&
+            refs.pendingStreamsRef.current.length > 0
+        ) {
+            streamManager.processPendingStreams();
+        }
+    }, [
+        refs.recvTransportRef.current?.id,
+        refs.socketRef.current?.connected,
+        isJoined,
+    ]);
     useEffect(() => {
         const checkPendingStreams = () => {
             const pendingCount = refs.pendingStreamsRef.current.length;
@@ -242,8 +247,8 @@ export function useCallRefactored(roomId: string, password?: string) {
             }
         };
 
-        const interval = setInterval(checkPendingStreams, 2000);
-        return () => clearInterval(interval);
+        // const interval = setInterval(checkPendingStreams, 2000);
+        // return () => clearInterval(interval);
     }, []);
 
     // Force initialize local media if not done after join
@@ -286,7 +291,6 @@ export function useCallRefactored(roomId: string, password?: string) {
             if (refs.localStreamRef.current && isJoined) {
                 try {
                     await vadManager.initialize();
-                    console.log("[useCallRefactored] VAD initialized");
                 } catch (error) {
                     console.error(
                         "[useCallRefactored] VAD initialization failed:",
@@ -310,16 +314,6 @@ export function useCallRefactored(roomId: string, password?: string) {
             const microphoneEnabled =
                 audioTracks.length > 0 &&
                 audioTracks.some((track) => track.enabled);
-
-            console.log("[useCallRefactored] Microphone state update:", {
-                tracksCount: audioTracks.length,
-                enabled: microphoneEnabled,
-                trackStates: audioTracks.map((t) => ({
-                    label: t.label,
-                    enabled: t.enabled,
-                })),
-                vadCurrentState: vadManager.getState(),
-            });
 
             vadManager.updateMicrophoneState(microphoneEnabled);
         }
@@ -368,12 +362,38 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Expose public interface
     const joinRoom = useCallback(async () => {
-        return await roomManager.joinRoom(password);
-    }, [roomId, room.username, password]);
+        try {
+            // Connect socket first if not connected
+            let currentSocket = contextSocket;
+            if (!currentSocket || !currentSocket.connected) {
+                currentSocket = await connectSocket();
+            }
+
+            // Ensure socket is properly assigned to refs
+            refs.socketRef.current = currentSocket;
+
+            // Wait a bit to ensure event handlers are registered
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Verify socket is connected
+            if (!currentSocket?.connected) {
+                throw new Error(
+                    "Socket is not connected after connection attempt"
+                );
+            }
+
+            return await roomManager.joinRoom(password);
+        } catch (error) {
+            throw error;
+        }
+    }, [roomId, room.username, password, contextSocket, connectSocket]);
 
     const leaveRoom = useCallback(async () => {
         await roomManager.leaveRoom();
-    }, []);
+
+        // Disconnect socket when leaving room
+        disconnectSocket();
+    }, [disconnectSocket]);
 
     const toggleVideo = useCallback(async () => {
         return await mediaManager.toggleVideo();
@@ -426,10 +446,6 @@ export function useCallRefactored(roomId: string, password?: string) {
 
                 // Mark as consuming to prevent duplicate requests
                 if (streamManager.isStreamBeingConsumed(streamId)) {
-                    console.log(
-                        "[useCallRefactored] Translation stream already being consumed:",
-                        streamId
-                    );
                     return true;
                 }
 
@@ -467,6 +483,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     return {
         // State
         streams,
+        screenStreams,
         isWebSocketJoined,
         isScreenSharing,
         speakingPeers,
@@ -507,16 +524,10 @@ export function useCallRefactored(roomId: string, password?: string) {
     };
 }
 
-// Export socket instance for use in other hooks
-let globalSocketRef: Socket | null = null;
-
-export const setGlobalSocket = (socket: Socket | null) => {
-    globalSocketRef = socket;
-};
-
+// Export socket access for backward compatibility
 export const getSocket = () => {
-    return globalSocketRef;
+    console.warn(
+        "getSocket is deprecated, use useSocket hook from SocketContext instead"
+    );
+    return null;
 };
-
-// Alias for backward compatibility
-export const sfuSocket = globalSocketRef;

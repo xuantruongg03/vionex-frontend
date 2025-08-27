@@ -287,7 +287,7 @@ export const ChatSidebar = ({
                                     )}
 
                                 <div
-                                    className={`max-w-[80%] rounded-lg p-3 relative group ${
+                                    className={`min-w-[120px] max-w-[66%] rounded-xl shadow-sm relative group ${
                                         message.sender === room.username
                                             ? "bg-blue-500 text-white"
                                             : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -299,95 +299,131 @@ export const ChatSidebar = ({
                                             : ""
                                     }`}
                                 >
-                                    <div className='flex items-start justify-between'>
-                                        <p className='text-sm font-semibold'>
-                                            {message.sender === room.username
-                                                ? "You"
-                                                : message.sender}
-                                        </p>
-
-                                        {/* Status Icons - only for pending */}
-                                        {message.sender === room.username &&
-                                            !message.isFailed && (
-                                                <div className='flex items-center gap-1 ml-2'>
-                                                    {message.isPending && (
-                                                        <Clock className='h-3 w-3 animate-pulse' />
-                                                    )}
-                                                </div>
-                                            )}
+                                    {/* Header with sender name only */}
+                                    <div className='px-3 pt-2 pb-1 border-b border-black/10 dark:border-white/10'>
+                                        <div className='flex items-center justify-between'>
+                                            <p className='text-xs font-medium opacity-80'>
+                                                {message.sender} (
+                                                {message.sender ===
+                                                room.username
+                                                    ? "You"
+                                                    : message.sender}
+                                                )
+                                            </p>
+                                            {/* Status Icons - only for pending */}
+                                            {message.sender === room.username &&
+                                                !message.isFailed && (
+                                                    <>
+                                                        {message.isPending && (
+                                                            <Clock className='h-3 w-3 animate-pulse opacity-60' />
+                                                        )}
+                                                    </>
+                                                )}
+                                        </div>
                                     </div>
 
-                                    {/* Reply Preview */}
-                                    {message.replyTo && (
-                                        <div className='mt-2 mb-2 p-2 rounded bg-black/10 dark:bg-white/10 border-l-2 border-current opacity-70'>
-                                            <p className='text-xs font-medium'>
-                                                Replying to{" "}
-                                                {message.replyTo.senderName}
-                                            </p>
-                                            <p className='text-xs truncate'>
-                                                {message.replyTo.isFile
-                                                    ? `📎 ${message.replyTo.text}`
-                                                    : message.replyTo.text}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {message.isImage ? (
-                                        <div className='mt-2'>
-                                            <p className='text-xs mb-1'>
-                                                <Image className='h-3 w-3 inline mr-1' />
-                                                {message.fileName}
-                                            </p>
-                                            <img
-                                                src={message.fileUrl}
-                                                alt={
-                                                    message.fileName || "Image"
-                                                }
-                                                className='rounded-md max-w-full max-h-[200px] object-contain'
-                                            />
-                                        </div>
-                                    ) : message.fileUrl ? (
-                                        <div className='mt-2'>
-                                            <a
-                                                href={message.fileUrl}
-                                                download={message.fileName}
-                                                target='_blank'
-                                                rel='noopener noreferrer'
-                                                className='flex items-center gap-1 text-xs underline'
-                                            >
-                                                <File className='h-3 w-3' />
-                                                {message.fileName}(
-                                                {Math.round(
-                                                    message.fileSize! / 1024
-                                                )}{" "}
-                                                KB)
-                                            </a>
-                                        </div>
-                                    ) : (
-                                        <p className='break-words'>
-                                            {message.text}
-                                        </p>
-                                    )}
+                                    {/* Message content box */}
+                                    <div
+                                        className={`mx-2 my-2 p-3 rounded-lg ${
+                                            message.sender === room.username
+                                                ? "bg-blue-400/30 text-white"
+                                                : "bg-white/50 dark:bg-gray-600/50 text-gray-900 dark:text-gray-100"
+                                        }`}
+                                    >
+                                        {/* Reply Preview */}
+                                        {message.replyTo && (
+                                            <div className='mb-2 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-800'>
+                                                {/* Reply header */}
+                                                <div className='px-2 py-1 border-b border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700'>
+                                                    <p className='text-xs font-medium text-gray-600 dark:text-gray-300'>
+                                                        Replying to{" "}
+                                                        {
+                                                            message.replyTo
+                                                                .senderName
+                                                        }
+                                                    </p>
+                                                </div>
+                                                {/* Reply content */}
+                                                <div className='px-2 py-1.5 bg-gray-50 dark:bg-gray-800'>
+                                                    <p className='text-xs truncate text-gray-700 dark:text-gray-400'>
+                                                        {message.replyTo.isFile
+                                                            ? `📎 ${message.replyTo.text}`
+                                                            : message.replyTo
+                                                                  .text}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
 
-                                    <div className='flex items-center justify-between mt-1'>
-                                        <p className='text-xs opacity-70'>
+                                        {/* Message content */}
+                                        {message.isImage ? (
+                                            <div>
+                                                <p className='text-sm mb-2 opacity-80'>
+                                                    <Image className='h-3 w-3 inline mr-1' />
+                                                    {message.fileName}
+                                                </p>
+                                                <img
+                                                    src={message.fileUrl}
+                                                    alt={
+                                                        message.fileName ||
+                                                        "Image"
+                                                    }
+                                                    className='rounded-md max-w-full max-h-[200px] object-contain'
+                                                />
+                                            </div>
+                                        ) : message.fileUrl ? (
+                                            <div>
+                                                <a
+                                                    href={message.fileUrl}
+                                                    download={message.fileName}
+                                                    target='_blank'
+                                                    rel='noopener noreferrer'
+                                                    className='flex items-center gap-2 text-sm underline hover:no-underline'
+                                                >
+                                                    <File className='h-4 w-4' />
+                                                    <span>
+                                                        {message.fileName}
+                                                        <span className='text-xs opacity-70 ml-1'>
+                                                            (
+                                                            {Math.round(
+                                                                message.fileSize! /
+                                                                    1024
+                                                            )}{" "}
+                                                            KB)
+                                                        </span>
+                                                    </span>
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <p className='text-sm leading-relaxed break-words'>
+                                                {message.text}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Footer with reply button and timestamp */}
+                                    <div className='px-3 pb-2 flex items-center justify-between'>
+                                        {/* Reply Button */}
+                                        {!message.isPending &&
+                                        !message.isFailed ? (
+                                            <button
+                                                onClick={() =>
+                                                    setReplyingTo(message)
+                                                }
+                                                className='opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded text-xs'
+                                                title='Reply to this message'
+                                            >
+                                                <Reply className='h-3 w-3' />
+                                            </button>
+                                        ) : (
+                                            <div></div>
+                                        )}
+
+                                        <p className='text-xs opacity-60'>
                                             {dayjs(message.timestamp).format(
                                                 CONSTANT.TIME_FORMAT
                                             )}
                                         </p>
-
-                                        {/* Reply Button */}
-                                        {!message.isPending &&
-                                            !message.isFailed && (
-                                                <button
-                                                    onClick={() =>
-                                                        setReplyingTo(message)
-                                                    }
-                                                    className='opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded text-xs'
-                                                    title='Reply to this message'
-                                                >
-                                                    <Reply className='h-3 w-3' />
-                                                </button>
-                                            )}
                                     </div>
                                 </div>
                             </div>
@@ -430,7 +466,7 @@ export const ChatSidebar = ({
 
                         {/* Reply Preview */}
                         {replyingTo && (
-                            <div className='mb-2 p-3 bg-gray-100 dark:bg-gray-800 rounded border-l-4 border-blue-500'>
+                            <div className='mb-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600'>
                                 <div className='flex items-center justify-between mb-1'>
                                     <p className='text-sm font-medium text-gray-600 dark:text-gray-300'>
                                         Replying to {replyingTo.senderName}
@@ -442,14 +478,16 @@ export const ChatSidebar = ({
                                         <X className='h-4 w-4 text-gray-500' />
                                     </button>
                                 </div>
-                                <p className='text-sm text-gray-700 dark:text-gray-400 truncate'>
-                                    {replyingTo.fileUrl
-                                        ? `📎 ${
-                                              replyingTo.fileName ||
-                                              replyingTo.text
-                                          }`
-                                        : replyingTo.text}
-                                </p>
+                                <div className='p-2 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600'>
+                                    <p className='text-sm text-gray-700 dark:text-gray-400 truncate'>
+                                        {replyingTo.fileUrl
+                                            ? `📎 ${
+                                                  replyingTo.fileName ||
+                                                  replyingTo.text
+                                              }`
+                                            : replyingTo.text}
+                                    </p>
+                                </div>
                             </div>
                         )}
 

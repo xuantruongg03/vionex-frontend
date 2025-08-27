@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getSocket } from "./use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
 import { toast } from "sonner";
 
 export interface Message {
@@ -34,8 +34,8 @@ export function useChat(roomId: string, userName: string) {
     >(new Map());
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
-    // Use global socket like use-user does
-    const socket = getSocket();
+    // Use Socket Context
+    const { socket } = useSocket();
 
     // Create temporary ID for messages
     const generateTempId = () =>

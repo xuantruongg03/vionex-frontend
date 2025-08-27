@@ -6,7 +6,7 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet";
-import { sfuSocket } from "@/hooks/use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
 import { User } from "@/interfaces";
 import { FileSpreadsheet, Pin, PinOff, Users, UserX } from "lucide-react";
 import React, { useMemo } from "react";
@@ -28,6 +28,7 @@ export const ParticipantsList = React.memo(
         const room = useSelector((state: any) => state.room);
         const { isCreator, username: myName, pinnedUsers } = room;
         const log = useSelector((state: any) => state.log);
+        const { socket: sfuSocket } = useSocket();
         const { isMonitorActive } = log;
 
         const usersList = useMemo(() => {
@@ -118,36 +119,36 @@ export const ParticipantsList = React.memo(
         return (
             <Sheet>
                 <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="relative">
-                        <Users className="h-4 w-4" />
-                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                    <Button variant='outline' size='icon' className='relative'>
+                        <Users className='h-4 w-4' />
+                        <span className='absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center'>
                             {userCount}
                         </span>
                     </Button>
                 </SheetTrigger>
-                <SheetContent showIcon className="overflow-y-auto">
+                <SheetContent showIcon className='overflow-y-auto'>
                     <SheetHeader>
                         <SheetTitle>Participants ({userCount})</SheetTitle>
                     </SheetHeader>
-                    <div className="mt-4 flex flex-col h-[calc(100vh-120px)]">
-                        <div className="overflow-y-auto flex-1 pr-2">
-                            <div className="space-y-2">
+                    <div className='mt-4 flex flex-col h-[calc(100vh-120px)]'>
+                        <div className='overflow-y-auto flex-1 pr-2'>
+                            <div className='space-y-2'>
                                 {usersList.map((user) => (
                                     <div
                                         key={user.peerId}
-                                        className="flex items-center justify-between p-2 rounded-lg hover:bg-secondary"
+                                        className='flex items-center justify-between p-2 rounded-lg hover:bg-secondary'
                                     >
-                                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                                            <span className="text-sm truncate">
+                                        <div className='flex items-center gap-2 min-w-0 flex-1'>
+                                            <span className='text-sm truncate'>
                                                 {user.displayName}
                                             </span>
                                         </div>
                                         {!user.isMe && (
-                                            <div className="flex gap-2 flex-shrink-0">
+                                            <div className='flex gap-2 flex-shrink-0'>
                                                 {togglePinUser && (
                                                     <Button
-                                                        variant="ghost"
-                                                        size="sm"
+                                                        variant='ghost'
+                                                        size='sm'
                                                         className={`hover:bg-blue-50 ${
                                                             user.isPinned
                                                                 ? "text-blue-500 hover:text-blue-700"
@@ -165,40 +166,40 @@ export const ParticipantsList = React.memo(
                                                         }
                                                     >
                                                         {user.isPinned ? (
-                                                            <PinOff className="h-4 w-4" />
+                                                            <PinOff className='h-4 w-4' />
                                                         ) : (
-                                                            <Pin className="h-4 w-4" />
+                                                            <Pin className='h-4 w-4' />
                                                         )}
                                                     </Button>
                                                 )}
                                                 {isCreator &&
                                                     isMonitorActive && (
                                                         <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                                            variant='ghost'
+                                                            size='sm'
+                                                            className='text-blue-500 hover:text-blue-700 hover:bg-blue-50'
                                                             onClick={() =>
                                                                 handleDownloadUserLog(
                                                                     user.peerId
                                                                 )
                                                             }
-                                                            title="Download user activity log"
+                                                            title='Download user activity log'
                                                         >
-                                                            <FileSpreadsheet className="h-4 w-4" />
+                                                            <FileSpreadsheet className='h-4 w-4' />
                                                         </Button>
                                                     )}
                                                 {isCreator && (
                                                     <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                        variant='ghost'
+                                                        size='sm'
+                                                        className='text-destructive hover:text-destructive hover:bg-destructive/10'
                                                         onClick={() =>
                                                             handleRemoveParticipant(
                                                                 user.peerId
                                                             )
                                                         }
                                                     >
-                                                        <UserX className="h-4 w-4" />
+                                                        <UserX className='h-4 w-4' />
                                                     </Button>
                                                 )}
                                             </div>

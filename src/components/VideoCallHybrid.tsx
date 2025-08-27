@@ -54,6 +54,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
 
     const {
         streams,
+        screenStreams,
         // isConnected,
         isJoined,
         speakingPeers,
@@ -92,13 +93,25 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                 !hasAttemptedJoin.current
             ) {
                 hasAttemptedJoin.current = true;
+                console.log("[VideoCallHybrid] Attempting to join room...", {
+                    roomId,
+                    username: room.username,
+                });
                 try {
-                    await joinRoom();
+                    const result = await joinRoom();
+                    console.log("[VideoCallHybrid] Auto-join success:", result);
                 } catch (error) {
                     console.error("[VideoCallHybrid] Auto-join failed:", error);
                     // Reset the flag on failure so user can retry
                     hasAttemptedJoin.current = false;
                 }
+            } else {
+                console.log("[VideoCallHybrid] Skipping auto-join:", {
+                    roomId,
+                    username: room.username,
+                    hasJoinRoom: !!joinRoom,
+                    hasAttempted: hasAttemptedJoin.current,
+                });
             }
         };
 
@@ -497,6 +510,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                 </div>
                 <VideoGrid
                     streams={streams}
+                    screenStreams={screenStreams}
                     isVideoOff={isVideoOff}
                     users={users || []}
                     isMuted={isMuted}

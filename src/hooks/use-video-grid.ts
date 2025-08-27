@@ -3,6 +3,7 @@ import { User } from "@/interfaces";
 
 export const useVideoGrid = (
     streams: any[],
+    screenStreams: any[],
     users: User[],
     speakingPeers: string[],
     myPeerId: string,
@@ -198,21 +199,22 @@ export const useVideoGrid = (
         [streams]
     );
 
-    // Screen share users logic
+    // Screen share users logic - use dedicated screenStreams instead of filtering
     const screenShareUsers = useMemo(() => {
-        const screenUsers = [];
-        const screenStreams = streams.filter((stream) => {
-            const isScreenShare =
-                stream.metadata?.isScreenShare ||
-                stream.metadata?.type === "screen" ||
-                stream.id.includes("screen-") ||
-                stream.id === "screen-local";
-            return isScreenShare;
-        });
+        if (screenStreams.length === 0) {
+            return [];
+        }
+
+        // Group streams by owner and pick the best one (with video tracks)
+        const streamsByOwner = new Map<string, any>();
 
         for (const stream of screenStreams) {
             let screenOwner = "";
-            if (stream.id === "screen-local") {
+            
+            // Enhanced owner detection with metadata priority
+            if (stream.metadata?.publisherId) {
+                screenOwner = stream.metadata.publisherId;
+            } else if (stream.id === "screen-local") {
                 screenOwner = myPeerId || "local";
             } else if (stream.id.startsWith("screen-")) {
                 screenOwner = stream.id.replace("screen-", "");
@@ -220,17 +222,34 @@ export const useVideoGrid = (
                 screenOwner = stream.metadata.peerId;
             }
 
-            if (screenOwner) {
-                screenUsers.push({
+            if (!screenOwner) continue;
+
+            const hasVideoTracks = stream.stream && stream.stream.getVideoTracks().length > 0;
+            const existingStream = streamsByOwner.get(screenOwner);
+
+            // Only replace if new stream has video and existing doesn't, or if no existing stream
+            if (!existingStream || (hasVideoTracks && (!existingStream.stream || existingStream.stream.getVideoTracks().length === 0))) {
+                streamsByOwner.set(screenOwner, stream);
+            }
+        }
+
+        // Create screen users from best streams
+        const screenUsers = [];
+        for (const [screenOwner, stream] of streamsByOwner) {
+            const hasVideoTracks = stream.stream && stream.stream.getVideoTracks().length > 0;
+            
+            if (hasVideoTracks) {
+                const screenUser = {
                     peerId: `${screenOwner}-screen`,
                     isScreenShare: true,
                     originalPeerId: screenOwner,
                     screenStream: stream,
-                });
+                };
+                screenUsers.push(screenUser);
             }
         }
         return screenUsers;
-    }, [streams, myPeerId]);
+    }, [screenStreams, myPeerId]);
 
     // Sorted users logic
     const sortedUsers = useMemo(() => {

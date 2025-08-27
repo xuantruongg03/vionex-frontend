@@ -3,9 +3,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import ApiService from "../services/signalService";
-import { getSocket } from "./use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
 
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
+
 
 interface User {
     peerId: string;
@@ -16,14 +16,14 @@ interface User {
 function useUser(roomId: string) {
     const [users, setUsers] = useState<User[] | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [apiService] = useState(() => new ApiService(API_BASE_URL));
+    const [apiService] = useState(() => new ApiService());
 
     const room = useSelector((state: any) => state.room);
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
-    // Use global socket from useCall
-    const socket = getSocket();
+    // Use Socket Context instead of global socket
+    const { socket, isConnected } = useSocket();
 
     // Set peerId for API authentication
     useEffect(() => {
@@ -97,17 +97,11 @@ function useUser(roomId: string) {
 
     useEffect(() => {
         if (!roomId || !socket) return;
-
-        const onReceiveUsers = (users: User[]) => {
+        const onReceiveUsers = (data: { users: User[] } | User[]) => {
             try {
-                console.log("👥 [use-user] Received users:", users);
+                // Handle format from backend: { users: User[] }
+                const users = Array.isArray(data) ? data : data.users || [];
                 setUsers(users);
-
-                // Do NOT update isCreator from users list - wait for sfu:join-success
-                // This prevents overriding the authoritative value from the backend
-                console.log(
-                    "👥 [use-user] Not updating isCreator from users list, waiting for sfu:join-success"
-                );
             } catch (err) {
                 console.error("Error in onReceiveUsers:", err);
             }
@@ -120,41 +114,12 @@ function useUser(roomId: string) {
             roomId: string;
         }) => {
             try {
-                console.log("✅ [use-user] Join success received:", data);
-                console.log("✅ [use-user] Current room state:", {
-                    username: room.username,
-                    isCreator: room.isCreator,
-                });
-
                 if (data.peerId === room.username) {
-                    console.log(
-                        "✅ [use-user] Updating isCreator from join-success:",
-                        data.isCreator
-                    );
-                    console.log("✅ [use-user] Dispatching SET_CREATOR with:", {
-                        isCreator: data.isCreator,
-                    });
 
                     dispatch({
                         type: "SET_CREATOR",
                         payload: { isCreator: data.isCreator },
                     });
-
-                    // Log state after dispatch
-                    setTimeout(() => {
-                        console.log(
-                            "✅ [use-user] Room state after SET_CREATOR dispatch should be updated in next render"
-                        );
-                    }, 100);
-                } else {
-                    console.log(
-                        "✅ [use-user] Join success for different user:",
-                        {
-                            eventPeerId: data.peerId,
-                            myUsername: room.username,
-                            match: data.peerId === room.username,
-                        }
-                    );
                 }
             } catch (err) {
                 console.error("Error in onJoinSuccess:", err);
@@ -163,10 +128,6 @@ function useUser(roomId: string) {
 
         const onUserRemoved = ({ peerId }: { peerId: string }) => {
             try {
-                console.log(
-                    "🗑️ [use-user] User removed event received:",
-                    peerId
-                );
                 const myName = room.username;
                 if (peerId === myName) {
                     toast.success(`Bạn đã bị xoá khỏi phòng`);
@@ -178,10 +139,6 @@ function useUser(roomId: string) {
                         if (!prevUsers) return null;
                         const filtered = prevUsers.filter(
                             (user) => user.peerId !== peerId
-                        );
-                        console.log(
-                            "🗑️ [use-user] Updated users list after user removed:",
-                            filtered
                         );
                         return filtered;
                     });
@@ -239,15 +196,10 @@ function useUser(roomId: string) {
 
         const onPeerLeft = (data: { peerId: string }) => {
             try {
-                console.log("🚪 [use-user] Peer left event received:", data);
                 setUsers((prevUsers) => {
                     if (!prevUsers) return null;
                     const filtered = prevUsers.filter(
                         (user) => user.peerId !== data.peerId
-                    );
-                    console.log(
-                        "🚪 [use-user] Updated users list after peer left:",
-                        filtered
                     );
                     return filtered;
                 });
@@ -259,28 +211,13 @@ function useUser(roomId: string) {
         // Setup WebSocket event listeners
         const setupSocketListeners = () => {
             if (!socket) return;
-
-            console.log(
-                "🔌 [use-user] Setting up socket listeners, connected:",
-                socket.connected
-            );
-
             try {
-                socket.on("sfu:users", onReceiveUsers);
+                socket.on("sfu:users-updated", onReceiveUsers);
                 socket.on("sfu:user-removed", onUserRemoved);
                 socket.on("sfu:new-peer-join", onUserJoined);
                 socket.on("sfu:creator-changed", onCreatorChanged);
                 socket.on("sfu:peer-left", onPeerLeft);
                 socket.on("sfu:join-success", onJoinSuccess);
-
-                console.log(
-                    "✅ [use-user] Socket listeners set up successfully"
-                );
-
-                // Fetch users when the hook is initialized and socket is connected
-                if (socket.connected) {
-                    socket.emit("sfu:get-users", { roomId });
-                }
             } catch (err) {
                 console.error("Error setting up socket events:", err);
                 setError("Lỗi thiết lập sự kiện socket");
@@ -289,8 +226,6 @@ function useUser(roomId: string) {
 
         // Handle socket connection and disconnection
         const handleSocketConnect = () => {
-            console.log("🔌 [use-user] Socket connected, fetching users");
-            socket?.emit("sfu:get-users", { roomId });
         };
 
         if (socket) {
@@ -299,22 +234,11 @@ function useUser(roomId: string) {
 
             // Listen for connection events
             socket.on("connect", handleSocketConnect);
-
-            // If already connected, fetch users
-            if (socket.connected) {
-                socket.emit("sfu:get-users", { roomId });
-            }
-        } else {
-            console.log(
-                "⚠️ [use-user] No socket available, falling back to HTTP API"
-            );
-            // Fallback to HTTP API if no socket available
-            fetchUsers();
         }
 
         return () => {
             if (socket) {
-                socket.off("sfu:users", onReceiveUsers);
+                socket.off("sfu:users-updated", onReceiveUsers);
                 socket.off("sfu:user-removed", onUserRemoved);
                 socket.off("sfu:new-peer-join", onUserJoined);
                 socket.off("sfu:creator-changed", onCreatorChanged);
@@ -324,7 +248,15 @@ function useUser(roomId: string) {
                 console.log("🧹 [use-user] Cleaned up socket listeners");
             }
         };
-    }, [roomId, room.username, dispatch, navigate, fetchUsers]);
+    }, [
+        roomId,
+        room.username,
+        dispatch,
+        navigate,
+        fetchUsers,
+        socket,
+        isConnected,
+    ]);
 
     return {
         users,

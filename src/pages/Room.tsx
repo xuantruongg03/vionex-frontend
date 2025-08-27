@@ -1,21 +1,10 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
 import { PasswordDialog } from "@/components/Dialogs/PasswordRequire";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import VideoPreview from "@/components/VideoPreview";
 import { useCheckRoomStatus, useCheckUsername, useVerifyRoom } from "@/hooks";
-import { useCall } from "@/hooks/use-call-hybrid-new";
+import { useCallRefactored as useCall } from "@/hooks/use-call-refactored";
 import { useCheckApi } from "@/hooks/use-check-api";
 import CONSTANT from "@/lib/constant";
 import { motion } from "framer-motion";

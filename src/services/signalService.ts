@@ -1,4 +1,5 @@
 import { types as mediasoupTypes } from "mediasoup-client";
+import axiosClient from "@/apis/api-client";
 
 interface StreamMetadata {
     video: boolean;
@@ -19,11 +20,10 @@ interface Stream {
 }
 
 class ApiService {
-    private baseUrl: string;
     private peerId: string | null = null;
 
-    constructor(baseUrl: string) {
-        this.baseUrl = baseUrl;
+    constructor() {
+        // No need for baseUrl since axiosClient already has it configured
     }
 
     setPeerId(peerId: string) {
@@ -32,23 +32,22 @@ class ApiService {
 
     private async request<T>(
         endpoint: string,
-        options?: RequestInit,
-        requireAuth: boolean = false
+        options: {
+            method?: string;
+            data?: any;
+            requireAuth?: boolean;
+        } = {}
     ): Promise<T> {
-        const headers: HeadersInit = {
-            "Content-Type": "application/json",
-            ...options?.headers,
-        };
+        const { method = "GET", data, requireAuth = false } = options;
+
+        // Prepare headers
+        const headers: any = {};
 
         // Add JWT authorization header only when required (for org rooms)
         if (requireAuth) {
             const accessToken = localStorage.getItem("accessToken");
             if (accessToken) {
                 headers["Authorization"] = `Bearer ${accessToken}`;
-                console.log(
-                    "[SignalService] Using access token:",
-                    accessToken.substring(0, 20) + "..."
-                );
             } else {
                 throw new Error(
                     "Authentication required but no access token found"
@@ -62,59 +61,37 @@ class ApiService {
             headers["X-Peer-Id"] = encodedPeerId;
         }
 
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
-            headers,
-            ...options,
-        });
-
-        if (!response.ok) {
-            // Defensive: try to parse error JSON, fallback to empty object
-            const errorText = await response.text();
-            let errorData: any = {};
-            try {
-                errorData = errorText ? JSON.parse(errorText) : {};
-            } catch {}
-            throw new Error(errorData.message || `Token validation failed`);
-        }
-
-        // Defensive: handle empty or invalid JSON response
-        const text = await response.text();
-        if (!text) return {} as T;
         try {
-            return JSON.parse(text);
-        } catch {
-            return {} as T;
+            const response = await axiosClient({
+                method,
+                url: endpoint,
+                data,
+                headers,
+            });
+
+            return response as T;
+        } catch (error: any) {
+            const message =
+                error.response?.data?.message ||
+                error.message ||
+                "Request failed";
+            throw new Error(message);
         }
     }
 
-    // Room API
+    // These methods are no longer used - WebSocket handles all communication
     async joinRoom(roomId: string, peerId: string, password?: string) {
-        return this.request<{
-            success: boolean;
-            message: string;
-            rtpCapabilities: mediasoupTypes.RtpCapabilities;
-        }>(`/api/room/${roomId}/join`, {
-            method: "POST",
-            body: JSON.stringify({ peerId, password }),
-        });
+        throw new Error("Use WebSocket join instead - sfu:join event");
     }
 
-    // Organization Room API - Requires Authentication
     async joinOrgRoom(roomId: string, peerId: string) {
-        return this.request<{
-            success: boolean;
-            message: string;
-            roomId: string;
-            participant: any;
-            user: any;
-        }>(
-            `/api/room/org/join`,
-            {
-                method: "POST",
-                body: JSON.stringify({ roomId, peerId }),
-            },
-            true
-        ); // requireAuth = true
+        throw new Error("Use WebSocket join instead - sfu:join event");
+    }
+
+    async getRouterRtpCapabilities(roomId: string) {
+        throw new Error(
+            "Router capabilities are provided via WebSocket - sfu:router-capabilities event"
+        );
     }
 
     async verifyOrgRoomAccess(roomId: string) {
@@ -122,14 +99,11 @@ class ApiService {
             success: boolean;
             message: string;
             roomId: string;
-        }>(
-            `/api/room/org/verify`,
-            {
-                method: "POST",
-                body: JSON.stringify({ roomId }),
-            },
-            true
-        ); // requireAuth = true
+        }>(`/api/room/org/verify`, {
+            method: "POST",
+            data: { roomId },
+            requireAuth: true,
+        });
     }
 
     // Updated endpoints to match new gateway.controller.ts
@@ -138,7 +112,7 @@ class ApiService {
             `/sfu/rtp-capabilities`,
             {
                 method: "PUT",
-                body: JSON.stringify({ rtpCapabilities }),
+                data: { rtpCapabilities },
             }
         );
     }
@@ -146,7 +120,7 @@ class ApiService {
     async createTransport(roomId: string, isProducer: boolean) {
         return this.request<any>(`/sfu/transport`, {
             method: "POST",
-            body: JSON.stringify({ roomId, isProducer }),
+            data: { roomId, isProducer },
         });
     }
 
@@ -168,7 +142,7 @@ class ApiService {
             message: string;
         }>(`/sfu/streams/${streamId}`, {
             method: "PUT",
-            body: JSON.stringify({ metadata, roomId }),
+            data: { metadata, roomId },
         });
     }
 
@@ -200,7 +174,7 @@ class ApiService {
             `/api/room/${roomId}/transports/${transportId}/connect`,
             {
                 method: "POST",
-                body: JSON.stringify({ peerId, dtlsParameters }),
+                data: { peerId, dtlsParameters },
             }
         );
     }
@@ -216,13 +190,13 @@ class ApiService {
             `/api/room/${roomId}/produce`,
             {
                 method: "POST",
-                body: JSON.stringify({
+                data: {
                     peerId,
                     transportId,
                     kind,
                     rtpParameters,
                     metadata: appData,
-                }),
+                },
             }
         );
     }
@@ -248,20 +222,12 @@ class ApiService {
             metadata: any;
         }>(`/api/room/${roomId}/consume`, {
             method: "POST",
-            body: JSON.stringify({
+            data: {
                 streamId,
                 transportId,
                 peerId: peerId,
-            }),
+            },
         });
-    }
-
-    // Updated methods for new HTTP endpoints
-    async getRouterRtpCapabilities(roomId: string) {
-        return this.request<{
-            success: boolean;
-            data: mediasoupTypes.RtpCapabilities;
-        }>(`/sfu/rooms/${roomId}/router-capabilities`);
     }
 
     async connectTransportHttp(
@@ -273,7 +239,7 @@ class ApiService {
             `/sfu/transport/${transportId}/connect`,
             {
                 method: "POST",
-                body: JSON.stringify({ dtlsParameters, roomId }),
+                data: { dtlsParameters, roomId },
             }
         );
     }
@@ -291,13 +257,13 @@ class ApiService {
             data: { id: string; producerId: string };
         }>(`/sfu/transport/${transportId}/produce`, {
             method: "POST",
-            body: JSON.stringify({
+            data: {
                 kind,
                 rtpParameters,
                 roomId,
                 participantId,
                 appData,
-            }),
+            },
         });
     }
 
@@ -312,12 +278,12 @@ class ApiService {
             `/sfu/transport/${transportId}/consume`,
             {
                 method: "POST",
-                body: JSON.stringify({
+                data: {
                     streamId,
                     rtpCapabilities,
                     roomId,
                     participantId,
-                }),
+                },
             }
         );
     }
@@ -331,7 +297,7 @@ class ApiService {
             `/sfu/consumer/${consumerId}/resume`,
             {
                 method: "POST",
-                body: JSON.stringify({ roomId, participantId }),
+                data: { roomId, participantId },
             }
         );
     }
@@ -341,7 +307,7 @@ class ApiService {
             `/sfu/consumer/${consumerId}/pause`,
             {
                 method: "POST",
-                body: JSON.stringify({ roomId }),
+                data: { roomId },
             }
         );
     }
@@ -351,7 +317,7 @@ class ApiService {
             `/sfu/consumer/${consumerId}`,
             {
                 method: "DELETE",
-                body: JSON.stringify({ roomId }),
+                data: { roomId },
             }
         );
     }
@@ -361,7 +327,7 @@ class ApiService {
             `/sfu/producer/${producerId}/pause`,
             {
                 method: "POST",
-                body: JSON.stringify({ roomId }),
+                data: { roomId },
             }
         );
     }
@@ -371,7 +337,7 @@ class ApiService {
             `/sfu/producer/${producerId}/resume`,
             {
                 method: "POST",
-                body: JSON.stringify({ roomId }),
+                data: { roomId },
             }
         );
     }
@@ -381,7 +347,7 @@ class ApiService {
             `/sfu/producer/${producerId}`,
             {
                 method: "DELETE",
-                body: JSON.stringify({ roomId }),
+                data: { roomId },
             }
         );
     }

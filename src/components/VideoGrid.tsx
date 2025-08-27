@@ -17,6 +17,7 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 
 export const VideoGrid = ({
     streams,
+    screenStreams,
     isVideoOff,
     isMuted,
     users,
@@ -27,6 +28,7 @@ export const VideoGrid = ({
     revertTranslationStream,
 }: {
     streams: { id: string; stream: MediaStream; metadata?: any }[];
+    screenStreams: { id: string; stream: MediaStream; metadata?: any }[];
     isVideoOff: boolean;
     isMuted: boolean;
     users: User[];
@@ -60,7 +62,14 @@ export const VideoGrid = ({
         isUserUsingTranslation,
         screenShareUsers,
         sortedUsers,
-    } = useVideoGrid(streams, users, speakingPeers, myPeerId, room);
+    } = useVideoGrid(
+        streams,
+        screenStreams,
+        users,
+        speakingPeers,
+        myPeerId,
+        room
+    );
 
     const [draggedItemPrevPos, setDraggedItemPrevPos] = useState<{
         i: string;
@@ -104,7 +113,19 @@ export const VideoGrid = ({
         const regularParticipants = localUser
             ? [localUser, ...sortedUsers]
             : sortedUsers;
-        const allParticipants = [...screenShareUsers, ...regularParticipants];
+
+        // Filter out invalid users before combining
+        const validRegularParticipants = regularParticipants.filter(
+            (user) => user && user.peerId
+        );
+        const validScreenShareUsers = screenShareUsers.filter(
+            (user) => user && user.peerId
+        );
+
+        const allParticipants = [
+            ...validScreenShareUsers,
+            ...validRegularParticipants,
+        ];
         const maxDisplayUsers = 11;
 
         const usersToDisplay = allParticipants.slice(0, maxDisplayUsers);
@@ -362,6 +383,12 @@ export const VideoGrid = ({
     // Render user grid item
     const renderUserGridItem = useCallback(
         (user: User) => {
+            // Safety check for user object
+            if (!user || !user.peerId) {
+                console.warn("[VideoGrid] Invalid user object:", user);
+                return null;
+            }
+
             // Handle screen share users specially
             if ((user as any).isScreenShare) {
                 const screenUser = user as any;
@@ -475,7 +502,9 @@ export const VideoGrid = ({
                         ) : (
                             <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-800 rounded-lg shadow-md'>
                                 <div className='w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-2 shadow-sm'>
-                                    {user.peerId[0].toUpperCase()}
+                                    {user.peerId && user.peerId.length > 0
+                                        ? user.peerId[0].toUpperCase()
+                                        : "?"}
                                 </div>
                                 <span className='text-white'>
                                     {isLocalUser
@@ -628,7 +657,9 @@ export const VideoGrid = ({
                         allowOverlap={true}
                         style={{ height: gridHeight, maxHeight: gridHeight }}
                     >
-                        {usersToShow.map(renderUserGridItem)}
+                        {usersToShow
+                            .filter((user) => user && user.peerId)
+                            .map(renderUserGridItem)}
 
                         {remainingUsers.length > 0 && (
                             <div

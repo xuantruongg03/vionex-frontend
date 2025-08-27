@@ -268,8 +268,8 @@ export class MediaManager {
                 // Clean up producers - unpublish screen share streams
                 this.producerManager.unpublishScreenShare();
 
-                // Update UI state
-                this.context.setters.setStreams((prev) =>
+                // Update UI state - remove from screen streams
+                this.context.setters.setScreenStreams((prev) =>
                     prev.filter((stream) => stream.id !== "screen-local")
                 );
 
@@ -280,6 +280,15 @@ export class MediaManager {
             }
 
             // Start screen sharing
+            console.log("[MediaManager] Checking screen share requirements:", {
+                hasSendTransport: !!this.context.refs.sendTransportRef.current,
+                sendTransportId: this.context.refs.sendTransportRef.current?.id,
+                sendTransportState:
+                    this.context.refs.sendTransportRef.current?.connectionState,
+                hasDevice: !!this.context.refs.deviceRef.current,
+                deviceLoaded: this.context.refs.deviceRef.current?.loaded,
+            });
+
             if (!this.context.refs.sendTransportRef.current) {
                 toast.error("Cannot start screen sharing: Not connected");
                 return false;
@@ -306,8 +315,8 @@ export class MediaManager {
 
             this.context.refs.screenStreamRef.current = screenStream;
 
-            // Add to streams for UI (local display)
-            this.context.setters.setStreams((prev) => [
+            // Add to screen streams for UI (local display)
+            this.context.setters.setScreenStreams((prev) => [
                 ...prev,
                 {
                     id: "screen-local",
@@ -317,6 +326,8 @@ export class MediaManager {
                         audio: screenStream.getAudioTracks().length > 0,
                         type: "screen",
                         isScreenShare: true,
+                        peerId: this.context.room.username,
+                        publisherId: this.context.room.username,
                     },
                 },
             ]);
@@ -355,7 +366,7 @@ export class MediaManager {
             }
 
             this.context.setters.setIsScreenSharing(false);
-            this.context.setters.setStreams((prev) =>
+            this.context.setters.setScreenStreams((prev) =>
                 prev.filter((stream) => stream.id !== "screen-local")
             );
 
@@ -392,8 +403,8 @@ export class MediaManager {
             this.context.refs.screenStreamRef.current = null;
             this.context.setters.setIsScreenSharing(false);
 
-            // Remove from streams
-            this.context.setters.setStreams((prev) =>
+            // Remove from screen streams
+            this.context.setters.setScreenStreams((prev) =>
                 prev.filter((stream) => stream.id !== "screen-local")
             );
 
