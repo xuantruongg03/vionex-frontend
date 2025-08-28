@@ -61,9 +61,14 @@ export class VADManager {
             const vadEvents = {
                 onSpeechStart: () => {
                     console.log("[VADManager] Speech started");
-                    this.context.setters.setIsSpeaking(true);
-                    this.handleSpeechStart();
-                    this.startPeriodicSending();
+                    // Only set speaking to true if microphone is enabled
+                    if (this.isMicrophoneEnabled()) {
+                        this.context.setters.setIsSpeaking(true);
+                        this.handleSpeechStart();
+                        this.startPeriodicSending();
+                    } else {
+                        console.log("[VADManager] Mic disabled, ignoring speech start");
+                    }
                 },
 
                 onSpeechEnd: (audioBuffer: Uint8Array, duration: number) => {
@@ -77,7 +82,11 @@ export class VADManager {
 
                     // Stop periodic sending and send final chunk
                     this.stopPeriodicSending();
-                    this.handleSpeechEnd(audioBuffer, duration);
+                    
+                    // Only send to server if mic was enabled during recording
+                    if (this.isMicrophoneEnabled()) {
+                        this.handleSpeechEnd(audioBuffer, duration);
+                    }
                 },
 
                 // Placeholder for future periodic chunk support
@@ -184,6 +193,8 @@ export class VADManager {
                 this.vadInstance.stopListening();
                 // Also stop any periodic sending
                 this.stopPeriodicSending();
+                // IMPORTANT: Set speaking to false when mic is turned off
+                this.context.setters.setIsSpeaking(false);
             }
         }
     }

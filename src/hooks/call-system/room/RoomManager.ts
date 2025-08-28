@@ -112,6 +112,10 @@ export class RoomManager {
                         this.mediaManager
                     ) {
                         await this.mediaManager.initializeLocalMedia();
+                        // Force sync metadata after initialization to ensure correct state
+                        setTimeout(async () => {
+                            await this.mediaManager.forceSyncMetadata();
+                        }, 2000);
                     }
                 }, 1000);
 
@@ -231,16 +235,13 @@ export class RoomManager {
     togglePinUser = (peerId: string) => {
         if (!this.context.setters.setIsJoined || !this.context.roomId) return;
 
-        if (
-            this.context.room.pinnedUsers.some((arr: any) =>
-                arr.includes(peerId)
-            )
-        ) {
+        if (this.context.room.pinnedUsers.includes(peerId)) {
+            // Unpin user
             this.context.refs.socketRef.current?.emit(
                 "sfu:unpin-user",
                 {
                     roomId: this.context.roomId,
-                    peerId,
+                    unpinnedPeerId: peerId, // Use proper field name
                 },
                 (res: any) => {
                     if (res.success) {
@@ -248,10 +249,22 @@ export class RoomManager {
                             type: ActionRoomType.REMOVE_PINNED_USER,
                             payload: peerId,
                         });
+                        
+                        // Show appropriate message
+                        if (res.stillInPriority) {
+                            toast.success(`Unpinned user ${peerId} (still in priority view)`);
+                            console.log(`[RoomManager] User ${peerId} unpinned - still in priority, consumers maintained`);
+                        } else {
+                            toast.success(`Unpinned user ${peerId} - ${res.consumersRemoved?.length || 0} consumers removed`);
+                            console.log(`[RoomManager] User ${peerId} unpinned - removed ${res.consumersRemoved?.length || 0} consumers`);
+                        }
+                    } else {
+                        toast.error(res.message || "Failed to unpin user");
                     }
                 }
             );
         } else {
+            // Pin user  
             if (!this.context.refs.recvTransportRef.current) {
                 toast.error("Receive transport not ready for pinning");
                 return;
@@ -260,14 +273,27 @@ export class RoomManager {
                 "sfu:pin-user",
                 {
                     roomId: this.context.roomId,
-                    peerId,
+                    pinnedPeerId: peerId, // Use proper field name
+                    transportId: this.context.refs.recvTransportRef.current.id,
                 },
                 (res: any) => {
                     if (res.success) {
+                        // Update Redux state regardless of whether it's already in priority
                         this.context.dispatch({
                             type: ActionRoomType.SET_PINNED_USERS,
-                            payload: { pinnedUsers: [peerId] },
+                            payload: { pinnedUsers: peerId },
                         });
+
+                        // Show appropriate message
+                        if (res.alreadyPriority) {
+                            toast.success(`Pinned user ${peerId} (already in priority view)`);
+                            console.log(`[RoomManager] User ${peerId} pinned - already in priority, no new consumers created`);
+                        } else {
+                            toast.success(`Pinned user ${peerId} - ${res.consumersCreated?.length || 0} consumers created`);
+                            console.log(`[RoomManager] User ${peerId} pinned - created ${res.consumersCreated?.length || 0} consumers`);
+                        }
+                    } else {
+                        toast.error(res.message || "Failed to pin user");
                     }
                 }
             );

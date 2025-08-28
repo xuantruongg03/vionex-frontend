@@ -160,7 +160,7 @@ export const useVideoGrid = (
 
     const isUserPinned = useCallback(
         (peerId: string) => {
-            return room.pinnedUsers?.some((arr: any) => arr.includes(peerId));
+            return room.pinnedUsers?.includes(peerId);
         },
         [room.pinnedUsers]
     );

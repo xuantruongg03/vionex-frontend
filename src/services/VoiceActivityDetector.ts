@@ -192,8 +192,13 @@ export class VoiceActivityDetector {
     setMicrophoneEnabled(enabled: boolean): void {
         this.microphoneEnabled = enabled;
 
-        if (!enabled && this.isRecording) {
-            this.stopRecording();
+        if (!enabled) {
+            // When mic is disabled, stop recording and reset speaking state
+            if (this.isRecording) {
+                this.stopRecording();
+            }
+            // Reset speech frame count to prevent false positives
+            this.speechFrameCount = 0;
         }
 
         console.log(`[VAD] Microphone ${enabled ? "enabled" : "disabled"}`);

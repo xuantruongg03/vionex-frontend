@@ -136,15 +136,8 @@ class ApiService {
         );
     }
 
-    async updateStream(streamId: string, metadata: any, roomId?: string) {
-        return await this.request<{
-            success: boolean;
-            message: string;
-        }>(`/sfu/streams/${streamId}`, {
-            method: "PUT",
-            data: { metadata, roomId },
-        });
-    }
+    // NOTE: updateStream HTTP method removed - now handled via WebSocket
+    // Use socket.emit('sfu:update-stream-metadata', { streamId, metadata, roomId }) instead
 
     async unpublishStream(streamId: string) {
         return this.request<{ success: boolean; message: string }>(

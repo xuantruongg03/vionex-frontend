@@ -72,16 +72,28 @@ const VideoPreview = memo(
                 const dataArray = new Uint8Array(
                     analyserRef.current.frequencyBinCount
                 );
+
+                // Optimized audio level update without interval
+                let frameCount = 0;
+
                 const updateAudioLevel = () => {
-                    if (analyserRef.current) {
+                    // Update every 6th frame (~10fps at 60fps) for better performance
+                    frameCount++;
+                    if (frameCount % 6 === 0 && analyserRef.current) {
                         analyserRef.current.getByteFrequencyData(dataArray);
-                        const average =
-                            dataArray.reduce((a, b) => a + b) /
-                            dataArray.length;
+
+                        // Optimized average calculation - sample every 4th element
+                        let sum = 0;
+                        for (let i = 0; i < dataArray.length; i += 4) {
+                            sum += dataArray[i];
+                        }
+                        const average = sum / (dataArray.length / 4);
+
                         const normalizedLevel = Math.min(average / 128, 1);
                         setAudioLevel(normalizedLevel);
                         setIsSpeaking(normalizedLevel > 0.1);
                     }
+
                     if (analyserRef.current) {
                         animationFrameRef.current =
                             requestAnimationFrame(updateAudioLevel);
@@ -109,7 +121,7 @@ const VideoPreview = memo(
             setAudioLevel(0);
             analyserRef.current = null;
         }, []);
-        
+
         const toggleCamera = useCallback(async () => {
             if (externalToggleVideo) {
                 // Use external toggle function from hook
@@ -332,6 +344,36 @@ const VideoPreview = memo(
             [userName]
         );
 
+        // Memoize avatar styles for better performance
+        const avatarClassName = useMemo(
+            () =>
+                `w-20 h-20 rounded-full mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-2xl relative z-10 transition-colors duration-300 ${
+                    isSpeaking && isAudioEnabled
+                        ? "bg-gradient-to-r from-green-500 to-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
+                        : "bg-gradient-to-r from-blue-500 to-purple-500"
+                }`,
+            [isSpeaking, isAudioEnabled]
+        );
+
+        // Memoize animation props
+        const avatarAnimation = useMemo(
+            () =>
+                isSpeaking && isAudioEnabled
+                    ? { scale: [1, 1.05, 1] }
+                    : { scale: 1 },
+            [isSpeaking, isAudioEnabled]
+        );
+
+        const avatarTransition = useMemo(
+            () => ({
+                duration: 0.8,
+                repeat: isSpeaking && isAudioEnabled ? Infinity : 0,
+                ease: "easeInOut",
+                repeatType: "loop" as const,
+            }),
+            [isSpeaking, isAudioEnabled]
+        );
+
         return (
             <motion.div
                 className={`relative h-[300px] bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl overflow-hidden shadow-2xl border border-white/10 group ${
@@ -342,7 +384,7 @@ const VideoPreview = memo(
                 transition={{ delay: 0.1, duration: 0.5 }}
             >
                 <motion.div
-                    className="relative w-full h-full"
+                    className='relative w-full h-full'
                     animate={{
                         scale: isSpeaking ? 1.02 : 1,
                     }}
@@ -362,48 +404,152 @@ const VideoPreview = memo(
                     <AnimatePresence>
                         {(!isVideoEnabled || isInitializing) && (
                             <motion.div
-                                className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900"
+                                className='absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900'
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                <div className="text-center">
+                                <div className='text-center'>
                                     {isInitializing ? (
                                         <motion.div
-                                            className="flex flex-col items-center gap-4"
+                                            className='flex flex-col items-center gap-4'
                                             initial={{ scale: 0.8, opacity: 0 }}
                                             animate={{ scale: 1, opacity: 1 }}
                                             transition={{ duration: 0.5 }}
                                         >
-                                            <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
-                                            <p className="text-white text-sm font-medium">
+                                            <Loader2 className='h-12 w-12 text-blue-500 animate-spin' />
+                                            <p className='text-white text-sm font-medium'>
                                                 Initializing camera and
                                                 microphone...
                                             </p>
                                         </motion.div>
                                     ) : (
                                         <motion.div
-                                            className="relative mx-auto mb-6"
+                                            className='relative mx-auto mb-6'
                                             whileHover={{ scale: 1.05 }}
                                             transition={{ duration: 0.2 }}
                                         >
-                                            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-2xl">
-                                                {avatarInitial}
-                                            </div>
-                                            {/* Breathing effect */}
+                                            {/* Sound wave animation when speaking (optimized) */}
+                                            <AnimatePresence>
+                                                {isSpeaking &&
+                                                    isAudioEnabled && (
+                                                        <motion.div
+                                                            className='absolute inset-0 flex items-center justify-center'
+                                                            initial={{
+                                                                opacity: 0,
+                                                            }}
+                                                            animate={{
+                                                                opacity: 1,
+                                                            }}
+                                                            exit={{
+                                                                opacity: 0,
+                                                            }}
+                                                            transition={{
+                                                                duration: 0.2,
+                                                            }}
+                                                        >
+                                                            <motion.div
+                                                                className='absolute w-24 h-24 rounded-full border-2 border-green-400/30'
+                                                                animate={{
+                                                                    scale: [
+                                                                        1, 1.4,
+                                                                        1,
+                                                                    ],
+                                                                    opacity: [
+                                                                        0.3,
+                                                                        0.6,
+                                                                        0.3,
+                                                                    ],
+                                                                }}
+                                                                transition={{
+                                                                    duration: 1.5,
+                                                                    repeat: Infinity,
+                                                                    ease: "easeInOut",
+                                                                    repeatType:
+                                                                        "loop",
+                                                                }}
+                                                            />
+                                                            <motion.div
+                                                                className='absolute w-28 h-28 rounded-full border-2 border-green-400/20'
+                                                                animate={{
+                                                                    scale: [
+                                                                        1, 1.6,
+                                                                        1,
+                                                                    ],
+                                                                    opacity: [
+                                                                        0.2,
+                                                                        0.4,
+                                                                        0.2,
+                                                                    ],
+                                                                }}
+                                                                transition={{
+                                                                    duration: 2,
+                                                                    repeat: Infinity,
+                                                                    ease: "easeInOut",
+                                                                    delay: 0.3,
+                                                                    repeatType:
+                                                                        "loop",
+                                                                }}
+                                                            />
+                                                            <motion.div
+                                                                className='absolute w-32 h-32 rounded-full border-2 border-green-400/10'
+                                                                animate={{
+                                                                    scale: [
+                                                                        1, 1.8,
+                                                                        1,
+                                                                    ],
+                                                                    opacity: [
+                                                                        0.1,
+                                                                        0.3,
+                                                                        0.1,
+                                                                    ],
+                                                                }}
+                                                                transition={{
+                                                                    duration: 2.5,
+                                                                    repeat: Infinity,
+                                                                    ease: "easeInOut",
+                                                                    delay: 0.6,
+                                                                    repeatType:
+                                                                        "loop",
+                                                                }}
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                            </AnimatePresence>
+
+                                            {/* Avatar with enhanced styling when speaking */}
                                             <motion.div
-                                                className="absolute inset-0 w-20 h-20 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 mx-auto opacity-30"
-                                                animate={{
-                                                    scale: [1, 1.2, 1],
-                                                    opacity: [0.3, 0.1, 0.3],
-                                                }}
-                                                transition={{
-                                                    duration: 2,
-                                                    repeat: Infinity,
-                                                    ease: "easeInOut",
-                                                }}
-                                            />
+                                                className={avatarClassName}
+                                                animate={avatarAnimation}
+                                                transition={avatarTransition}
+                                            >
+                                                {avatarInitial}
+                                            </motion.div>
+
+                                            {/* Breathing effect (only when not speaking) - optimized */}
+                                            <AnimatePresence>
+                                                {(!isSpeaking ||
+                                                    !isAudioEnabled) && (
+                                                    <motion.div
+                                                        className='absolute inset-0 w-20 h-20 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 mx-auto opacity-30'
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{
+                                                            scale: [1, 1.2, 1],
+                                                            opacity: [
+                                                                0.3, 0.1, 0.3,
+                                                            ],
+                                                        }}
+                                                        exit={{ opacity: 0 }}
+                                                        transition={{
+                                                            duration: 2,
+                                                            repeat: Infinity,
+                                                            ease: "easeInOut",
+                                                            repeatType: "loop",
+                                                        }}
+                                                    />
+                                                )}
+                                            </AnimatePresence>
                                         </motion.div>
                                     )}
                                 </div>
@@ -413,40 +559,40 @@ const VideoPreview = memo(
                 </motion.div>
                 {/* Name overlay - always visible */}
                 <motion.div
-                    className="absolute left-4 bottom-4 px-3 py-1.5 text-xs text-white bg-black/60 rounded-lg"
+                    className='absolute left-4 bottom-4 px-3 py-1.5 text-xs text-white bg-black/60 rounded-lg'
                     animate={{
                         scale: isSpeaking ? 1.05 : 1,
                     }}
                     transition={{ duration: 0.2 }}
                 >
-                    <p className="text-white text-sm font-medium flex items-center gap-2">
+                    <p className='text-white text-sm font-medium flex items-center gap-2'>
                         {displayName}
                     </p>
                 </motion.div>{" "}
                 {/* Status icons in top-right corner */}
                 {!isInitializing && (
-                    <div className="absolute top-2 right-2 flex gap-1">
+                    <div className='absolute top-2 right-2 flex gap-1'>
                         {!isVideoEnabled && (
-                            <div className="bg-black/60 p-1 rounded-full">
-                                <VideoOff className="h-4 w-4 text-white" />
+                            <div className='bg-black/60 p-1 rounded-full'>
+                                <VideoOff className='h-4 w-4 text-white' />
                             </div>
                         )}
                         {!isAudioEnabled && (
-                            <div className="bg-black/60 p-1 rounded-full">
-                                <MicOff className="h-4 w-4 text-white" />
+                            <div className='bg-black/60 p-1 rounded-full'>
+                                <MicOff className='h-4 w-4 text-white' />
                             </div>
                         )}
                     </div>
                 )}
                 {/* Enhanced Camera Controls */}
-                <div className="absolute bottom-3 right-3 flex gap-4 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out transform translate-y-2 group-hover:translate-y-0">
+                <div className='absolute bottom-3 right-3 flex gap-4 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out transform translate-y-2 group-hover:translate-y-0'>
                     <motion.div
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         transition={{ duration: 0.2 }}
                     >
                         <Button
-                            size="sm"
+                            size='sm'
                             variant={isVideoEnabled ? "default" : "destructive"}
                             className={`rounded-full w-14 h-14 p-0 shadow-2xl backdrop-blur-md border-2 transition-all duration-300 ${
                                 isVideoEnabled
@@ -457,11 +603,11 @@ const VideoPreview = memo(
                             disabled={isLoadingVideo || isInitializing}
                         >
                             {isLoadingVideo ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <Loader2 className='w-5 h-5 animate-spin' />
                             ) : isVideoEnabled ? (
-                                <Video className="w-5 h-5" />
+                                <Video className='w-5 h-5' />
                             ) : (
-                                <VideoOff className="w-5 h-5" />
+                                <VideoOff className='w-5 h-5' />
                             )}
                         </Button>
                     </motion.div>
@@ -478,7 +624,7 @@ const VideoPreview = memo(
                         }}
                     >
                         <Button
-                            size="sm"
+                            size='sm'
                             variant={isAudioEnabled ? "default" : "destructive"}
                             className={`rounded-full w-14 h-14 p-0 shadow-2xl backdrop-blur-md border-2 transition-all duration-300 ${
                                 isAudioEnabled
@@ -489,11 +635,11 @@ const VideoPreview = memo(
                             disabled={isLoadingAudio || isInitializing}
                         >
                             {isLoadingAudio ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <Loader2 className='w-5 h-5 animate-spin' />
                             ) : isAudioEnabled ? (
-                                <Mic className="w-5 h-5" />
+                                <Mic className='w-5 h-5' />
                             ) : (
-                                <MicOff className="w-5 h-5" />
+                                <MicOff className='w-5 h-5' />
                             )}
                         </Button>
                     </motion.div>

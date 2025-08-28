@@ -149,6 +149,7 @@ export const VideoGrid = ({
         remainingUsers,
         setUsersToShow,
         setRemainingUsers,
+        room.pinnedUsers, // Re-trigger when pin state changes
     ]);
 
     // Calculate grid dimensions
@@ -239,6 +240,7 @@ export const VideoGrid = ({
         totalDisplayItems,
         setLayouts,
         selectedLayoutTemplate,
+        room.pinnedUsers, // Re-trigger layout when pin state changes
     ]);
 
     const createOccupancyMap = (
@@ -446,15 +448,24 @@ export const VideoGrid = ({
                     (s) => s.metadata?.type === "mic"
                 );
 
-                const hasVideoStream = videoStreams.some(
-                    (s) => s.metadata?.video !== false
-                );
-                const hasAudioStream = audioStreams.some(
-                    (s) => s.metadata?.audio !== false
-                );
+                // IMPROVED: More comprehensive video/audio state detection
+                // Check if user has any video streams AND if they're enabled
+                const hasEnabledVideoStream =
+                    videoStreams.length > 0 &&
+                    videoStreams.some((s) => s.metadata?.video === true);
 
-                remoteVideoOff = !hasVideoStream;
-                remoteMicOff = !hasAudioStream;
+                // Check if user has any audio streams AND if they're enabled
+                const hasEnabledAudioStream =
+                    audioStreams.length > 0 &&
+                    audioStreams.some((s) => s.metadata?.audio === true);
+
+                // If no streams exist, assume off. If streams exist but metadata is undefined, assume off for safety
+                remoteVideoOff = !hasEnabledVideoStream;
+                remoteMicOff = !hasEnabledAudioStream;
+
+                console.log(
+                    `[VideoGrid] ${user.peerId} - Video streams: ${videoStreams.length}, Audio streams: ${audioStreams.length}, Video enabled: ${hasEnabledVideoStream}, Audio enabled: ${hasEnabledAudioStream}`
+                );
             }
 
             const isScreenShare =
@@ -468,56 +479,43 @@ export const VideoGrid = ({
                     className='participant-container h-full w-full'
                 >
                     <div className='h-full w-full relative'>
-                        {userStream ? (
-                            <StreamTile
-                                stream={userStream}
-                                userName={
-                                    isLocalUser
-                                        ? `${user.peerId} (You)`
-                                        : user.peerId
+                        {/* FIXED: Always render StreamTile, even without stream */}
+                        <StreamTile
+                            stream={
+                                userStream || {
+                                    id: `no-stream-${user.peerId}`,
+                                    stream: new MediaStream(),
+                                    metadata: {},
                                 }
-                                isSpeaking={
-                                    isSpeaking ||
-                                    speakingPeers.includes(user.peerId)
-                                }
-                                onClick={() => {}}
-                                videoOff={
-                                    isScreenShare
-                                        ? false
-                                        : isLocalUser
-                                        ? isVideoOff
-                                        : remoteVideoOff
-                                }
-                                micOff={isLocalUser ? isMuted : remoteMicOff}
-                                audioStream={getUserAudioStream(user.peerId)}
-                                isScreen={isScreenShare}
-                                isPinned={isUserPinned(user.peerId)}
-                                togglePin={() => togglePinUser(user.peerId)}
-                                hasTranslation={hasUserTranslation(user.peerId)}
-                                isUsingTranslation={isUserUsingTranslation(
-                                    user.peerId
-                                )}
-                                onToggleTranslation={handleToggleTranslation}
-                            />
-                        ) : (
-                            <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-800 rounded-lg shadow-md'>
-                                <div className='w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mb-2 shadow-sm'>
-                                    {user.peerId && user.peerId.length > 0
-                                        ? user.peerId[0].toUpperCase()
-                                        : "?"}
-                                </div>
-                                <span className='text-white'>
-                                    {isLocalUser
-                                        ? `${user.peerId} (You)`
-                                        : user.peerId}
-                                </span>
-                                <span className='text-xs text-gray-400 dark:text-gray-300 mt-1'>
-                                    {isLocalUser
-                                        ? "Camera/Mic turn off"
-                                        : "No camera/mic"}
-                                </span>
-                            </div>
-                        )}
+                            }
+                            userName={
+                                isLocalUser
+                                    ? `${user.peerId} (You)`
+                                    : user.peerId
+                            }
+                            isSpeaking={
+                                isSpeaking ||
+                                speakingPeers.includes(user.peerId)
+                            }
+                            onClick={() => {}}
+                            videoOff={
+                                isScreenShare
+                                    ? false
+                                    : isLocalUser
+                                    ? isVideoOff
+                                    : remoteVideoOff
+                            }
+                            micOff={isLocalUser ? isMuted : remoteMicOff}
+                            audioStream={getUserAudioStream(user.peerId)}
+                            isScreen={isScreenShare}
+                            isPinned={isUserPinned(user.peerId)}
+                            togglePin={() => togglePinUser(user.peerId)}
+                            hasTranslation={hasUserTranslation(user.peerId)}
+                            isUsingTranslation={isUserUsingTranslation(
+                                user.peerId
+                            )}
+                            onToggleTranslation={handleToggleTranslation}
+                        />
                     </div>
                 </div>
             );

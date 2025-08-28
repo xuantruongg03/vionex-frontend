@@ -1,14 +1,4 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
+
 import { ActionVideoType } from "@/interfaces/action";
 import { motion } from "framer-motion";
 import {
@@ -73,7 +63,7 @@ export const PinOverlay = ({
                   : "bg-black/60 dark:bg-black/75 text-white hover:bg-black/80 dark:hover:bg-black/90"
           }
         `}
-                title={isPinned ? "Bỏ ghim" : "Ghim người dùng này"}
+                title={isPinned ? "Unpin user" : "Pin user"}
             >
                 {isPinned ? (
                     <PinOff className='h-3.5 w-3.5' />
@@ -105,6 +95,9 @@ export const StreamTile = ({
     const dispatch = useDispatch();
     const [showControls, setShowControls] = useState(false);
     const isLocal = stream.id === "local";
+
+    // Fix: Only show speaking when mic is on
+    const isActuallySpeaking = isSpeaking && !micOff;
 
     useEffect(() => {
         if (videoRef.current && stream.stream) {
@@ -152,11 +145,19 @@ export const StreamTile = ({
             onMouseLeave={() => setShowControls(false)}
             className={`relative bg-gray-800 dark:bg-gray-900 rounded-md overflow-hidden flex items-center justify-center cursor-pointer hover:ring-1 hover:ring-blue-500 w-full h-full ${
                 isPinned ? "ring-2 ring-blue-500" : ""
-            } ${isScreen ? "ring-2 ring-green-500" : ""}`}
+            } ${isScreen ? "ring-2 ring-green-500" : ""} ${
+                // ENHANCED: Speaking user gets prominent green border when camera is on
+                isActuallySpeaking && !videoOff
+                    ? "ring-4 ring-green-400 shadow-lg shadow-green-400/20"
+                    : ""
+            }`}
         >
             <div
                 className={`relative bg-gray-800 dark:bg-gray-900 w-full h-full rounded-md overflow-hidden ${
-                    isSpeaking ? "ring-1 ring-green-500" : ""
+                    // ENHANCED: Subtle ring for speaking when video is off (avatar will have animation)
+                    isActuallySpeaking && videoOff
+                        ? "ring-2 ring-green-400/60"
+                        : ""
                 }`}
             >
                 <video
@@ -164,8 +165,13 @@ export const StreamTile = ({
                     autoPlay
                     playsInline
                     muted
-                    className={`w-full h-full object-cover ${
+                    className={`w-full h-full object-cover transition-all duration-300 ${
                         isScreen ? "screen-share" : ""
+                    } ${
+                        // ENHANCED: Speaking user video gets subtle glow effect
+                        isActuallySpeaking && !videoOff
+                            ? "filter brightness-110 contrast-105"
+                            : ""
                     }`}
                     style={{ display: videoOff ? "none" : "block" }}
                     onError={(e) => {
@@ -175,6 +181,31 @@ export const StreamTile = ({
                         });
                     }}
                 />
+
+                {/* ENHANCED: Speaking indicator overlay for video streams */}
+                {isActuallySpeaking && !videoOff && !isScreen && (
+                    <motion.div
+                        className='absolute top-2 left-2 flex items-center gap-1 bg-green-500/90 text-white text-xs px-2 py-1 rounded-full shadow-lg'
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <motion.div
+                            className='w-2 h-2 bg-white rounded-full'
+                            animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [0.8, 1, 0.8],
+                            }}
+                            transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                            }}
+                        />
+                        <span className='font-medium'>Speaking</span>
+                    </motion.div>
+                )}
 
                 {audioStream && (
                     <audio
@@ -191,11 +222,79 @@ export const StreamTile = ({
 
                 {videoOff && !isScreen && (
                     <div className='absolute inset-0 flex items-center justify-center bg-gray-900 dark:bg-gray-800 z-10'>
-                        <div className='text-center'>
-                            <div className='w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 mx-auto flex items-center justify-center text-white text-xl font-semibold mb-1 shadow-sm'>
+                        <div className='text-center relative'>
+                            {/* ENHANCED: Sound wave animation when speaking */}
+                            {isActuallySpeaking && (
+                                <div className='absolute inset-0 flex items-center justify-center'>
+                                    <motion.div
+                                        className='absolute w-20 h-20 rounded-full border-2 border-green-400/30'
+                                        animate={{
+                                            scale: [1, 1.3, 1],
+                                            opacity: [0.3, 0.6, 0.3],
+                                        }}
+                                        transition={{
+                                            duration: 1.5,
+                                            repeat: Infinity,
+                                            ease: "easeInOut",
+                                        }}
+                                    />
+                                    <motion.div
+                                        className='absolute w-24 h-24 rounded-full border-2 border-green-400/20'
+                                        animate={{
+                                            scale: [1, 1.5, 1],
+                                            opacity: [0.2, 0.4, 0.2],
+                                        }}
+                                        transition={{
+                                            duration: 2,
+                                            repeat: Infinity,
+                                            ease: "easeInOut",
+                                            delay: 0.3,
+                                        }}
+                                    />
+                                    <motion.div
+                                        className='absolute w-28 h-28 rounded-full border-2 border-green-400/10'
+                                        animate={{
+                                            scale: [1, 1.7, 1],
+                                            opacity: [0.1, 0.3, 0.1],
+                                        }}
+                                        transition={{
+                                            duration: 2.5,
+                                            repeat: Infinity,
+                                            ease: "easeInOut",
+                                            delay: 0.6,
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* ENHANCED: Avatar with enhanced styling when speaking */}
+                            <motion.div
+                                className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center text-white text-xl font-semibold mb-1 shadow-sm relative z-10 ${
+                                    isActuallySpeaking
+                                        ? "bg-green-500 dark:bg-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
+                                        : "bg-blue-500 dark:bg-blue-600"
+                                }`}
+                                animate={
+                                    isActuallySpeaking
+                                        ? {
+                                              scale: [1, 1.05, 1],
+                                          }
+                                        : {}
+                                }
+                                transition={{
+                                    duration: 0.8,
+                                    repeat: isActuallySpeaking ? Infinity : 0,
+                                    ease: "easeInOut",
+                                }}
+                            >
                                 {userName.charAt(0).toUpperCase()}
-                            </div>
-                            <p className='text-white text-base font-medium'>
+                            </motion.div>
+
+                            <p
+                                className={`text-white text-base font-medium ${
+                                    isActuallySpeaking ? "text-green-100" : ""
+                                }`}
+                            >
                                 {userName}
                             </p>
                         </div>

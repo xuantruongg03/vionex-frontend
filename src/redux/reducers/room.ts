@@ -63,20 +63,24 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
 
             return state;
         case ActionRoomType.SET_PINNED_USERS:
-            const newPinnedUsers = [
-                ...state.pinnedUsers,
-                action.payload?.pinnedUsers,
-            ];
-            return {
-                ...state,
-                pinnedUsers: newPinnedUsers,
-            };
+            const pinnedUser = action.payload?.pinnedUsers || action.payload;
+            // Ensure we don't add duplicate pins
+            const existingPins = Array.isArray(state.pinnedUsers)
+                ? state.pinnedUsers
+                : [];
+            if (!existingPins.includes(pinnedUser)) {
+                return {
+                    ...state,
+                    pinnedUsers: [...existingPins, pinnedUser],
+                };
+            }
+            return state;
 
         case ActionRoomType.REMOVE_PINNED_USER:
             return {
                 ...state,
                 pinnedUsers: state.pinnedUsers.filter(
-                    ([user]) => user !== action.payload
+                    (user) => user !== action.payload
                 ),
             };
 
