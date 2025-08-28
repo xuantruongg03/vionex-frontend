@@ -1,4 +1,3 @@
-
 import { StreamMetadata } from "@/interfaces/signal";
 import { toast } from "sonner";
 import { CallSystemContext, PendingStreamData } from "../types";
@@ -82,7 +81,7 @@ export class StreamManager {
                         ...data.metadata,
                     },
                 };
-                
+
                 return [...filteredStreams, newStream];
             });
         } else if (mediaType === "screen_audio") {
@@ -94,8 +93,10 @@ export class StreamManager {
                 );
 
                 // Find if we have existing screen stream to preserve video
-                const existingStream = prev.find(s => s.id === `screen-${publisherId}`);
-                
+                const existingStream = prev.find(
+                    (s) => s.id === `screen-${publisherId}`
+                );
+
                 const newStream = {
                     id: `screen-${publisherId}`,
                     stream: mediaStream,
@@ -109,7 +110,7 @@ export class StreamManager {
                         ...data.metadata,
                     },
                 };
-                
+
                 return [...filteredStreams, newStream];
             });
         }
@@ -221,8 +222,19 @@ export class StreamManager {
             mediaType === "screen" || mediaType === "screen_audio";
 
         if (isScreenShare) {
-            // Remove screen share stream
+            // Remove screen share stream from regular streams
             this.context.setters.setStreams((prev) =>
+                prev.filter((stream) => {
+                    const isScreenFromThisPeer =
+                        stream.id === `screen-${publisherId}` ||
+                        (stream.metadata?.peerId === publisherId &&
+                            stream.metadata?.isScreenShare);
+                    return !isScreenFromThisPeer;
+                })
+            );
+
+            // Remove screen share stream from dedicated screen streams state
+            this.context.setters.setScreenStreams((prev) =>
                 prev.filter((stream) => {
                     const isScreenFromThisPeer =
                         stream.id === `screen-${publisherId}` ||
@@ -256,10 +268,27 @@ export class StreamManager {
      * Remove streams from a specific peer
      */
     removePeerStreams = (peerId: string) => {
-        // Remove streams from this peer
+        // Remove regular streams from this peer
         this.context.setters.setStreams((prev) => {
             const filteredStreams = prev.filter((s) => !s.id.includes(peerId));
             return filteredStreams;
+        });
+
+        // Remove screen share streams from this peer
+        this.context.setters.setScreenStreams((prev) => {
+            const filteredStreams = prev.filter((s) => !s.id.includes(peerId));
+            return filteredStreams;
+        });
+
+        // Clean up remote streams map for all streams from this peer
+        const streamsToDelete = [];
+        for (const [key] of this.context.refs.remoteStreamsMapRef.current) {
+            if (key.includes(peerId)) {
+                streamsToDelete.push(key);
+            }
+        }
+        streamsToDelete.forEach((key) => {
+            this.context.refs.remoteStreamsMapRef.current.delete(key);
         });
 
         // Remove from speaking peers
@@ -278,8 +307,20 @@ export class StreamManager {
     removeScreenShareStreams = (peerId: string) => {
         toast.info(`${peerId} stopped screen sharing`);
 
-        // Remove screen share streams from this peer
+        // Remove screen share streams from regular streams state
         this.context.setters.setStreams((prev) =>
+            prev.filter((stream) => {
+                // Remove streams that match this peer's screen share
+                const isScreenFromThisPeer =
+                    stream.id === `screen-${peerId}` ||
+                    (stream.metadata?.peerId === peerId &&
+                        stream.metadata?.isScreenShare);
+                return !isScreenFromThisPeer;
+            })
+        );
+
+        // Remove screen share streams from dedicated screen streams state
+        this.context.setters.setScreenStreams((prev) =>
             prev.filter((stream) => {
                 // Remove streams that match this peer's screen share
                 const isScreenFromThisPeer =

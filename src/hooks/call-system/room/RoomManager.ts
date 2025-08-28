@@ -147,6 +147,11 @@ export class RoomManager {
      */
     leaveRoom = async () => {
         try {
+            // Cleanup screen share if active before leaving
+            if (this.context.state.isScreenSharing && this.mediaManager) {
+                this.mediaManager.handleScreenShareEnded();
+            }
+
             // Cleanup local references but don't cleanup global media service
             this.context.refs.sendTransportRef.current?.close();
             this.context.refs.recvTransportRef.current?.close();
@@ -156,6 +161,8 @@ export class RoomManager {
             this.context.setters.setIsConnected(false);
             this.context.setters.setIsWebSocketJoined(false);
             this.context.setters.setStreams([]);
+            this.context.setters.setScreenStreams([]);
+            this.context.setters.setIsScreenSharing(false);
             this.context.refs.isInitializedRef.current = false;
             this.context.refs.isPublishingRef.current = false;
             this.context.refs.localStreamRef.current = null;
@@ -167,7 +174,6 @@ export class RoomManager {
             this.context.refs.currentStreamIdsRef.current = {};
             this.context.refs.pendingStreamsRef.current = [];
             this.context.refs.screenStreamRef.current = null;
-            this.context.setters.setIsScreenSharing(false);
 
             this.context.dispatch({
                 type: ActionRoomType.RESET,

@@ -117,25 +117,25 @@ export const VADDemo: React.FC<VADDemoProps> = ({ roomId }) => {
     };
 
     return (
-        <div className="p-4 border rounded-lg bg-white shadow-sm">
-            <h3 className="text-lg font-semibold mb-4">
+        <div className='p-4 border rounded-lg bg-white shadow-sm'>
+            <h3 className='text-lg font-semibold mb-4'>
                 🎙️ Voice Activity Detection
             </h3>
 
             {/* VAD Status */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
+            <div className='grid grid-cols-2 gap-4 mb-4'>
+                <div className='space-y-2'>
+                    <div className='flex items-center space-x-2'>
                         <div
                             className={`w-3 h-3 rounded-full`}
                             style={{ backgroundColor: getVADStatusColor() }}
                         />
-                        <span className="text-sm font-medium">
+                        <span className='text-sm font-medium'>
                             {getVADStatusText()}
                         </span>
                     </div>
 
-                    <div className="text-xs text-gray-600 space-y-1">
+                    <div className='text-xs text-gray-600 space-y-1'>
                         <div>
                             Initialized: {vadState.isInitialized ? "✅" : "❌"}
                         </div>
@@ -155,12 +155,12 @@ export const VADDemo: React.FC<VADDemoProps> = ({ roomId }) => {
                     </div>
                 </div>
 
-                <div className="space-y-2">
-                    <div className="text-sm font-medium">
+                <div className='space-y-2'>
+                    <div className='text-sm font-medium'>
                         Speaking: {isSpeaking ? "🗣️ YES" : "🤐 NO"}
                     </div>
 
-                    <div className="text-xs text-gray-600 space-y-1">
+                    <div className='text-xs text-gray-600 space-y-1'>
                         <div>Room Joined: {isJoined ? "✅" : "❌"}</div>
                         <div>Stream: {localStream ? "✅" : "❌"}</div>
                         <div>{getMicrophoneStatus()}</div>
@@ -170,7 +170,7 @@ export const VADDemo: React.FC<VADDemoProps> = ({ roomId }) => {
             </div>
 
             {/* Controls */}
-            <div className="flex space-x-3 flex-wrap">
+            <div className='flex space-x-3 flex-wrap'>
                 <button
                     onClick={handleToggleVAD}
                     disabled={!vadState.isInitialized}
@@ -200,24 +200,24 @@ export const VADDemo: React.FC<VADDemoProps> = ({ roomId }) => {
 
                 <button
                     onClick={testMicrophone}
-                    className="px-4 py-2 rounded text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white"
+                    className='px-4 py-2 rounded text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white'
                 >
                     Test Mic
                 </button>
             </div>
 
             {/* VAD Configuration Info */}
-            <div className="mt-4 p-3 bg-gray-50 rounded text-xs">
-                <h4 className="font-medium mb-2">
+            <div className='mt-4 p-3 bg-gray-50 rounded text-xs'>
+                <h4 className='font-medium mb-2'>
                     VAD Configuration (Testing Mode):
                 </h4>
-                <div className="grid grid-cols-2 gap-2 text-gray-600">
+                <div className='grid grid-cols-2 gap-2 text-gray-600'>
                     <div>Sample Rate: 16kHz</div>
                     <div>Frame Size: 1024</div>
                     <div>Min Speech: 300ms</div>
                     <div>Silence Timeout: 500ms</div>
                     <div>Max Recording: 15s</div>
-                    <div className="font-bold text-red-600">
+                    <div className='font-bold text-red-600'>
                         Energy Threshold: 0.0001 ⬇️
                     </div>
                     <div>Confirmation Frames: 3</div>
@@ -226,9 +226,9 @@ export const VADDemo: React.FC<VADDemoProps> = ({ roomId }) => {
             </div>
 
             {/* Debug Info */}
-            <div className="mt-4 p-3 bg-yellow-50 rounded text-xs">
-                <h4 className="font-medium mb-2">🔍 Debug Information:</h4>
-                <div className="text-gray-600 space-y-1">
+            <div className='mt-4 p-3 bg-yellow-50 rounded text-xs'>
+                <h4 className='font-medium mb-2'>🔍 Debug Information:</h4>
+                <div className='text-gray-600 space-y-1'>
                     <div>✅ Check browser console for detailed VAD logs</div>
                     <div>✅ Energy threshold lowered to 0.0001 for testing</div>
                     <div>
@@ -239,9 +239,9 @@ export const VADDemo: React.FC<VADDemoProps> = ({ roomId }) => {
             </div>
 
             {/* Instructions */}
-            <div className="mt-4 p-3 bg-blue-50 rounded text-xs">
-                <h4 className="font-medium mb-2">🔧 How to Test:</h4>
-                <ol className="list-decimal list-inside space-y-1 text-gray-600">
+            <div className='mt-4 p-3 bg-blue-50 rounded text-xs'>
+                <h4 className='font-medium mb-2'>🔧 How to Test:</h4>
+                <ol className='list-decimal list-inside space-y-1 text-gray-600'>
                     <li>Make sure microphone is enabled</li>
                     <li>Join a room</li>
                     <li>VAD will auto-start listening</li>
@@ -252,7 +252,7 @@ export const VADDemo: React.FC<VADDemoProps> = ({ roomId }) => {
             </div>
 
             {/* Audio Player for VAD Recordings */}
-            <div className="mt-6">
+            <div className='mt-6'>
                 <AudioPlayer
                     key={refreshKey}
                     recordings={recordings}

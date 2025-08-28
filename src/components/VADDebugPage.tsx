@@ -93,56 +93,56 @@ export const VADDebugPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 p-4">
-            <div className="max-w-4xl mx-auto">
-                <h1 className="text-2xl font-bold mb-6 text-center">
+        <div className='min-h-screen bg-gray-100 p-4'>
+            <div className='max-w-4xl mx-auto'>
+                <h1 className='text-2xl font-bold mb-6 text-center'>
                     🎙️ VAD Debug & Audio Playback
                 </h1>
 
                 {/* Setup Controls */}
-                <div className="mb-6 p-4 bg-white rounded-lg shadow">
-                    <h2 className="text-lg font-semibold mb-4">
+                <div className='mb-6 p-4 bg-white rounded-lg shadow'>
+                    <h2 className='text-lg font-semibold mb-4'>
                         Setup Controls
                     </h2>
 
                     {/* Username */}
-                    <div className="mb-4 flex items-center space-x-4">
-                        <label className="text-sm font-medium min-w-24">
+                    <div className='mb-4 flex items-center space-x-4'>
+                        <label className='text-sm font-medium min-w-24'>
                             Username:
                         </label>
                         <input
-                            type="text"
+                            type='text'
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className="px-3 py-2 border rounded-md flex-1 max-w-md"
-                            placeholder="Enter username"
+                            className='px-3 py-2 border rounded-md flex-1 max-w-md'
+                            placeholder='Enter username'
                         />
                         <button
                             onClick={handleSetUsername}
-                            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
                         >
                             Set Username
                         </button>
                     </div>
 
                     {/* Room ID */}
-                    <div className="mb-4 flex items-center space-x-4">
-                        <label className="text-sm font-medium min-w-24">
+                    <div className='mb-4 flex items-center space-x-4'>
+                        <label className='text-sm font-medium min-w-24'>
                             Room ID:
                         </label>
                         <input
-                            type="text"
+                            type='text'
                             value={roomId}
                             onChange={(e) => setRoomId(e.target.value)}
-                            className="px-3 py-2 border rounded-md flex-1 max-w-md"
-                            placeholder="Enter room ID"
+                            className='px-3 py-2 border rounded-md flex-1 max-w-md'
+                            placeholder='Enter room ID'
                         />
                     </div>
 
                     {/* Status */}
-                    <div className="mb-4 p-3 bg-gray-50 rounded">
-                        <h3 className="font-medium mb-2">Current Status:</h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className='mb-4 p-3 bg-gray-50 rounded'>
+                        <h3 className='font-medium mb-2'>Current Status:</h3>
+                        <div className='grid grid-cols-2 gap-4 text-sm'>
                             <div>Username: {room.username || "Not set"}</div>
                             <div>Connected: {isConnected ? "✅" : "❌"}</div>
                             <div>Joined: {isJoined ? "✅" : "❌"}</div>
@@ -157,24 +157,24 @@ export const VADDebugPage: React.FC = () => {
                             </div>
                         </div>
                         {error && (
-                            <div className="mt-2 text-red-600 text-sm">
+                            <div className='mt-2 text-red-600 text-sm'>
                                 Error: {error}
                             </div>
                         )}
                     </div>
 
                     {/* Actions */}
-                    <div className="flex space-x-3 flex-wrap">
+                    <div className='flex space-x-3 flex-wrap'>
                         <button
                             onClick={handleTestMicrophone}
-                            className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+                            className='px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600'
                         >
                             🎤 Test Mic
                         </button>
 
                         <button
                             onClick={handleCheckRecordings}
-                            className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600"
+                            className='px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600'
                         >
                             📊 Check Recordings
                         </button>
@@ -182,7 +182,7 @@ export const VADDebugPage: React.FC = () => {
                         <button
                             onClick={initializeLocalMedia}
                             disabled={loading}
-                            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                            className='px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50'
                         >
                             {loading ? "Loading..." : "Init Media"}
                         </button>
@@ -190,7 +190,7 @@ export const VADDebugPage: React.FC = () => {
                         <button
                             onClick={handleJoinRoom}
                             disabled={loading || !room.username}
-                            className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50"
+                            className='px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50'
                         >
                             {loading ? "Joining..." : "Join Room"}
                         </button>
@@ -198,16 +198,16 @@ export const VADDebugPage: React.FC = () => {
                 </div>
 
                 {/* Audio Mode Comparison */}
-                <div className="mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <h2 className="text-lg font-semibold mb-4 text-amber-800">
+                <div className='mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200'>
+                    <h2 className='text-lg font-semibold mb-4 text-amber-800'>
                         🎵 Audio Mode Comparison
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-3 bg-white rounded border">
-                            <h3 className="font-medium text-green-700 mb-2">
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                        <div className='p-3 bg-white rounded border'>
+                            <h3 className='font-medium text-green-700 mb-2'>
                                 🎯 VAD Debug Mode (This Page)
                             </h3>
-                            <ul className="text-sm space-y-1">
+                            <ul className='text-sm space-y-1'>
                                 <li>• Uses raw audio stream directly</li>
                                 <li>• No VADAudioProcessor enhancement</li>
                                 <li>• Total gain: 1.0x (no amplification)</li>
@@ -215,11 +215,11 @@ export const VADDebugPage: React.FC = () => {
                                 <li>• Minimal audio processing</li>
                             </ul>
                         </div>
-                        <div className="p-3 bg-white rounded border">
-                            <h3 className="font-medium text-blue-700 mb-2">
+                        <div className='p-3 bg-white rounded border'>
+                            <h3 className='font-medium text-blue-700 mb-2'>
                                 🔧 Main Call System
                             </h3>
-                            <ul className="text-sm space-y-1">
+                            <ul className='text-sm space-y-1'>
                                 <li>• Uses VADAudioProcessor enhancement</li>
                                 <li>• Gain + compression applied</li>
                                 <li>• Total gain: 3.0x (reduced from 67.5x)</li>
@@ -230,8 +230,8 @@ export const VADDebugPage: React.FC = () => {
                             </ul>
                         </div>
                     </div>
-                    <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
-                        <p className="text-sm text-blue-700">
+                    <div className='mt-4 p-3 bg-blue-50 rounded border border-blue-200'>
+                        <p className='text-sm text-blue-700'>
                             💡 <strong>To test raw audio in main call:</strong>{" "}
                             Add <code>?rawAudio=true</code> to the URL (e.g.,{" "}
                             <code>/call/room123?rawAudio=true</code>)
@@ -240,7 +240,7 @@ export const VADDebugPage: React.FC = () => {
                 </div>
 
                 {/* VAD Demo and Tests */}
-                <div className="space-y-6">
+                <div className='space-y-6'>
                     {/* Recordings Debug Panel - Shows all recordings clearly */}
                     <RecordingsDebug
                         getRecordings={getVADRecordings}
@@ -254,11 +254,11 @@ export const VADDebugPage: React.FC = () => {
                     <VADDemo roomId={roomId} />
                 </div>
 
-                <div className="mt-8 p-4 bg-yellow-50 rounded-lg">
-                    <h3 className="font-semibold text-yellow-800 mb-2">
+                <div className='mt-8 p-4 bg-yellow-50 rounded-lg'>
+                    <h3 className='font-semibold text-yellow-800 mb-2'>
                         📝 Hướng dẫn sử dụng
                     </h3>
-                    <ol className="list-decimal list-inside space-y-2 text-yellow-700 text-sm">
+                    <ol className='list-decimal list-inside space-y-2 text-yellow-700 text-sm'>
                         <li>Nhập Room ID và tham gia phòng</li>
                         <li>Bật microphone và đảm bảo VAD đang hoạt động</li>
                         <li>Nói một vài câu để VAD ghi âm</li>
@@ -269,11 +269,11 @@ export const VADDebugPage: React.FC = () => {
                     </ol>
                 </div>
 
-                <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                    <h3 className="font-semibold text-green-800 mb-2">
+                <div className='mt-6 p-4 bg-green-50 rounded-lg'>
+                    <h3 className='font-semibold text-green-800 mb-2'>
                         🔍 Debug Tips
                     </h3>
-                    <ul className="list-disc list-inside space-y-1 text-green-700 text-sm">
+                    <ul className='list-disc list-inside space-y-1 text-green-700 text-sm'>
                         <li>Mở Developer Console để xem log chi tiết</li>
                         <li>Kiểm tra thông số energy và ZCR trong console</li>
                         <li>So sánh chất lượng âm thanh giữa các bản ghi âm</li>

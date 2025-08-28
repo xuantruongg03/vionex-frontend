@@ -22,9 +22,6 @@ import {
     VADManager,
 } from "./call-system";
 
-// Constants
-
-
 /**
  * Refactored Call Hook
  * Main hook that orchestrates all call system modules

@@ -428,7 +428,23 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             this.handleStreamMetadataUpdated
         );
         socket.on("sfu:stream-removed", (data: any) => {
-            this.streamManager.removeStream(data.streamId || data.stream_id);
+            const streamId = data.streamId || data.stream_id;
+            if (streamId) {
+                console.log(`Removing stream: ${streamId}`);
+                this.streamManager.removeStream(streamId);
+
+                // Also remove from consuming tracking
+                this.streamManager.removeFromConsuming(streamId);
+
+                // Parse stream ID to show appropriate toast for screen share
+                const parts = streamId.split("_");
+                const publisherId = parts[0];
+                const mediaType = parts[1];
+
+                if (mediaType === "screen" || mediaType === "screen_audio") {
+                    toast.info(`${publisherId} stopped screen sharing`);
+                }
+            }
         });
 
         // Consumer handlers
