@@ -46,8 +46,9 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     };
 
     // Peer management handlers
-    handlePeerLeft = async (data: { peerId: string }) => {
-        this.streamManager.removePeerStreams(data.peerId);
+    handlePeerLeft = async (data: { peerId: string; reason?: string }) => {
+        // Pass reason to StreamManager so it can show appropriate message
+        this.streamManager.removePeerStreams(data.peerId, data.reason);
     };
 
     // Stream handlers
@@ -125,8 +126,8 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             metadata.isScreenShare ||
             metadata.type === "screen" ||
             metadata.type === "screen_audio" ||
-            streamId.includes("_screen_") ||
-            streamId.includes("_screen_audio_");
+            (streamId && streamId.includes("_screen_")) ||
+            (streamId && streamId.includes("_screen_audio_"));
 
         if (isOwnStream && !isScreenShare) {
             return;
@@ -561,7 +562,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // Pin/Unpin response handlers
         socket.on("sfu:pin-user-response", this.handlePinResponse);
         socket.on("sfu:unpin-user-response", this.handleUnpinResponse);
-        
+
         // Pin/Unpin broadcast events (when other users pin/unpin)
         socket.on("sfu:user-pinned", this.handleUserPinned);
         socket.on("sfu:user-unpinned", this.handleUserUnpinned);
@@ -624,11 +625,11 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // Pin/Unpin response handlers
         socket.off("sfu:pin-user-response", this.handlePinResponse);
         socket.off("sfu:unpin-user-response", this.handleUnpinResponse);
-        
+
         // Pin/Unpin broadcast events
         socket.off("sfu:user-pinned", this.handleUserPinned);
         socket.off("sfu:user-unpinned", this.handleUserUnpinned);
-        
+
         // Legacy handlers
         socket.off("sfu:pin-success", this.handlePinSuccess);
         socket.off("sfu:pin-error", this.handlePinError);

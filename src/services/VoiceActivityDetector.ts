@@ -262,32 +262,32 @@ export class VoiceActivityDetector {
         const confirmedSpeech =
             this.speechFrameCount >= this.speechConfirmationFrames;
 
-        // Enhanced debug logging - always log when energy is above minimal threshold
-        const shouldLog =
-            Math.random() < 0.05 || // Increase logging frequency for debugging
-            energy > 0.00001 ||
-            isSpeech ||
-            confirmedSpeech;
-        if (shouldLog) {
-            // Calculate additional metrics for debugging
-            const maxAmplitude = Math.max(
-                ...Array.from(audioData).map(Math.abs)
-            );
-            const rms = Math.sqrt(energy);
-            console.log(
-                `[VAD] Energy: ${energy.toFixed(8)}, RMS: ${rms.toFixed(
-                    6
-                )}, Max: ${maxAmplitude.toFixed(6)}, ZCR: ${zcr.toFixed(
-                    4
-                )}, Threshold: ${
-                    this.config.energyThreshold
-                }, Speech: ${isSpeech}, Confirmed: ${confirmedSpeech}, Frames: ${
-                    this.speechFrameCount
-                }/${this.speechConfirmationFrames}, Recording: ${
-                    this.isRecording
-                }`
-            );
-        }
+        // // Enhanced debug logging - always log when energy is above minimal threshold
+        // const shouldLog =
+        //     Math.random() < 0.05 || // Increase logging frequency for debugging
+        //     energy > 0.00001 ||
+        //     isSpeech ||
+        //     confirmedSpeech;
+        // if (shouldLog) {
+        //     // Calculate additional metrics for debugging
+        //     const maxAmplitude = Math.max(
+        //         ...Array.from(audioData).map(Math.abs)
+        //     );
+        //     const rms = Math.sqrt(energy);
+        //     console.log(
+        //         `[VAD] Energy: ${energy.toFixed(8)}, RMS: ${rms.toFixed(
+        //             6
+        //         )}, Max: ${maxAmplitude.toFixed(6)}, ZCR: ${zcr.toFixed(
+        //             4
+        //         )}, Threshold: ${
+        //             this.config.energyThreshold
+        //         }, Speech: ${isSpeech}, Confirmed: ${confirmedSpeech}, Frames: ${
+        //             this.speechFrameCount
+        //         }/${this.speechConfirmationFrames}, Recording: ${
+        //             this.isRecording
+        //         }`
+        //     );
+        // }
 
         if (confirmedSpeech) {
             this.handleSpeechDetected(audioData, timestamp);

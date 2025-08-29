@@ -17,12 +17,12 @@ export const ParticipantsList = React.memo(
     ({
         roomId,
         togglePinUser,
-        handleRemoveUser,
+        handleKickUser,
         users,
     }: {
         roomId: string;
         togglePinUser?: (peerId: string) => void;
-        handleRemoveUser?: (peerId: string) => void;
+        handleKickUser?: (peerId: string) => void;
         users: User[];
     }) => {
         const room = useSelector((state: any) => state.room);
@@ -54,7 +54,7 @@ export const ParticipantsList = React.memo(
 
         const handleRemoveParticipant = (peerId: string) => {
             if (isCreator) {
-                handleRemoveUser(peerId);
+                handleKickUser(peerId);
             } else {
                 toast.error("You can't remove participants");
             }

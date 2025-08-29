@@ -73,7 +73,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
     } = useCall(roomId ?? "", room.password || null);
     const {
         users: hybridUsers,
-        handleRemoveUser: removeUserFromHook,
+        handleKickUser: kickUserFromHook,
         fetchUsers,
         // error: userError,
     } = useUser(roomId ?? "");
@@ -165,12 +165,12 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         return Array.from(userMap.values());
     }, [hybridUsers, streams, room.username, room.isCreator]);
 
-    // Handle user removal using the user hook
-    const handleRemoveUser = useCallback(
+    // Handle user kick using the user hook
+    const handleKickUser = useCallback(
         (participantId: string) => {
-            removeUserFromHook(participantId);
+            kickUserFromHook(participantId);
         },
-        [removeUserFromHook]
+        [kickUserFromHook]
     );
 
     // Fetch users when joined or streams change significantly
@@ -503,7 +503,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                         <ParticipantsList
                             roomId={roomId}
                             togglePinUser={togglePinUser}
-                            handleRemoveUser={handleRemoveUser}
+                            handleKickUser={handleKickUser}
                             users={users}
                         />
                     </div>

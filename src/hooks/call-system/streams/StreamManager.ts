@@ -267,7 +267,7 @@ export class StreamManager {
     /**
      * Remove streams from a specific peer
      */
-    removePeerStreams = (peerId: string) => {
+    removePeerStreams = (peerId: string, reason?: string) => {
         // Remove regular streams from this peer
         this.context.setters.setStreams((prev) => {
             const filteredStreams = prev.filter((s) => !s.id.includes(peerId));
@@ -298,7 +298,13 @@ export class StreamManager {
             return newSet;
         });
 
-        toast.info(`${peerId} left the room`);
+        // Show appropriate message based on reason
+        if (reason === "kicked") {
+            toast.info(`${peerId} was removed from the room`);
+        } else {
+            // voluntary or undefined (default to voluntary)
+            toast.info(`${peerId} left the room`);
+        }
     };
 
     /**

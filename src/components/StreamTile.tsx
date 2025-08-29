@@ -1,4 +1,3 @@
-
 import { ActionVideoType } from "@/interfaces/action";
 import { motion } from "framer-motion";
 import {
@@ -223,80 +222,91 @@ export const StreamTile = ({
                 {videoOff && !isScreen && (
                     <div className='absolute inset-0 flex items-center justify-center bg-gray-900 dark:bg-gray-800 z-10'>
                         <div className='text-center relative'>
-                            {/* ENHANCED: Sound wave animation when speaking */}
-                            {isActuallySpeaking && (
-                                <div className='absolute inset-0 flex items-center justify-center'>
-                                    <motion.div
-                                        className='absolute w-20 h-20 rounded-full border-2 border-green-400/30'
-                                        animate={{
-                                            scale: [1, 1.3, 1],
-                                            opacity: [0.3, 0.6, 0.3],
-                                        }}
-                                        transition={{
-                                            duration: 1.5,
-                                            repeat: Infinity,
-                                            ease: "easeInOut",
-                                        }}
-                                    />
-                                    <motion.div
-                                        className='absolute w-24 h-24 rounded-full border-2 border-green-400/20'
-                                        animate={{
-                                            scale: [1, 1.5, 1],
-                                            opacity: [0.2, 0.4, 0.2],
-                                        }}
-                                        transition={{
-                                            duration: 2,
-                                            repeat: Infinity,
-                                            ease: "easeInOut",
-                                            delay: 0.3,
-                                        }}
-                                    />
-                                    <motion.div
-                                        className='absolute w-28 h-28 rounded-full border-2 border-green-400/10'
-                                        animate={{
-                                            scale: [1, 1.7, 1],
-                                            opacity: [0.1, 0.3, 0.1],
-                                        }}
-                                        transition={{
-                                            duration: 2.5,
-                                            repeat: Infinity,
-                                            ease: "easeInOut",
-                                            delay: 0.6,
-                                        }}
-                                    />
-                                </div>
-                            )}
-
                             {/* ENHANCED: Avatar with enhanced styling when speaking */}
-                            <motion.div
-                                className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center text-white text-xl font-semibold mb-1 shadow-sm relative z-10 ${
-                                    isActuallySpeaking
-                                        ? "bg-green-500 dark:bg-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
-                                        : "bg-blue-500 dark:bg-blue-600"
-                                }`}
-                                animate={
-                                    isActuallySpeaking
-                                        ? {
-                                              scale: [1, 1.05, 1],
-                                          }
-                                        : {}
-                                }
-                                transition={{
-                                    duration: 0.8,
-                                    repeat: isActuallySpeaking ? Infinity : 0,
-                                    ease: "easeInOut",
-                                }}
-                            >
-                                {userName.charAt(0).toUpperCase()}
-                            </motion.div>
+                            <div className='relative flex flex-col items-center'>
+                                {/* Avatar container with sound waves positioned relative to it */}
+                                <div className='relative w-16 h-16 flex items-center justify-center'>
+                                    {/* Sound wave animation - positioned absolute to avatar container */}
+                                    {isActuallySpeaking && (
+                                        <div className='absolute inset-0 flex items-center justify-center'>
+                                            <motion.div
+                                                className='absolute w-20 h-20 rounded-full border-2 border-green-400/30'
+                                                animate={{
+                                                    scale: [1, 1.3, 1],
+                                                    opacity: [0.3, 0.6, 0.3],
+                                                }}
+                                                transition={{
+                                                    duration: 1.5,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut",
+                                                }}
+                                            />
+                                            <motion.div
+                                                className='absolute w-24 h-24 rounded-full border-2 border-green-400/20'
+                                                animate={{
+                                                    scale: [1, 1.5, 1],
+                                                    opacity: [0.2, 0.4, 0.2],
+                                                }}
+                                                transition={{
+                                                    duration: 2,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut",
+                                                    delay: 0.3,
+                                                }}
+                                            />
+                                            <motion.div
+                                                className='absolute w-28 h-28 rounded-full border-2 border-green-400/10'
+                                                animate={{
+                                                    scale: [1, 1.7, 1],
+                                                    opacity: [0.1, 0.3, 0.1],
+                                                }}
+                                                transition={{
+                                                    duration: 2.5,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut",
+                                                    delay: 0.6,
+                                                }}
+                                            />
+                                        </div>
+                                    )}
 
-                            <p
-                                className={`text-white text-base font-medium ${
-                                    isActuallySpeaking ? "text-green-100" : ""
-                                }`}
-                            >
-                                {userName}
-                            </p>
+                                    {/* Avatar - positioned relative within the container */}
+                                    <motion.div
+                                        className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold shadow-sm relative z-10 ${
+                                            isActuallySpeaking
+                                                ? "bg-green-500 dark:bg-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
+                                                : "bg-blue-500 dark:bg-blue-600"
+                                        }`}
+                                        animate={
+                                            isActuallySpeaking
+                                                ? {
+                                                      scale: [1, 1.05, 1],
+                                                  }
+                                                : {}
+                                        }
+                                        transition={{
+                                            duration: 0.8,
+                                            repeat: isActuallySpeaking
+                                                ? Infinity
+                                                : 0,
+                                            ease: "easeInOut",
+                                        }}
+                                    >
+                                        {userName.charAt(0).toUpperCase()}
+                                    </motion.div>
+                                </div>
+
+                                {/* Username - positioned outside the avatar container */}
+                                <p
+                                    className={`text-white text-base font-medium mt-2 ${
+                                        isActuallySpeaking
+                                            ? "text-green-100"
+                                            : ""
+                                    }`}
+                                >
+                                    {userName}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 )}
