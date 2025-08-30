@@ -274,8 +274,8 @@ export const StreamTile = ({
                                     <motion.div
                                         className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold shadow-sm relative z-10 ${
                                             isActuallySpeaking
-                                                ? "bg-green-500 dark:bg-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
-                                                : "bg-blue-500 dark:bg-blue-600"
+                                                ? "bg-gradient-to-r from-green-500 to-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
+                                                : "bg-gradient-to-r from-blue-500 to-purple-500"
                                         }`}
                                         animate={
                                             isActuallySpeaking
