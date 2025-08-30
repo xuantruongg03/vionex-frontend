@@ -28,7 +28,7 @@ import {
     Vote,
     X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
@@ -118,18 +118,170 @@ export const SecretVotingDialog = ({
     // Use Socket Context
     const { socket } = useSocket();
 
-    // Helper function to get creator ID from vote session (handles both formats)
-    const getCreatorId = (voteSession: VoteSession | null): string => {
-        if (!voteSession) return "";
-        return voteSession.creatorId || voteSession.creator_id || "";
-    };
+    // Utility functions for better code organization
+    const getCreatorId = useCallback(
+        (voteSession: VoteSession | null): string => {
+            if (!voteSession) return "";
+            return voteSession.creatorId || voteSession.creator_id || "";
+        },
+        []
+    );
 
-    // Helper function to check if current user is creator
-    const isCurrentUserCreator = (voteSession: VoteSession | null): boolean => {
-        const creatorId = getCreatorId(voteSession);
-        const result = creatorId === user.username;
-        return result;
-    };
+    const isCurrentUserCreator = useCallback(
+        (voteSession: VoteSession | null): boolean => {
+            const creatorId = getCreatorId(voteSession);
+            return creatorId === user.username;
+        },
+        [getCreatorId, user.username]
+    );
+
+    const getVoters = useCallback(
+        (voteSession: VoteSession | null): string[] => {
+            if (!voteSession) return [];
+            return voteSession.voters || voteSession.participants || [];
+        },
+        []
+    );
+
+    const clearVoteTimeouts = useCallback(() => {
+        if ((window as any).voteTimeoutId) {
+            clearTimeout((window as any).voteTimeoutId);
+            (window as any).voteTimeoutId = null;
+        }
+        if ((window as any).endVoteTimeoutId) {
+            clearTimeout((window as any).endVoteTimeoutId);
+            (window as any).endVoteTimeoutId = null;
+        }
+    }, []);
+
+    // Memoized computed values
+    const isCreator = useMemo(() => user.isCreator, [user.isCreator]);
+
+    const canCreateVote = useMemo(() => {
+        return isCreator && !activeVote && socket?.connected;
+    }, [isCreator, activeVote, socket?.connected]);
+
+    const canVote = useMemo(() => {
+        return activeVote && !hasVoted && socket?.connected && selectedOption;
+    }, [activeVote, hasVoted, socket?.connected, selectedOption]);
+
+    const canEndVote = useMemo(() => {
+        return activeVote && isCreator && socket?.connected;
+    }, [activeVote, isCreator, socket?.connected]);
+
+    const sortedVoteResults = useMemo(() => {
+        if (!voteResults || voteResults.length === 0) return [];
+        return [...voteResults].sort((a, b) => b.votes - a.votes);
+    }, [voteResults]);
+
+    // Event handlers defined outside useEffect to be reusable
+    const handleVoteCreated = useCallback(
+        (data: VoteSession) => {
+            setActiveVote(data);
+            setActiveTab("vote");
+            // Check if current user has already voted using voters array
+            const voters = getVoters(data);
+            setHasVoted(voters.includes(user.username));
+        },
+        [getVoters, user.username]
+    );
+
+    const handleVoteResults = useCallback(
+        (data: VoteSession) => {
+            if (data && data.options) {
+                setVoteResults(data.options);
+                const voters = getVoters(data);
+                setTotalVotes(voters.length);
+
+                // Only switch to results tab if user has voted
+                if (voters.includes(user.username)) {
+                    setActiveTab("results");
+                }
+            }
+        },
+        [getVoters, user.username]
+    );
+
+    const handleActiveVote = useCallback(
+        (data: VoteSession | null) => {
+            if (data) {
+                setActiveVote(data);
+                const voters = getVoters(data);
+                setHasVoted(voters.includes(user.username));
+
+                if (voters.includes(user.username)) {
+                    socket?.emit("sfu:get-vote-results", {
+                        roomId,
+                        voteId: data.id,
+                    });
+                } else {
+                    setActiveTab("vote");
+                }
+            }
+        },
+        [getVoters, user.username, socket, roomId]
+    );
+
+    const handleVoteError = useCallback(
+        (error: { message: string; code: string }) => {
+            clearVoteTimeouts();
+            toast.error(error.message || "Has error with voting session");
+            setIsSubmitting(false);
+        },
+        [clearVoteTimeouts]
+    );
+
+    const handleVoteUpdated = useCallback(
+        (data: VoteSession) => {
+            // Check if this user was the one who voted
+            const voters = getVoters(data);
+            const currentUserVoted = voters.includes(user.username);
+
+            // Only update state if current user is in the voters list
+            if (currentUserVoted) {
+                // Clear timeout if exists
+                if ((window as any).voteTimeoutId) {
+                    clearTimeout((window as any).voteTimeoutId);
+                    (window as any).voteTimeoutId = null;
+                }
+
+                setIsSubmitting(false);
+                setHasVoted(true);
+                toast.success("Submit vote successfully");
+
+                // Use the data directly from vote-updated (it's already the latest)
+                setActiveVote(data);
+                setVoteResults(data.options || []);
+                const voters = getVoters(data);
+                setTotalVotes(voters.length);
+                setActiveTab("results");
+            } else {
+                // If user has already voted and is viewing results, update the data
+                if (hasVoted && activeTab === "results") {
+                    // Update with latest data
+                    setVoteResults(data.options || []);
+                    const voters = getVoters(data);
+                    setTotalVotes(voters.length);
+                    setActiveVote(data);
+                }
+            }
+        },
+        [getVoters, user.username, hasVoted, activeTab]
+    );
+
+    const handleVoteEnded = useCallback(
+        (data: VoteSession) => {
+            clearVoteTimeouts();
+            setIsSubmitting(false);
+            toast.success("Session vote ended successfully");
+            setActiveVote(null);
+            setActiveTab("create");
+            setHasVoted(false);
+            setVoteResults([]);
+            setTotalVotes(0);
+        },
+        [clearVoteTimeouts]
+    );
 
     const form = useForm<z.infer<typeof voteSchema>>({
         resolver: zodResolver(voteSchema),
@@ -158,91 +310,7 @@ export const SecretVotingDialog = ({
             return;
         }
 
-        const handleVoteCreated = (data: VoteSession) => {
-            setActiveVote(data);
-            setActiveTab("vote");
-            // Check if current user has already voted using voters array
-            const voters = data.voters || data.participants || [];
-            setHasVoted(voters.includes(user.username));
-        };
-
-        const handleVoteResults = (data: VoteSession) => {
-            if (data && data.options) {
-                setVoteResults(data.options);
-                const voters = data.voters || data.participants || [];
-                setTotalVotes(voters.length);
-                setActiveTab("results");
-            }
-        };
-
-        const handleActiveVote = (data: VoteSession | null) => {
-            if (data) {
-                setActiveVote(data);
-                const voters = data.voters || data.participants || [];
-                setHasVoted(voters.includes(user.username));
-
-                if (voters.includes(user.username)) {
-                    socket.emit("sfu:get-vote-results", {
-                        roomId,
-                        voteId: data.id,
-                    });
-                } else {
-                    setActiveTab("vote");
-                }
-            }
-        };
-
-        const handleVoteError = (error: { message: string; code: string }) => {
-            // Clear timeouts if they exist
-            if ((window as any).voteTimeoutId) {
-                clearTimeout((window as any).voteTimeoutId);
-                (window as any).voteTimeoutId = null;
-            }
-            if ((window as any).endVoteTimeoutId) {
-                clearTimeout((window as any).endVoteTimeoutId);
-                (window as any).endVoteTimeoutId = null;
-            }
-
-            toast.error(error.message || "Has error with voting session");
-            setIsSubmitting(false);
-        };
-
-        const handleVoteUpdated = (data: VoteSession) => {
-            console.log("[SecretVoting] Received sfu:vote-updated:", data);
-
-            // Clear timeout if exists
-            if ((window as any).voteTimeoutId) {
-                clearTimeout((window as any).voteTimeoutId);
-                (window as any).voteTimeoutId = null;
-            }
-
-            setIsSubmitting(false);
-            setHasVoted(true);
-            toast.success("Submit vote successfully");
-
-            // Request updated vote results
-            socket.emit("sfu:get-vote-results", {
-                roomId,
-                voteId: data.id,
-            });
-        };
-
-        const handleVoteEnded = (data: VoteSession) => {
-            // Clear timeout if exists
-            if ((window as any).endVoteTimeoutId) {
-                clearTimeout((window as any).endVoteTimeoutId);
-                (window as any).endVoteTimeoutId = null;
-            }
-
-            setIsSubmitting(false);
-            toast.success("Session vote ended successfully");
-            setActiveVote(null);
-            setActiveTab("create");
-            setHasVoted(false);
-            setVoteResults([]);
-            setTotalVotes(0);
-        };
-
+        // Set up event listeners using the memoized handlers
         socket.on("sfu:vote-created", handleVoteCreated);
         socket.on("sfu:vote-results", handleVoteResults);
         socket.on("sfu:active-vote", handleActiveVote);
@@ -251,7 +319,9 @@ export const SecretVotingDialog = ({
         socket.on("sfu:vote-ended", handleVoteEnded);
 
         // Get active vote when dialog opens
-        socket.emit("sfu:get-active-vote", { roomId });
+        if (isOpen) {
+            socket.emit("sfu:get-active-vote", { roomId });
+        }
 
         return () => {
             socket.off("sfu:vote-created", handleVoteCreated);
@@ -261,84 +331,97 @@ export const SecretVotingDialog = ({
             socket.off("sfu:vote-updated", handleVoteUpdated);
             socket.off("sfu:vote-ended", handleVoteEnded);
         };
-    }, [roomId, socket, user.username, isOpen]);
+    }, [
+        socket,
+        isOpen,
+        roomId,
+        handleVoteCreated,
+        handleVoteResults,
+        handleActiveVote,
+        handleVoteError,
+        handleVoteUpdated,
+        handleVoteEnded,
+    ]);
 
-    const handleSubmit = (values: z.infer<typeof voteSchema>) => {
-        if (values.options.length < 2) {
-            toast.error("At least 2 options are required");
-            return;
-        }
-        if (!user.isCreator) {
-            toast.error("Only the creator can create a voting session");
-            return;
-        }
+    const handleSubmit = useCallback(
+        (values: z.infer<typeof voteSchema>) => {
+            if (values.options.length < 2) {
+                toast.error("At least 2 options are required");
+                return;
+            }
+            if (!user.isCreator) {
+                toast.error("Only the creator can create a voting session");
+                return;
+            }
 
-        if (!socket) {
-            toast.error("Socket is not available");
-            return;
-        }
+            if (!socket) {
+                toast.error("Socket is not available");
+                return;
+            }
 
-        if (!socket.connected) {
-            toast.error("Cannot connect to server");
-            return;
-        }
+            if (!socket.connected) {
+                toast.error("Cannot connect to server");
+                return;
+            }
 
-        setIsSubmitting(true);
+            setIsSubmitting(true);
 
-        const options = values.options.map((option) => ({
-            id: Math.random().toString(36).substring(2, 9),
-            text: option,
-            votes: 0,
-        }));
+            const options = values.options.map((option) => ({
+                id: Math.random().toString(36).substring(2, 9),
+                text: option,
+                votes: 0,
+            }));
 
-        const payload = {
-            roomId,
-            question: values.question,
-            options,
-            creatorId: user.username,
-        };
+            const payload = {
+                roomId,
+                question: values.question,
+                options,
+                creatorId: user.username,
+            };
 
-        // Define event handlers first
-        const handleVoteCreatedOnce = (data: VoteSession) => {
-            clearTimeout(timeoutId);
-            setIsSubmitting(false);
-            setActiveVote(data);
-            setActiveTab("vote");
-            toast.success("Vote created successfully");
-            socket.off("sfu:vote-created", handleVoteCreatedOnce);
-            socket.off("sfu:vote-error", handleVoteErrorOnce);
-        };
+            // Define event handlers first
+            const handleVoteCreatedOnce = (data: VoteSession) => {
+                clearTimeout(timeoutId);
+                setIsSubmitting(false);
+                setActiveVote(data);
+                setActiveTab("vote");
+                toast.success("Vote created successfully");
+                socket.off("sfu:vote-created", handleVoteCreatedOnce);
+                socket.off("sfu:vote-error", handleVoteErrorOnce);
+            };
 
-        // Listen for error response
-        const handleVoteErrorOnce = (error: {
-            message: string;
-            code: string;
-        }) => {
-            clearTimeout(timeoutId);
-            setIsSubmitting(false);
-            toast.error(error.message || "Has error with voting session");
-            socket.off("sfu:vote-created", handleVoteCreatedOnce);
-            socket.off("sfu:vote-error", handleVoteErrorOnce);
-        };
+            // Listen for error response
+            const handleVoteErrorOnce = (error: {
+                message: string;
+                code: string;
+            }) => {
+                clearTimeout(timeoutId);
+                setIsSubmitting(false);
+                toast.error(error.message || "Has error with voting session");
+                socket.off("sfu:vote-created", handleVoteCreatedOnce);
+                socket.off("sfu:vote-error", handleVoteErrorOnce);
+            };
 
-        // Add timeout to handle no response
-        const timeoutId = setTimeout(() => {
-            setIsSubmitting(false);
-            toast.error("Timeout - Server no response");
-            // Clean up event listeners
-            socket.off("sfu:vote-created", handleVoteCreatedOnce);
-            socket.off("sfu:vote-error", handleVoteErrorOnce);
-        }, 10000); // 10 second timeout
+            // Add timeout to handle no response
+            const timeoutId = setTimeout(() => {
+                setIsSubmitting(false);
+                toast.error("Timeout - Server no response");
+                // Clean up event listeners
+                socket.off("sfu:vote-created", handleVoteCreatedOnce);
+                socket.off("sfu:vote-error", handleVoteErrorOnce);
+            }, 10000); // 10 second timeout
 
-        // Set up event listeners
-        socket.on("sfu:vote-created", handleVoteCreatedOnce);
-        socket.on("sfu:vote-error", handleVoteErrorOnce);
+            // Set up event listeners
+            socket.on("sfu:vote-created", handleVoteCreatedOnce);
+            socket.on("sfu:vote-error", handleVoteErrorOnce);
 
-        // Emit the create vote event (no callback expected)
-        socket.emit("sfu:create-vote", payload);
-    };
+            // Emit the create vote event (no callback expected)
+            socket.emit("sfu:create-vote", payload);
+        },
+        [roomId, user.isCreator, user.username, socket]
+    );
 
-    const handleVote = () => {
+    const handleVote = useCallback(() => {
         if (!selectedOption || !activeVote) return;
 
         if (!socket || !socket.connected) {
@@ -355,9 +438,9 @@ export const SecretVotingDialog = ({
             optionId: selectedOption,
             voterId: user.username,
         });
-    };
+    }, [selectedOption, activeVote, socket, roomId, user.username]);
 
-    const handleEndVote = () => {
+    const handleEndVote = useCallback(() => {
         if (!activeVote) return;
 
         if (!socket || !socket.connected) {
@@ -367,23 +450,26 @@ export const SecretVotingDialog = ({
 
         setIsSubmitting(true);
 
-        // Emit the end vote without callback - will get response via sfu:vote-ended event
+        // Emit the end vote without callback
         socket.emit("sfu:end-vote", {
             roomId,
             voteId: activeVote.id,
             creatorId: user.username,
         });
-    };
+    }, [activeVote, socket, roomId, user.username]);
 
-    const addOption = () => {
+    const addOption = useCallback(() => {
         if (fields.length >= 5) return;
         append("");
-    };
+    }, [fields.length, append]);
 
-    const removeOption = (index: number) => {
-        if (fields.length <= 2) return;
-        remove(index);
-    };
+    const removeOption = useCallback(
+        (index: number) => {
+            if (fields.length <= 2) return;
+            remove(index);
+        },
+        [fields.length, remove]
+    );
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -541,7 +627,7 @@ export const SecretVotingDialog = ({
                                         variant='outline'
                                         onClick={onClose}
                                     >
-                                        Đóng
+                                        Close
                                     </Button>
                                 </motion.div>
                             ) : (
@@ -820,12 +906,20 @@ export const SecretVotingDialog = ({
                                             <Button
                                                 type='button'
                                                 onClick={() =>
+                                                    hasVoted &&
                                                     setActiveTab("results")
                                                 }
-                                                className='flex items-center gap-2'
+                                                className={`flex items-center gap-2 ${
+                                                    !hasVoted
+                                                        ? "opacity-50 cursor-not-allowed"
+                                                        : ""
+                                                }`}
+                                                disabled={!hasVoted}
                                             >
                                                 <BarChart3 className='h-4 w-4' />{" "}
-                                                View results
+                                                {hasVoted
+                                                    ? "View results"
+                                                    : "Vote first to see results"}
                                             </Button>
                                         </motion.div>
                                     )}
@@ -860,7 +954,7 @@ export const SecretVotingDialog = ({
                                 className='space-y-3'
                                 variants={staggerContainer}
                             >
-                                {voteResults.map((option) => {
+                                {sortedVoteResults.map((option) => {
                                     const percentage =
                                         totalVotes > 0
                                             ? Math.round(

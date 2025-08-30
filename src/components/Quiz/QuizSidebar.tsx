@@ -63,12 +63,6 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
     const [allStudentResults, setAllStudentResults] = useState<
         { participantId: string; results: QuizResultsData }[]
     >([]);
-    const [individualSubmissions, setIndividualSubmissions] = useState<
-        { participantId: string; results: QuizResultsData }[]
-    >([]);
-    const [selectedStudentResult, setSelectedStudentResult] = useState<
-        string | null
-    >(null);
     const [hasSubmittedQuiz, setHasSubmittedQuiz] = useState(false);
     const [submittedQuizzes, setSubmittedQuizzes] = useState<Set<string>>(
         new Set()
