@@ -12,6 +12,13 @@ export interface ActionRoom {
         isOrganizationRoom?: boolean;
         organizationId?: string;
         roomId?: string;
+        // User info for sharing with other participants
+        userInfo?: {
+            id: string;
+            email: string;
+            name: string;
+            avatar?: string;
+        };
     };
 }
 

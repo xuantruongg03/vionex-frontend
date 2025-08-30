@@ -115,7 +115,11 @@ const Room = () => {
 
                 dispatch({
                     type: "JOIN_ROOM",
-                    payload: { username: finalUserName, isCreator: true },
+                    payload: {
+                        username: finalUserName,
+                        isCreator: true,
+                        userInfo: user,
+                    },
                 });
                 // const newRoomId = `${Math.random()
                 //     .toString(36)
@@ -149,6 +153,7 @@ const Room = () => {
                         username: finalUserName,
                         password: password,
                         isLocked: true,
+                        userInfo: user,
                     },
                 });
                 navigate(`/room/${roomId}`);
@@ -198,6 +203,7 @@ const Room = () => {
                         username: finalUserName,
                         isOrganizationRoom: true,
                         roomId: roomId,
+                        userInfo: user,
                     },
                 });
                 navigate(`/room/${roomId}`);
@@ -285,7 +291,10 @@ const Room = () => {
                     const finalUserName = user?.name || userName;
                     dispatch({
                         type: "JOIN_ROOM",
-                        payload: { username: finalUserName },
+                        payload: {
+                            username: finalUserName,
+                            userInfo: user,
+                        },
                     });
                     navigate(`/room/${roomId}`);
                 }

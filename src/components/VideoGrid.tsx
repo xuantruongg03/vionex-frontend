@@ -445,6 +445,7 @@ export const VideoGrid = ({
                             hasTranslation={false}
                             isUsingTranslation={false}
                             onToggleTranslation={handleToggleTranslation}
+                            userInfo={user.userInfo} // Pass user info for screen share streams too
                         />
                     </div>
                 );
@@ -533,6 +534,7 @@ export const VideoGrid = ({
                         hasTranslation={hasUserTranslation(user.peerId)}
                         isUsingTranslation={isUserUsingTranslation(user.peerId)}
                         onToggleTranslation={handleToggleTranslation}
+                        userInfo={user.userInfo} // Pass user info for avatar and email
                     />
                 </div>
             );
@@ -598,6 +600,7 @@ export const VideoGrid = ({
                                 )}
                                 isPinned={false}
                                 togglePin={() => {}}
+                                userInfo={localUser.userInfo} // Pass user info for local user too
                             />
                         ) : (
                             <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-950 rounded-lg'>

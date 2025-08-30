@@ -19,6 +19,7 @@ import Room from "./pages/Room";
 import VideoCallRoom from "./pages/VideoCallRoom";
 import Auth from "./pages/Auth";
 import OrganizationDashboard from "./pages/OrganizationDashboard";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,16 @@ const AppContent = () => {
                 element={
                     <ProtectedRoute requireAuth={false}>
                         <Auth />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path={ROUTES.PROFILE}
+                element={
+                    <ProtectedRoute requireAuth={true}>
+                        <Layout requireAuth={true}>
+                            <Profile />
+                        </Layout>
                     </ProtectedRoute>
                 }
             />

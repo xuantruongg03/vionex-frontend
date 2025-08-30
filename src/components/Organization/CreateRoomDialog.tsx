@@ -89,6 +89,7 @@ export const CreateRoomDialog = ({
                         isOrganizationRoom: true,
                         organizationId: organizationId,
                         roomId: roomId,
+                        userInfo: user,
                     },
                 });
 

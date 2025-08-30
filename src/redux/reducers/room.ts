@@ -10,6 +10,8 @@ const initialState = {
     isOrganizationRoom: false,
     organizationId: null,
     roomId: null,
+    // User info for sharing with other participants
+    userInfo: null,
 };
 
 const roomReducer = (state = initialState, action: ActionRoom) => {
@@ -35,6 +37,8 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                 organizationId:
                     action.payload?.organizationId || state.organizationId,
                 roomId: action.payload?.roomId || state.roomId,
+                // User info for sharing with other participants
+                userInfo: action.payload?.userInfo || state.userInfo,
             };
             return state;
         case ActionRoomType.LEAVE_ROOM:
@@ -48,6 +52,8 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                 isOrganizationRoom: false,
                 organizationId: null,
                 roomId: null,
+                // Reset user info
+                userInfo: null,
             };
             return state;
         case ActionRoomType.SET_CREATOR:

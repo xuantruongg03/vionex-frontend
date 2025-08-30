@@ -1,21 +1,15 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
-
 import { types as mediasoupTypes } from "mediasoup-client";
 // Types
 export interface User {
     peerId: string;
     isCreator: boolean;
     timeArrive: Date;
+    userInfo?: {
+        id: string;
+        email: string;
+        name: string;
+        avatar?: string;
+    };
 }
 
 export interface StreamMetadata {

@@ -5,6 +5,16 @@ const login = async (params: { email: string; password: string }) => {
     return response;
 };
 
+const loginGoogle = async (params: {
+    email: string;
+    name: string;
+    avatar?: string;
+    googleId: string;
+}) => {
+    const response = await axiosClient.post(`/api/auth/google`, params);
+    return response;
+};
+
 const register = async (params: {
     email: string;
     password: string;
@@ -24,11 +34,18 @@ const logout = async () => {
     return response;
 };
 
+const updateProfile = async (params: { name: string; avatar: string }) => {
+    const response = await axiosClient.put(`/api/auth/update-profile`, params);
+    return response;
+};
+
 const authService = {
     login,
+    loginGoogle,
     register,
     getUserInfo,
     logout,
+    updateProfile,
 };
 
 export default authService;

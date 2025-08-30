@@ -13,14 +13,9 @@ import ROUTES from "@/lib/routes";
 import {
     Building,
     ChevronDown,
-    Edit,
-    Key,
     LogOut,
-    Settings,
-    Shield,
-    User,
+    User
 } from "lucide-react";
-import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -38,7 +33,6 @@ interface RootState {
 }
 
 const UserDropdown = () => {
-    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { isAuthenticated, user } = useSelector(
@@ -55,8 +49,6 @@ const UserDropdown = () => {
     }
 
     const handleLogout = async () => {
-        setIsLoggingOut(true);
-        // await authService.logout();
         await logout().then((res) => {
             if (res.data.success) {
                 // Clear localStorage
@@ -140,29 +132,12 @@ const UserDropdown = () => {
                     <span>Organization</span>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className='cursor-pointer focus:bg-gray-100 dark:focus:bg-gray-800'>
+                <DropdownMenuItem
+                    className='cursor-pointer focus:bg-gray-100 dark:focus:bg-gray-800'
+                    onClick={() => navigate(ROUTES.PROFILE)}
+                >
                     <User className='mr-2 h-4 w-4' />
-                    <span>Thông tin cá nhân</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem className='cursor-pointer focus:bg-gray-100 dark:focus:bg-gray-800'>
-                    <Shield className='mr-2 h-4 w-4' />
-                    <span>Quản lý tài khoản</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem className='cursor-pointer focus:bg-gray-100 dark:focus:bg-gray-800'>
-                    <Key className='mr-2 h-4 w-4' />
-                    <span>Đổi mật khẩu</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem className='cursor-pointer focus:bg-gray-100 dark:focus:bg-gray-800'>
-                    <Edit className='mr-2 h-4 w-4' />
-                    <span>Cập nhật thông tin</span>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem className='cursor-pointer focus:bg-gray-100 dark:focus:bg-gray-800'>
-                    <Settings className='mr-2 h-4 w-4' />
-                    <span>Cài đặt</span>
+                    <span>Profile</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
@@ -170,11 +145,11 @@ const UserDropdown = () => {
                 <DropdownMenuItem
                     className='cursor-pointer text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/20 focus:text-red-700 dark:focus:text-red-300'
                     onClick={handleLogout}
-                    disabled={isLoggingOut}
+                    disabled={isPending}
                 >
                     <LogOut className='mr-2 h-4 w-4' />
                     <span>
-                        {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
+                        {isPending ? "Logging out..." : "Log out"}
                     </span>
                 </DropdownMenuItem>
             </DropdownMenuContent>

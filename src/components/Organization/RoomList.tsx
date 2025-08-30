@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { CreateRoomDialog } from "./CreateRoomDialog";
 import { useState } from "react";
-import nameDefault from "@/lib/name";
 import { useVerifyOrgRoomAccess } from "@/hooks/org";
 import { useUserPermissions } from "@/hooks/org/use-user-permissions";
 
@@ -49,6 +48,7 @@ export const RoomList = ({
                     isOrganizationRoom: true,
                     organizationId: organizationId,
                     roomId: roomId,
+                    userInfo: user,
                 },
             });
 

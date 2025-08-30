@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSelector } from "react-redux";
 import { toast } from "sonner";
 
 const VideoPreview = memo(
@@ -30,6 +31,9 @@ const VideoPreview = memo(
         const videoRef = useRef<HTMLVideoElement>(null);
         const analyserRef = useRef<AnalyserNode | null>(null);
         const animationFrameRef = useRef<number | null>(null);
+
+        // Redux
+        const user = useSelector((state: any) => state.auth.user);
 
         const cleanupMediaResources = useCallback(() => {
             if (animationFrameRef.current) {
@@ -308,10 +312,13 @@ const VideoPreview = memo(
         // Optimized memoization - combine related calculations
         const displayInfo = useMemo(
             () => ({
-                name: userName || "Your Name",
-                initial: userName.charAt(0).toUpperCase() || "U",
+                name: userName || user?.name || "Your Name",
+                initial: (userName || user?.name || "U")
+                    .charAt(0)
+                    .toUpperCase(),
+                avatar: user?.avatar,
             }),
-            [userName]
+            [userName, user?.name, user?.avatar]
         );
 
         // Memoize speaking-related styles and animations together
@@ -492,7 +499,27 @@ const VideoPreview = memo(
                                                     speakingStyles.avatarTransition
                                                 }
                                             >
-                                                {displayInfo.initial}
+                                                {displayInfo.avatar ? (
+                                                    <img
+                                                        src={displayInfo.avatar}
+                                                        alt={displayInfo.name}
+                                                        className='w-full h-full object-cover rounded-full'
+                                                        onError={(e) => {
+                                                            // Fallback to initial if image fails to load
+                                                            const target =
+                                                                e.target as HTMLImageElement;
+                                                            const parent =
+                                                                target.parentElement;
+                                                            if (parent) {
+                                                                parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-white text-2xl font-bold">${displayInfo.initial}</div>`;
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className='w-full h-full flex items-center justify-center text-white text-2xl font-bold'>
+                                                        {displayInfo.initial}
+                                                    </div>
+                                                )}
                                             </motion.div>
                                         </motion.div>
                                     )}
@@ -510,6 +537,18 @@ const VideoPreview = memo(
                     transition={{ duration: 0.2 }}
                 >
                     <p className='text-white text-sm font-medium flex items-center gap-2'>
+                        {displayInfo.avatar && (
+                            <img
+                                src={displayInfo.avatar}
+                                alt={displayInfo.name}
+                                className='w-6 h-6 object-cover rounded-full border border-white/30'
+                                onError={(e) => {
+                                    // Hide avatar if fails to load
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                }}
+                            />
+                        )}
                         {displayInfo.name}
                     </p>
                 </motion.div>{" "}

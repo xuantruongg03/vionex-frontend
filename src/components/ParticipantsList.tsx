@@ -136,12 +136,52 @@ export const ParticipantsList = React.memo(
                                 {usersList.map((user) => (
                                     <div
                                         key={user.peerId}
-                                        className='flex items-center justify-between p-2 rounded-lg hover:bg-secondary'
+                                        className='flex items-center justify-between p-3 rounded-lg hover:bg-secondary'
                                     >
-                                        <div className='flex items-center gap-2 min-w-0 flex-1'>
-                                            <span className='text-sm truncate'>
-                                                {user.displayName}
-                                            </span>
+                                        <div className='flex items-center gap-3 min-w-0 flex-1'>
+                                            {/* Avatar */}
+                                            <div className='w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold bg-gradient-to-r from-blue-500 to-purple-500 flex-shrink-0'>
+                                                {user.userInfo?.avatar ? (
+                                                    <img
+                                                        src={
+                                                            user.userInfo.avatar
+                                                        }
+                                                        alt={user.peerId}
+                                                        className='w-full h-full object-cover rounded-full'
+                                                        onError={(e) => {
+                                                            // Fallback to initial if image fails to load
+                                                            const target =
+                                                                e.target as HTMLImageElement;
+                                                            const parent =
+                                                                target.parentElement;
+                                                            if (parent) {
+                                                                parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-white text-sm font-semibold">${user.peerId
+                                                                    .charAt(0)
+                                                                    .toUpperCase()}</div>`;
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className='w-full h-full flex items-center justify-center text-white text-sm font-semibold'>
+                                                        {user.peerId
+                                                            .charAt(0)
+                                                            .toUpperCase()}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* User info */}
+                                            <div className='min-w-0 flex-1'>
+                                                <div className='text-sm truncate font-medium'>
+                                                    {user.displayName}
+                                                </div>
+                                                {/* Email display with smaller font */}
+                                                {user.userInfo?.email && (
+                                                    <div className='text-xs text-muted-foreground truncate mt-0.5'>
+                                                        {user.userInfo.email}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         {!user.isMe && (
                                             <div className='flex gap-2 flex-shrink-0'>

@@ -70,6 +70,7 @@ export class RoomManager {
                 roomId: this.context.roomId,
                 peerId: this.context.room.username,
                 password: password,
+                userInfo: this.context.room.userInfo, // Add user info
             });
 
             // Wait for join success and router capabilities
@@ -249,14 +250,26 @@ export class RoomManager {
                             type: ActionRoomType.REMOVE_PINNED_USER,
                             payload: peerId,
                         });
-                        
+
                         // Show appropriate message
                         if (res.stillInPriority) {
-                            toast.success(`Unpinned user ${peerId} (still in priority view)`);
-                            console.log(`[RoomManager] User ${peerId} unpinned - still in priority, consumers maintained`);
+                            toast.success(
+                                `Unpinned user ${peerId} (still in priority view)`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} unpinned - still in priority, consumers maintained`
+                            );
                         } else {
-                            toast.success(`Unpinned user ${peerId} - ${res.consumersRemoved?.length || 0} consumers removed`);
-                            console.log(`[RoomManager] User ${peerId} unpinned - removed ${res.consumersRemoved?.length || 0} consumers`);
+                            toast.success(
+                                `Unpinned user ${peerId} - ${
+                                    res.consumersRemoved?.length || 0
+                                } consumers removed`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} unpinned - removed ${
+                                    res.consumersRemoved?.length || 0
+                                } consumers`
+                            );
                         }
                     } else {
                         toast.error(res.message || "Failed to unpin user");
@@ -264,7 +277,7 @@ export class RoomManager {
                 }
             );
         } else {
-            // Pin user  
+            // Pin user
             if (!this.context.refs.recvTransportRef.current) {
                 toast.error("Receive transport not ready for pinning");
                 return;
@@ -286,11 +299,23 @@ export class RoomManager {
 
                         // Show appropriate message
                         if (res.alreadyPriority) {
-                            toast.success(`Pinned user ${peerId} (already in priority view)`);
-                            console.log(`[RoomManager] User ${peerId} pinned - already in priority, no new consumers created`);
+                            toast.success(
+                                `Pinned user ${peerId} (already in priority view)`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} pinned - already in priority, no new consumers created`
+                            );
                         } else {
-                            toast.success(`Pinned user ${peerId} - ${res.consumersCreated?.length || 0} consumers created`);
-                            console.log(`[RoomManager] User ${peerId} pinned - created ${res.consumersCreated?.length || 0} consumers`);
+                            toast.success(
+                                `Pinned user ${peerId} - ${
+                                    res.consumersCreated?.length || 0
+                                } consumers created`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} pinned - created ${
+                                    res.consumersCreated?.length || 0
+                                } consumers`
+                            );
                         }
                     } else {
                         toast.error(res.message || "Failed to pin user");

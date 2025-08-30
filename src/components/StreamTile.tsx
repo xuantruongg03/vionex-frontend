@@ -9,7 +9,7 @@ import {
     Volume2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 interface StreamTileProps {
     stream: { id: string; stream: MediaStream; metadata?: any };
@@ -27,6 +27,13 @@ interface StreamTileProps {
     hasTranslation?: boolean;
     isUsingTranslation?: boolean;
     onToggleTranslation?: (userId: string, enable: boolean) => void;
+    // User info for avatar and email display
+    userInfo?: {
+        id: string;
+        email: string;
+        name: string;
+        avatar?: string;
+    };
 }
 
 export const PinOverlay = ({
@@ -89,11 +96,15 @@ export const StreamTile = ({
     hasTranslation = false,
     isUsingTranslation = false,
     onToggleTranslation,
+    userInfo,
 }: StreamTileProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const dispatch = useDispatch();
     const [showControls, setShowControls] = useState(false);
     const isLocal = stream.id === "local";
+
+    // Get user info from Redux for local stream
+    const user = useSelector((state: any) => state.auth.user);
 
     // Fix: Only show speaking when mic is on
     const isActuallySpeaking = isSpeaking && !micOff;
@@ -292,20 +303,51 @@ export const StreamTile = ({
                                             ease: "easeInOut",
                                         }}
                                     >
-                                        {userName.charAt(0).toUpperCase()}
+                                        {/* Avatar from userInfo (remote) or auth user (local) */}
+                                        {userInfo?.avatar ||
+                                        (isLocal && user?.avatar) ? (
+                                            <img
+                                                src={
+                                                    userInfo?.avatar ||
+                                                    user?.avatar
+                                                }
+                                                alt={userName}
+                                                className='w-full h-full object-cover rounded-full'
+                                                onError={(e) => {
+                                                    // Fallback to initial if image fails to load
+                                                    const target =
+                                                        e.target as HTMLImageElement;
+                                                    const parent =
+                                                        target.parentElement;
+                                                    if (parent) {
+                                                        parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-white text-xl font-semibold">${userName
+                                                            .charAt(0)
+                                                            .toUpperCase()}</div>`;
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className='w-full h-full flex items-center justify-center text-white text-xl font-semibold'>
+                                                {userName
+                                                    .charAt(0)
+                                                    .toUpperCase()}
+                                            </div>
+                                        )}
                                     </motion.div>
                                 </div>
 
                                 {/* Username - positioned outside the avatar container */}
-                                <p
-                                    className={`text-white text-base font-medium mt-2 ${
-                                        isActuallySpeaking
-                                            ? "text-green-100"
-                                            : ""
-                                    }`}
-                                >
-                                    {userName}
-                                </p>
+                                <div className='text-center mt-2'>
+                                    <p
+                                        className={`text-white text-base font-medium ${
+                                            isActuallySpeaking
+                                                ? "text-green-100"
+                                                : ""
+                                        }`}
+                                    >
+                                        {userName}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -313,7 +355,22 @@ export const StreamTile = ({
             </div>
 
             <span className='absolute bottom-2 left-2 text-xs text-white bg-black/60 dark:bg-black/75 px-1.5 py-0.5 rounded-md shadow-sm'>
-                <span>{userName}</span>
+                <span className='flex items-center gap-1'>
+                    {/* Avatar for any user with avatar (local or remote) */}
+                    {(userInfo?.avatar || (isLocal && user?.avatar)) && (
+                        <img
+                            src={userInfo?.avatar || user?.avatar}
+                            alt={userName}
+                            className='w-4 h-4 object-cover rounded-full border border-white/30'
+                            onError={(e) => {
+                                // Hide avatar if fails to load
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = "none";
+                            }}
+                        />
+                    )}
+                    {userName}
+                </span>
             </span>
 
             <div className='absolute top-1 right-1 flex gap-1'>

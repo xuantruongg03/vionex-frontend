@@ -98,20 +98,12 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                     username: room.username,
                 });
                 try {
-                    const result = await joinRoom();
-                    console.log("[VideoCallHybrid] Auto-join success:", result);
+                    await joinRoom();
                 } catch (error) {
                     console.error("[VideoCallHybrid] Auto-join failed:", error);
                     // Reset the flag on failure so user can retry
                     hasAttemptedJoin.current = false;
                 }
-            } else {
-                console.log("[VideoCallHybrid] Skipping auto-join:", {
-                    roomId,
-                    username: room.username,
-                    hasJoinRoom: !!joinRoom,
-                    hasAttempted: hasAttemptedJoin.current,
-                });
             }
         };
 
