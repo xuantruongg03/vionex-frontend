@@ -77,3 +77,22 @@ export interface ActionAuth {
         refreshToken?: string;
     };
 }
+
+export enum ActionLayoutType {
+    SET_SELECTED_LAYOUT = "SET_SELECTED_LAYOUT",
+    RESET_LAYOUT = "RESET_LAYOUT",
+    SET_LAYOUT_PREFERENCES = "SET_LAYOUT_PREFERENCES",
+}
+
+export interface ActionLayout {
+    type: ActionLayoutType;
+    payload?: {
+        selectedLayoutTemplate?: string;
+        autoSaveToStorage?: boolean;
+        preferences?: {
+            preferredLayout?: string;
+            enableAutoLayout?: boolean;
+            saveToStorage?: boolean;
+        };
+    };
+}

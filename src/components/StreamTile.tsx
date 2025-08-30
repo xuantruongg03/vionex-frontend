@@ -26,7 +26,7 @@ interface StreamTileProps {
     // Translation control props
     hasTranslation?: boolean;
     isUsingTranslation?: boolean;
-    onToggleTranslation?: (userId: string, enable: boolean) => void;
+    // onToggleTranslation?: (userId: string, enable: boolean) => void;
     // User info for avatar and email display
     userInfo?: {
         id: string;
@@ -95,7 +95,7 @@ export const StreamTile = ({
     ref,
     hasTranslation = false,
     isUsingTranslation = false,
-    onToggleTranslation,
+    // onToggleTranslation,
     userInfo,
 }: StreamTileProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -134,14 +134,14 @@ export const StreamTile = ({
         }
     };
 
-    const handleToggleTranslation = () => {
-        if (onToggleTranslation && !isLocal && !isScreen) {
-            const userId = userName.includes("-")
-                ? userName.split("-")[1]
-                : userName;
-            onToggleTranslation(userId, !isUsingTranslation);
-        }
-    };
+    // const handleToggleTranslation = () => {
+    //     if (onToggleTranslation && !isLocal && !isScreen) {
+    //         const userId = userName.includes("-")
+    //             ? userName.split("-")[1]
+    //             : userName;
+    //         onToggleTranslation(userId, !isUsingTranslation);
+    //     }
+    // };
 
     return (
         <motion.div
@@ -395,7 +395,7 @@ export const StreamTile = ({
             )}
 
             {/* Translation Toggle Button */}
-            {!isLocal &&
+            {/* {!isLocal &&
                 !isScreen &&
                 hasTranslation &&
                 onToggleTranslation &&
@@ -433,7 +433,7 @@ export const StreamTile = ({
                             )}
                         </button>
                     </motion.div>
-                )}
+                )} */}
 
             {isPinned && (
                 <div className='absolute top-1 right-1 bg-blue-500 dark:bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm'>

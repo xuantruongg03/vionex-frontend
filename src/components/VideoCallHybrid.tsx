@@ -93,10 +93,6 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                 !hasAttemptedJoin.current
             ) {
                 hasAttemptedJoin.current = true;
-                console.log("[VideoCallHybrid] Attempting to join room...", {
-                    roomId,
-                    username: room.username,
-                });
                 try {
                     await joinRoom();
                 } catch (error) {

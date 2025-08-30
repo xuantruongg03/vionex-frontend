@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useSelector } from "react-redux";
 import { User } from "@/interfaces";
+import { RootState } from "@/redux/store";
 
 export const useVideoGrid = (
     streams: any[],
@@ -12,13 +14,16 @@ export const useVideoGrid = (
     const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
     const streamMapRef = useRef<Map<string, MediaStream>>(new Map());
 
+    // Get layout state from Redux instead of local state
+    const selectedLayoutTemplate = useSelector(
+        (state: RootState) => state.layout.selectedLayoutTemplate
+    );
+
     const [layouts, setLayouts] = useState<{ [index: string]: any[] }>({});
     const [currentBreakpoint, setCurrentBreakpoint] = useState("lg");
     const [mounted, setMounted] = useState(false);
     const [usersToShow, setUsersToShow] = useState<User[]>([]);
     const [remainingUsers, setRemainingUsers] = useState<User[]>([]);
-    const [selectedLayoutTemplate, setSelectedLayoutTemplate] =
-        useState("auto");
 
     const attachMediaStream = useCallback((id: string, stream: MediaStream) => {
         const videoElement = videoRefs.current[id];
@@ -210,7 +215,7 @@ export const useVideoGrid = (
 
         for (const stream of screenStreams) {
             let screenOwner = "";
-            
+
             // Enhanced owner detection with metadata priority
             if (stream.metadata?.publisherId) {
                 screenOwner = stream.metadata.publisherId;
@@ -224,11 +229,17 @@ export const useVideoGrid = (
 
             if (!screenOwner) continue;
 
-            const hasVideoTracks = stream.stream && stream.stream.getVideoTracks().length > 0;
+            const hasVideoTracks =
+                stream.stream && stream.stream.getVideoTracks().length > 0;
             const existingStream = streamsByOwner.get(screenOwner);
 
             // Only replace if new stream has video and existing doesn't, or if no existing stream
-            if (!existingStream || (hasVideoTracks && (!existingStream.stream || existingStream.stream.getVideoTracks().length === 0))) {
+            if (
+                !existingStream ||
+                (hasVideoTracks &&
+                    (!existingStream.stream ||
+                        existingStream.stream.getVideoTracks().length === 0))
+            ) {
                 streamsByOwner.set(screenOwner, stream);
             }
         }
@@ -236,8 +247,9 @@ export const useVideoGrid = (
         // Create screen users from best streams
         const screenUsers = [];
         for (const [screenOwner, stream] of streamsByOwner) {
-            const hasVideoTracks = stream.stream && stream.stream.getVideoTracks().length > 0;
-            
+            const hasVideoTracks =
+                stream.stream && stream.stream.getVideoTracks().length > 0;
+
             if (hasVideoTracks) {
                 const screenUser = {
                     peerId: `${screenOwner}-screen`,
@@ -305,8 +317,7 @@ export const useVideoGrid = (
         setUsersToShow,
         remainingUsers,
         setRemainingUsers,
-        selectedLayoutTemplate,
-        setSelectedLayoutTemplate,
+        selectedLayoutTemplate, // Now from Redux
         getUserStream,
         getUserAudioStream,
         isUserScreenSharing,

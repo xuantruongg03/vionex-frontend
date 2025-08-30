@@ -220,6 +220,7 @@ const VideoPreview = memo(
             cleanupAudioAnalyser,
             externalToggleAudio,
         ]);
+        
         // Combined effect for stream management and cleanup
         useEffect(() => {
             let mounted = true;
@@ -248,9 +249,6 @@ const VideoPreview = memo(
                 // Setup video element
                 if (videoRef.current) {
                     videoRef.current.srcObject = externalStream;
-                    videoRef.current.play().catch((error) => {
-                        console.log("Video autoplay prevented:", error);
-                    });
                 }
             }
 
@@ -598,13 +596,6 @@ const VideoPreview = memo(
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        animate={{
-                            boxShadow: isSpeaking
-                                ? `0 0 20px rgba(34, 197, 94, ${
-                                      0.5 + audioLevel * 0.3
-                                  })`
-                                : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                        }}
                     >
                         <Button
                             size='sm'

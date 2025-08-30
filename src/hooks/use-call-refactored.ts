@@ -287,6 +287,24 @@ export function useCallRefactored(roomId: string, password?: string) {
         const initVAD = async () => {
             if (refs.localStreamRef.current && isJoined) {
                 try {
+                    // Check if local stream has audio tracks before initializing VAD
+                    const localStream = refs.localStreamRef.current;
+                    const audioTracks = localStream.getAudioTracks();
+
+                    if (audioTracks.length === 0) {
+                        return;
+                    }
+
+                    // Check if audio tracks are enabled
+                    const hasEnabledAudio = audioTracks.some(
+                        (track) => track.enabled
+                    );
+                    if (!hasEnabledAudio) {
+                        console.warn(
+                            "[useCallRefactored] All audio tracks are disabled, skipping VAD initialization"
+                        );
+                        return;
+                    }
                     await vadManager.initialize();
                 } catch (error) {
                     console.error(
@@ -298,7 +316,7 @@ export function useCallRefactored(roomId: string, password?: string) {
         };
 
         initVAD();
-    }, [refs.localStreamRef.current, isJoined]);
+    }, [refs.localStreamRef.current, isJoined]); // Remove invalid dependency
 
     // Monitor microphone state for VAD
     useEffect(() => {
