@@ -38,7 +38,7 @@ export function useNetworkMonitor({ transport, onPoorNetworkDetected, onGoodNetw
 
         try {
             if (!transport || transport.connectionState !== "connected") {
-                toast.error("Giám sát chỉ hoạt động khi có kết nối nhận");
+                toast.error("Monitoring is only active with a receiving connection");
                 return;
             }
 

@@ -62,7 +62,7 @@ const testimonials = [
         role: "CEO, TechFlow Inc.",
         content:
             "VideoMeet has revolutionized our remote collaboration. The video quality is exceptional and the platform is incredibly reliable.",
-        avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face",
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&crop=face",
         rating: 5,
         company: "TechFlow Inc.",
     },
