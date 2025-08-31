@@ -1,14 +1,3 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
 import { ActionVideoType } from "@/interfaces/action";
 import { motion } from "framer-motion";
 import {
@@ -20,7 +9,7 @@ import {
     Volume2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 interface StreamTileProps {
     stream: { id: string; stream: MediaStream; metadata?: any };
@@ -37,7 +26,14 @@ interface StreamTileProps {
     // Translation control props
     hasTranslation?: boolean;
     isUsingTranslation?: boolean;
-    onToggleTranslation?: (userId: string, enable: boolean) => void;
+    // onToggleTranslation?: (userId: string, enable: boolean) => void;
+    // User info for avatar and email display
+    userInfo?: {
+        id: string;
+        email: string;
+        name: string;
+        avatar?: string;
+    };
 }
 
 export const PinOverlay = ({
@@ -57,7 +53,7 @@ export const PinOverlay = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute top-1 left-1 z-20"
+            className='absolute top-1 left-1 z-20'
         >
             <button
                 onClick={(e) => {
@@ -73,12 +69,12 @@ export const PinOverlay = ({
                   : "bg-black/60 dark:bg-black/75 text-white hover:bg-black/80 dark:hover:bg-black/90"
           }
         `}
-                title={isPinned ? "Bỏ ghim" : "Ghim người dùng này"}
+                title={isPinned ? "Unpin user" : "Pin user"}
             >
                 {isPinned ? (
-                    <PinOff className="h-3.5 w-3.5" />
+                    <PinOff className='h-3.5 w-3.5' />
                 ) : (
-                    <Pin className="h-3.5 w-3.5" />
+                    <Pin className='h-3.5 w-3.5' />
                 )}
             </button>
         </motion.div>
@@ -99,12 +95,19 @@ export const StreamTile = ({
     ref,
     hasTranslation = false,
     isUsingTranslation = false,
-    onToggleTranslation,
+    // onToggleTranslation,
+    userInfo,
 }: StreamTileProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const dispatch = useDispatch();
     const [showControls, setShowControls] = useState(false);
     const isLocal = stream.id === "local";
+
+    // Get user info from Redux for local stream
+    const user = useSelector((state: any) => state.auth.user);
+
+    // Fix: Only show speaking when mic is on
+    const isActuallySpeaking = isSpeaking && !micOff;
 
     useEffect(() => {
         if (videoRef.current && stream.stream) {
@@ -131,14 +134,14 @@ export const StreamTile = ({
         }
     };
 
-    const handleToggleTranslation = () => {
-        if (onToggleTranslation && !isLocal && !isScreen) {
-            const userId = userName.includes("-")
-                ? userName.split("-")[1]
-                : userName;
-            onToggleTranslation(userId, !isUsingTranslation);
-        }
-    };
+    // const handleToggleTranslation = () => {
+    //     if (onToggleTranslation && !isLocal && !isScreen) {
+    //         const userId = userName.includes("-")
+    //             ? userName.split("-")[1]
+    //             : userName;
+    //         onToggleTranslation(userId, !isUsingTranslation);
+    //     }
+    // };
 
     return (
         <motion.div
@@ -152,11 +155,19 @@ export const StreamTile = ({
             onMouseLeave={() => setShowControls(false)}
             className={`relative bg-gray-800 dark:bg-gray-900 rounded-md overflow-hidden flex items-center justify-center cursor-pointer hover:ring-1 hover:ring-blue-500 w-full h-full ${
                 isPinned ? "ring-2 ring-blue-500" : ""
-            } ${isScreen ? "ring-2 ring-green-500" : ""}`}
+            } ${isScreen ? "ring-2 ring-green-500" : ""} ${
+                // ENHANCED: Speaking user gets prominent green border when camera is on
+                isActuallySpeaking && !videoOff
+                    ? "ring-4 ring-green-400 shadow-lg shadow-green-400/20"
+                    : ""
+            }`}
         >
             <div
                 className={`relative bg-gray-800 dark:bg-gray-900 w-full h-full rounded-md overflow-hidden ${
-                    isSpeaking ? "ring-1 ring-green-500" : ""
+                    // ENHANCED: Subtle ring for speaking when video is off (avatar will have animation)
+                    isActuallySpeaking && videoOff
+                        ? "ring-2 ring-green-400/60"
+                        : ""
                 }`}
             >
                 <video
@@ -164,8 +175,13 @@ export const StreamTile = ({
                     autoPlay
                     playsInline
                     muted
-                    className={`w-full h-full object-cover ${
+                    className={`w-full h-full object-cover transition-all duration-300 ${
                         isScreen ? "screen-share" : ""
+                    } ${
+                        // ENHANCED: Speaking user video gets subtle glow effect
+                        isActuallySpeaking && !videoOff
+                            ? "filter brightness-110 contrast-105"
+                            : ""
                     }`}
                     style={{ display: videoOff ? "none" : "block" }}
                     onError={(e) => {
@@ -175,6 +191,31 @@ export const StreamTile = ({
                         });
                     }}
                 />
+
+                {/* ENHANCED: Speaking indicator overlay for video streams */}
+                {isActuallySpeaking && !videoOff && !isScreen && (
+                    <motion.div
+                        className='absolute top-2 left-2 flex items-center gap-1 bg-green-500/90 text-white text-xs px-2 py-1 rounded-full shadow-lg'
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <motion.div
+                            className='w-2 h-2 bg-white rounded-full'
+                            animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [0.8, 1, 0.8],
+                            }}
+                            transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                            }}
+                        />
+                        <span className='font-medium'>Speaking</span>
+                    </motion.div>
+                )}
 
                 {audioStream && (
                     <audio
@@ -190,38 +231,157 @@ export const StreamTile = ({
                 )}
 
                 {videoOff && !isScreen && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900 dark:bg-gray-800 z-10">
-                        <div className="text-center">
-                            <div className="w-16 h-16 rounded-full bg-blue-500 dark:bg-blue-600 mx-auto flex items-center justify-center text-white text-xl font-semibold mb-1 shadow-sm">
-                                {userName.charAt(0).toUpperCase()}
+                    <div className='absolute inset-0 flex items-center justify-center bg-gray-900 dark:bg-gray-800 z-10'>
+                        <div className='text-center relative'>
+                            {/* ENHANCED: Avatar with enhanced styling when speaking */}
+                            <div className='relative flex flex-col items-center'>
+                                {/* Avatar container with sound waves positioned relative to it */}
+                                <div className='relative w-16 h-16 flex items-center justify-center'>
+                                    {/* Sound wave animation - positioned absolute to avatar container */}
+                                    {isActuallySpeaking && (
+                                        <div className='absolute inset-0 flex items-center justify-center'>
+                                            <motion.div
+                                                className='absolute w-20 h-20 rounded-full border-2 border-green-400/30'
+                                                animate={{
+                                                    scale: [1, 1.3, 1],
+                                                    opacity: [0.3, 0.6, 0.3],
+                                                }}
+                                                transition={{
+                                                    duration: 1.5,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut",
+                                                }}
+                                            />
+                                            <motion.div
+                                                className='absolute w-24 h-24 rounded-full border-2 border-green-400/20'
+                                                animate={{
+                                                    scale: [1, 1.5, 1],
+                                                    opacity: [0.2, 0.4, 0.2],
+                                                }}
+                                                transition={{
+                                                    duration: 2,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut",
+                                                    delay: 0.3,
+                                                }}
+                                            />
+                                            <motion.div
+                                                className='absolute w-28 h-28 rounded-full border-2 border-green-400/10'
+                                                animate={{
+                                                    scale: [1, 1.7, 1],
+                                                    opacity: [0.1, 0.3, 0.1],
+                                                }}
+                                                transition={{
+                                                    duration: 2.5,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut",
+                                                    delay: 0.6,
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Avatar - positioned relative within the container */}
+                                    <motion.div
+                                        className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-semibold shadow-sm relative z-10 ${
+                                            isActuallySpeaking
+                                                ? "bg-gradient-to-r from-green-500 to-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
+                                                : "bg-gradient-to-r from-blue-500 to-purple-500"
+                                        }`}
+                                        animate={
+                                            isActuallySpeaking
+                                                ? {
+                                                      scale: [1, 1.05, 1],
+                                                  }
+                                                : {}
+                                        }
+                                        transition={{
+                                            duration: 0.8,
+                                            repeat: isActuallySpeaking
+                                                ? Infinity
+                                                : 0,
+                                            ease: "easeInOut",
+                                        }}
+                                    >
+                                        {/* Avatar from userInfo (remote) or auth user (local) */}
+                                        {userInfo?.avatar ||
+                                        (isLocal && user?.avatar) ? (
+                                            <img
+                                                src={
+                                                    userInfo?.avatar ||
+                                                    user?.avatar
+                                                }
+                                                alt={userName}
+                                                className='w-full h-full object-cover rounded-full'
+                                                onError={(e) => {
+                                                    // Fallback to initial if image fails to load
+                                                    const target =
+                                                        e.target as HTMLImageElement;
+                                                    const parent =
+                                                        target.parentElement;
+                                                    if (parent) {
+                                                        parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-white text-xl font-semibold">${userName
+                                                            .charAt(0)
+                                                            .toUpperCase()}</div>`;
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className='w-full h-full flex items-center justify-center text-white text-xl font-semibold'>
+                                                {userName
+                                                    .charAt(0)
+                                                    .toUpperCase()}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                </div>
+
+                                {/* Username - positioned outside the avatar container */}
+                                <div className='text-center mt-2'>
+                                    <p
+                                        className={`text-white text-base font-medium ${
+                                            isActuallySpeaking
+                                                ? "text-green-100"
+                                                : ""
+                                        }`}
+                                    >
+                                        {userName}
+                                    </p>
+                                </div>
                             </div>
-                            <p className="text-white text-base font-medium">
-                                {userName}
-                            </p>
                         </div>
                     </div>
                 )}
             </div>
 
-            <span className="absolute bottom-2 left-2 text-xs text-white bg-black/60 dark:bg-black/75 px-1.5 py-0.5 rounded-md shadow-sm">
-                {isScreen ? (
-                    <span className="flex items-center gap-1">
-                        {userName} - Share Screen
-                    </span>
-                ) : (
-                    <span>{userName}</span>
-                )}
+            <span className='absolute bottom-2 left-2 text-xs text-white bg-black/60 dark:bg-black/75 px-1.5 py-0.5 rounded-md shadow-sm'>
+                <span className='flex items-center gap-1'>
+                    {/* Avatar for any user with avatar (local or remote) */}
+                    {(userInfo?.avatar || (isLocal && user?.avatar)) && (
+                        <img
+                            src={userInfo?.avatar || user?.avatar}
+                            alt={userName}
+                            className='w-4 h-4 object-cover rounded-full border border-white/30'
+                            onError={(e) => {
+                                // Hide avatar if fails to load
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = "none";
+                            }}
+                        />
+                    )}
+                    {userName}
+                </span>
             </span>
 
-            <div className="absolute top-1 right-1 flex gap-1">
+            <div className='absolute top-1 right-1 flex gap-1'>
                 {videoOff && !isScreen && (
-                    <div className="bg-black/60 dark:bg-black/75 p-1 rounded-md shadow-sm">
-                        <VideoOff className="h-4 w-4 text-white" />
+                    <div className='bg-black/60 dark:bg-black/75 p-1 rounded-md shadow-sm'>
+                        <VideoOff className='h-4 w-4 text-white' />
                     </div>
                 )}
                 {micOff && (
-                    <div className="bg-black/60 dark:bg-black/75 p-1 rounded-md z-20 shadow-sm">
-                        <MicOff className="h-4 w-4 text-white" />
+                    <div className='bg-black/60 dark:bg-black/75 p-1 rounded-md z-20 shadow-sm'>
+                        <MicOff className='h-4 w-4 text-white' />
                     </div>
                 )}
             </div>
@@ -235,7 +395,7 @@ export const StreamTile = ({
             )}
 
             {/* Translation Toggle Button */}
-            {!isLocal &&
+            {/* {!isLocal &&
                 !isScreen &&
                 hasTranslation &&
                 onToggleTranslation &&
@@ -244,7 +404,7 @@ export const StreamTile = ({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute top-1 left-12 z-20"
+                        className='absolute top-1 left-12 z-20'
                     >
                         <button
                             onClick={(e) => {
@@ -267,17 +427,17 @@ export const StreamTile = ({
                             }
                         >
                             {isUsingTranslation ? (
-                                <Volume2 className="h-3.5 w-3.5" />
+                                <Volume2 className='h-3.5 w-3.5' />
                             ) : (
-                                <Languages className="h-3.5 w-3.5" />
+                                <Languages className='h-3.5 w-3.5' />
                             )}
                         </button>
                     </motion.div>
-                )}
+                )} */}
 
             {isPinned && (
-                <div className="absolute top-1 right-1 bg-blue-500 dark:bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                    <Pin className="h-3 w-3" />
+                <div className='absolute top-1 right-1 bg-blue-500 dark:bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm'>
+                    <Pin className='h-3 w-3' />
                     <span>Pinned</span>
                 </div>
             )}

@@ -48,8 +48,6 @@ class MediaStreamService {
     }
 
     private async _doInitialize(): Promise<MediaStream> {
-        console.log("[MediaService] Initializing new local media stream");
-
         try {
             // Try to get both video and audio
             const stream = await navigator.mediaDevices.getUserMedia({

@@ -78,6 +78,8 @@ export class MediaManager {
                     const publishResult =
                         await this.producerManager.publishTracks();
                     if (publishResult) {
+                        // FIXED: Sync metadata with actual track states after publishing
+                        await this.syncMetadataWithTrackStates();
                     }
                 }, 1000);
             }
@@ -109,6 +111,52 @@ export class MediaManager {
     };
 
     /**
+     * Sync metadata with actual track states after publishing
+     */
+    private syncMetadataWithTrackStates = async (): Promise<void> => {
+        try {
+            const localStream = mediaStreamService.localStream;
+            if (!localStream) return;
+
+            // Get actual track states
+            const videoTracks = localStream.getVideoTracks();
+            const audioTracks = localStream.getAudioTracks();
+
+            const videoEnabled =
+                videoTracks.length > 0 && videoTracks[0].enabled;
+            const audioEnabled =
+                audioTracks.length > 0 && audioTracks[0].enabled;
+
+            // Update both video and audio streams with correct metadata via WebSocket
+            const streamId =
+                this.context.refs.currentStreamIdsRef.current.primary ||
+                this.context.refs.currentStreamIdsRef.current.video ||
+                this.context.refs.currentStreamIdsRef.current.audio;
+
+            if (streamId && this.context.refs.socketRef.current) {
+                // Use WebSocket instead of HTTP
+                this.context.refs.socketRef.current.emit(
+                    "sfu:update-stream-metadata",
+                    {
+                        streamId: streamId,
+                        metadata: {
+                            video: videoEnabled,
+                            audio: audioEnabled,
+                        },
+                        roomId: this.context.roomId,
+                    }
+                );
+
+                console.log(
+                    `[MediaManager] Synced metadata via WebSocket - video: ${videoEnabled}, audio: ${audioEnabled}`
+                );
+            }
+        } catch (error) {
+            console.warn("Failed to sync metadata with track states:", error);
+        }
+    };
+
+    /**
      * Toggle video on/off
      */
     toggleVideo = async (): Promise<boolean> => {
@@ -131,10 +179,10 @@ export class MediaManager {
                 )
             );
 
-            // // Update stream metadata via HTTP
+            // Update stream metadata via WebSocket
             try {
                 if (
-                    this.context.refs.apiServiceRef.current &&
+                    this.context.refs.socketRef.current &&
                     this.context.room.username
                 ) {
                     // Try to use video-specific streamId first, then primary
@@ -150,13 +198,17 @@ export class MediaManager {
                             ? audioTrack.enabled
                             : false;
 
-                        await this.context.refs.apiServiceRef.current.updateStream(
-                            streamId,
+                        // Use WebSocket instead of HTTP
+                        this.context.refs.socketRef.current.emit(
+                            "sfu:update-stream-metadata",
                             {
-                                video: enabled,
-                                audio: audioEnabled,
-                            },
-                            this.context.roomId
+                                streamId: streamId,
+                                metadata: {
+                                    video: enabled,
+                                    audio: audioEnabled,
+                                },
+                                roomId: this.context.roomId,
+                            }
                         );
                     } else {
                         console.warn("No streamId available for video update");
@@ -206,10 +258,10 @@ export class MediaManager {
                 );
             }
 
-            // Update stream metadata via HTTP
+            // Update stream metadata via WebSocket
             try {
                 if (
-                    this.context.refs.apiServiceRef.current &&
+                    this.context.refs.socketRef.current &&
                     this.context.room.username
                 ) {
                     // Try to use audio-specific streamId first, then primary
@@ -225,13 +277,17 @@ export class MediaManager {
                             ? videoTrack.enabled
                             : false;
 
-                        await this.context.refs.apiServiceRef.current.updateStream(
-                            streamId,
+                        // Use WebSocket instead of HTTP
+                        this.context.refs.socketRef.current.emit(
+                            "sfu:update-stream-metadata",
                             {
-                                audio: enabled,
-                                video: videoEnabled,
-                            },
-                            this.context.roomId
+                                streamId: streamId,
+                                metadata: {
+                                    audio: enabled,
+                                    video: videoEnabled,
+                                },
+                                roomId: this.context.roomId,
+                            }
                         );
                     } else {
                         console.warn("No streamId available for audio update");
@@ -268,8 +324,8 @@ export class MediaManager {
                 // Clean up producers - unpublish screen share streams
                 this.producerManager.unpublishScreenShare();
 
-                // Update UI state
-                this.context.setters.setStreams((prev) =>
+                // Update UI state - remove from screen streams
+                this.context.setters.setScreenStreams((prev) =>
                     prev.filter((stream) => stream.id !== "screen-local")
                 );
 
@@ -280,6 +336,15 @@ export class MediaManager {
             }
 
             // Start screen sharing
+            console.log("[MediaManager] Checking screen share requirements:", {
+                hasSendTransport: !!this.context.refs.sendTransportRef.current,
+                sendTransportId: this.context.refs.sendTransportRef.current?.id,
+                sendTransportState:
+                    this.context.refs.sendTransportRef.current?.connectionState,
+                hasDevice: !!this.context.refs.deviceRef.current,
+                deviceLoaded: this.context.refs.deviceRef.current?.loaded,
+            });
+
             if (!this.context.refs.sendTransportRef.current) {
                 toast.error("Cannot start screen sharing: Not connected");
                 return false;
@@ -306,8 +371,8 @@ export class MediaManager {
 
             this.context.refs.screenStreamRef.current = screenStream;
 
-            // Add to streams for UI (local display)
-            this.context.setters.setStreams((prev) => [
+            // Add to screen streams for UI (local display)
+            this.context.setters.setScreenStreams((prev) => [
                 ...prev,
                 {
                     id: "screen-local",
@@ -317,6 +382,8 @@ export class MediaManager {
                         audio: screenStream.getAudioTracks().length > 0,
                         type: "screen",
                         isScreenShare: true,
+                        peerId: this.context.room.username,
+                        publisherId: this.context.room.username,
                     },
                 },
             ]);
@@ -355,7 +422,7 @@ export class MediaManager {
             }
 
             this.context.setters.setIsScreenSharing(false);
-            this.context.setters.setStreams((prev) =>
+            this.context.setters.setScreenStreams((prev) =>
                 prev.filter((stream) => stream.id !== "screen-local")
             );
 
@@ -392,8 +459,8 @@ export class MediaManager {
             this.context.refs.screenStreamRef.current = null;
             this.context.setters.setIsScreenSharing(false);
 
-            // Remove from streams
-            this.context.setters.setStreams((prev) =>
+            // Remove from screen streams
+            this.context.setters.setScreenStreams((prev) =>
                 prev.filter((stream) => stream.id !== "screen-local")
             );
 
@@ -406,5 +473,12 @@ export class MediaManager {
      */
     getLocalStream = (): MediaStream | null => {
         return mediaStreamService.localStream;
+    };
+
+    /**
+     * Force sync metadata with current track states (public method)
+     */
+    forceSyncMetadata = async (): Promise<void> => {
+        await this.syncMetadataWithTrackStates();
     };
 }

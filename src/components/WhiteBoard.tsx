@@ -1,4 +1,4 @@
-import { getSocket } from "@/hooks/use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { ChevronRight, Lock } from "lucide-react";
@@ -37,6 +37,9 @@ export const Whiteboard = React.memo(
             users: users?.length || 0,
             usersData: users,
         });
+
+        // Use Socket Context at component level
+        const { socket } = useSocket();
 
         const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] =
             useState(false);
@@ -107,9 +110,6 @@ export const Whiteboard = React.memo(
                 isReceivingRemoteUpdateRef.current = isReceiving;
             },
         });
-
-        // Get socket for direct event handling where needed
-        const socket = getSocket();
 
         const handleChangeRef = useRef(handleChange);
         const handlePointerUpdateRef = useRef(handlePointerUpdate);
@@ -296,14 +296,14 @@ export const Whiteboard = React.memo(
             <>
                 <Sheet open={isOpen} onOpenChange={onClose}>
                     <SheetContent
-                        className="sm:max-w-[800px] md:max-w-[1200px] w-full p-0"
-                        side="right"
+                        className='sm:max-w-[800px] md:max-w-[1200px] w-full p-0'
+                        side='right'
                         style={{ transition: "none" }}
                     >
-                        <SheetHeader className="p-4 border-b">
-                            <div className="flex justify-between items-center">
+                        <SheetHeader className='p-4 border-b'>
+                            <div className='flex justify-between items-center'>
                                 <SheetTitle>Bảng trắng</SheetTitle>
-                                <div className="flex items-center gap-2">
+                                <div className='flex items-center gap-2'>
                                     {(() => {
                                         console.log(
                                             "🎨 [Whiteboard] Button render check:",
@@ -316,32 +316,32 @@ export const Whiteboard = React.memo(
                                         return (
                                             isCreator && (
                                                 <Button
-                                                    variant="outline"
-                                                    size="sm"
+                                                    variant='outline'
+                                                    size='sm'
                                                     onClick={() =>
                                                         setIsPermissionsDialogOpen(
                                                             true
                                                         )
                                                     }
                                                 >
-                                                    <Lock className="h-4 w-4 mr-1" />
+                                                    <Lock className='h-4 w-4 mr-1' />
                                                     Quản lý quyền vẽ
                                                 </Button>
                                             )
                                         );
                                     })()}
                                     <Button
-                                        variant="outline"
-                                        size="icon"
+                                        variant='outline'
+                                        size='icon'
                                         onClick={onClose}
                                     >
-                                        <ChevronRight className="h-4 w-4" />
+                                        <ChevronRight className='h-4 w-4' />
                                     </Button>
                                 </div>
                             </div>
                             <SheetDescription>
                                 {!isCreator && !canDraw && (
-                                    <div className="text-yellow-600 bg-yellow-50 p-2 rounded-md mt-2">
+                                    <div className='text-yellow-600 bg-yellow-50 p-2 rounded-md mt-2'>
                                         <span>
                                             Bạn chỉ có thể xem bảng trắng này.
                                             Chỉ chủ phòng mới có thể vẽ hoặc cấp
@@ -353,7 +353,7 @@ export const Whiteboard = React.memo(
                         </SheetHeader>
 
                         <div
-                            className="excalidraw-container"
+                            className='excalidraw-container'
                             style={{
                                 height: "calc(100vh - 120px)",
                                 width: "100%",
@@ -416,8 +416,8 @@ export const Whiteboard = React.memo(
                                         viewModeEnabled={!canDraw}
                                         zenModeEnabled={false}
                                         gridModeEnabled={false}
-                                        theme="light"
-                                        name="Whiteboard Session"
+                                        theme='light'
+                                        name='Whiteboard Session'
                                         UIOptions={{
                                             canvasActions: {
                                                 loadScene: false,

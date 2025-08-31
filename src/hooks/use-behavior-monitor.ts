@@ -1,4 +1,4 @@
-import { sfuSocket } from "@/hooks/use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
 import { ActionLogType } from "@/interfaces/action";
 import { TypeUserEvent } from "@/interfaces/behavior";
 import { useCallback, useEffect, useRef } from "react";
@@ -12,6 +12,7 @@ interface BehaviorMonitorProps {
 
 export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
     const dispatch = useDispatch();
+    const { socket: sfuSocket } = useSocket();
     const { isLookingAtScreen, isInitialized, hasCamera } = useDetectEye();
     // const isLookingAtScreen = false;
     // const isInitialized = false;

@@ -16,7 +16,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { getSocket } from "@/hooks/use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -28,7 +28,7 @@ import {
     Vote,
     X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
@@ -115,21 +115,173 @@ export const SecretVotingDialog = ({
     const [voteResults, setVoteResults] = useState<VoteOption[]>([]);
     const [totalVotes, setTotalVotes] = useState(0);
 
-    // Get socket instance
-    const socket = getSocket();
+    // Use Socket Context
+    const { socket } = useSocket();
 
-    // Helper function to get creator ID from vote session (handles both formats)
-    const getCreatorId = (voteSession: VoteSession | null): string => {
-        if (!voteSession) return "";
-        return voteSession.creatorId || voteSession.creator_id || "";
-    };
+    // Utility functions for better code organization
+    const getCreatorId = useCallback(
+        (voteSession: VoteSession | null): string => {
+            if (!voteSession) return "";
+            return voteSession.creatorId || voteSession.creator_id || "";
+        },
+        []
+    );
 
-    // Helper function to check if current user is creator
-    const isCurrentUserCreator = (voteSession: VoteSession | null): boolean => {
-        const creatorId = getCreatorId(voteSession);
-        const result = creatorId === user.username;
-        return result;
-    };
+    const isCurrentUserCreator = useCallback(
+        (voteSession: VoteSession | null): boolean => {
+            const creatorId = getCreatorId(voteSession);
+            return creatorId === user.username;
+        },
+        [getCreatorId, user.username]
+    );
+
+    const getVoters = useCallback(
+        (voteSession: VoteSession | null): string[] => {
+            if (!voteSession) return [];
+            return voteSession.voters || voteSession.participants || [];
+        },
+        []
+    );
+
+    const clearVoteTimeouts = useCallback(() => {
+        if ((window as any).voteTimeoutId) {
+            clearTimeout((window as any).voteTimeoutId);
+            (window as any).voteTimeoutId = null;
+        }
+        if ((window as any).endVoteTimeoutId) {
+            clearTimeout((window as any).endVoteTimeoutId);
+            (window as any).endVoteTimeoutId = null;
+        }
+    }, []);
+
+    // Memoized computed values
+    const isCreator = useMemo(() => user.isCreator, [user.isCreator]);
+
+    const canCreateVote = useMemo(() => {
+        return isCreator && !activeVote && socket?.connected;
+    }, [isCreator, activeVote, socket?.connected]);
+
+    const canVote = useMemo(() => {
+        return activeVote && !hasVoted && socket?.connected && selectedOption;
+    }, [activeVote, hasVoted, socket?.connected, selectedOption]);
+
+    const canEndVote = useMemo(() => {
+        return activeVote && isCreator && socket?.connected;
+    }, [activeVote, isCreator, socket?.connected]);
+
+    const sortedVoteResults = useMemo(() => {
+        if (!voteResults || voteResults.length === 0) return [];
+        return [...voteResults].sort((a, b) => b.votes - a.votes);
+    }, [voteResults]);
+
+    // Event handlers defined outside useEffect to be reusable
+    const handleVoteCreated = useCallback(
+        (data: VoteSession) => {
+            setActiveVote(data);
+            setActiveTab("vote");
+            // Check if current user has already voted using voters array
+            const voters = getVoters(data);
+            setHasVoted(voters.includes(user.username));
+        },
+        [getVoters, user.username]
+    );
+
+    const handleVoteResults = useCallback(
+        (data: VoteSession) => {
+            if (data && data.options) {
+                setVoteResults(data.options);
+                const voters = getVoters(data);
+                setTotalVotes(voters.length);
+
+                // Only switch to results tab if user has voted
+                if (voters.includes(user.username)) {
+                    setActiveTab("results");
+                }
+            }
+        },
+        [getVoters, user.username]
+    );
+
+    const handleActiveVote = useCallback(
+        (data: VoteSession | null) => {
+            if (data) {
+                setActiveVote(data);
+                const voters = getVoters(data);
+                setHasVoted(voters.includes(user.username));
+
+                if (voters.includes(user.username)) {
+                    socket?.emit("sfu:get-vote-results", {
+                        roomId,
+                        voteId: data.id,
+                    });
+                } else {
+                    setActiveTab("vote");
+                }
+            }
+        },
+        [getVoters, user.username, socket, roomId]
+    );
+
+    const handleVoteError = useCallback(
+        (error: { message: string; code: string }) => {
+            clearVoteTimeouts();
+            toast.error(error.message || "Has error with voting session");
+            setIsSubmitting(false);
+        },
+        [clearVoteTimeouts]
+    );
+
+    const handleVoteUpdated = useCallback(
+        (data: VoteSession) => {
+            // Check if this user was the one who voted
+            const voters = getVoters(data);
+            const currentUserVoted = voters.includes(user.username);
+
+            // Only update state if current user is in the voters list
+            if (currentUserVoted) {
+                // Clear timeout if exists
+                if ((window as any).voteTimeoutId) {
+                    clearTimeout((window as any).voteTimeoutId);
+                    (window as any).voteTimeoutId = null;
+                }
+
+                setIsSubmitting(false);
+                setHasVoted(true);
+                toast.success("Submit vote successfully");
+
+                // Use the data directly from vote-updated (it's already the latest)
+                setActiveVote(data);
+                setVoteResults(data.options || []);
+                const voters = getVoters(data);
+                setTotalVotes(voters.length);
+                setActiveTab("results");
+            } else {
+                // If user has already voted and is viewing results, update the data
+                if (hasVoted && activeTab === "results") {
+                    // Update with latest data
+                    setVoteResults(data.options || []);
+                    const voters = getVoters(data);
+                    setTotalVotes(voters.length);
+                    setActiveVote(data);
+                }
+            }
+        },
+        [getVoters, user.username, hasVoted, activeTab]
+    );
+
+    const handleVoteEnded = useCallback(
+        (data: VoteSession) => {
+            clearVoteTimeouts();
+            setIsSubmitting(false);
+            toast.success("Session vote ended successfully");
+            setActiveVote(null);
+            setActiveTab("create");
+            setHasVoted(false);
+            setVoteResults([]);
+            setTotalVotes(0);
+        },
+        [clearVoteTimeouts]
+    );
 
     const form = useForm<z.infer<typeof voteSchema>>({
         resolver: zodResolver(voteSchema),
@@ -151,96 +303,14 @@ export const SecretVotingDialog = ({
         }
 
         if (!socket.connected) {
-            console.warn("[SecretVoting] Socket not connected, attempting to connect...");
+            console.warn(
+                "[SecretVoting] Socket not connected, attempting to connect..."
+            );
             socket.connect();
             return;
         }
 
-        const handleVoteCreated = (data: VoteSession) => {
-            setActiveVote(data);
-            setActiveTab("vote");
-            // Check if current user has already voted using voters array
-            const voters = data.voters || data.participants || [];
-            setHasVoted(voters.includes(user.username));
-        };
-
-        const handleVoteResults = (data: VoteSession) => {
-            if (data && data.options) {
-                setVoteResults(data.options);
-                const voters = data.voters || data.participants || [];
-                setTotalVotes(voters.length);
-                setActiveTab("results");
-            }
-        };
-
-        const handleActiveVote = (data: VoteSession | null) => {
-            if (data) {
-                setActiveVote(data);
-                const voters = data.voters || data.participants || [];
-                setHasVoted(voters.includes(user.username));
-
-                if (voters.includes(user.username)) {
-                    socket.emit("sfu:get-vote-results", {
-                        roomId,
-                        voteId: data.id,
-                    });
-                } else {
-                    setActiveTab("vote");
-                }
-            }
-        };
-
-        const handleVoteError = (error: { message: string; code: string }) => {
-            // Clear timeouts if they exist
-            if ((window as any).voteTimeoutId) {
-                clearTimeout((window as any).voteTimeoutId);
-                (window as any).voteTimeoutId = null;
-            }
-            if ((window as any).endVoteTimeoutId) {
-                clearTimeout((window as any).endVoteTimeoutId);
-                (window as any).endVoteTimeoutId = null;
-            }
-
-            toast.error(error.message || "Has error with voting session");
-            setIsSubmitting(false);
-        };
-
-        const handleVoteUpdated = (data: VoteSession) => {
-            console.log("[SecretVoting] Received sfu:vote-updated:", data);
-
-            // Clear timeout if exists
-            if ((window as any).voteTimeoutId) {
-                clearTimeout((window as any).voteTimeoutId);
-                (window as any).voteTimeoutId = null;
-            }
-
-            setIsSubmitting(false);
-            setHasVoted(true);
-            toast.success("Submit vote successfully");
-
-            // Request updated vote results
-            socket.emit("sfu:get-vote-results", {
-                roomId,
-                voteId: data.id,
-            });
-        };
-
-        const handleVoteEnded = (data: VoteSession) => {
-            // Clear timeout if exists
-            if ((window as any).endVoteTimeoutId) {
-                clearTimeout((window as any).endVoteTimeoutId);
-                (window as any).endVoteTimeoutId = null;
-            }
-
-            setIsSubmitting(false);
-            toast.success("Session vote ended successfully");
-            setActiveVote(null);
-            setActiveTab("create");
-            setHasVoted(false);
-            setVoteResults([]);
-            setTotalVotes(0);
-        };
-
+        // Set up event listeners using the memoized handlers
         socket.on("sfu:vote-created", handleVoteCreated);
         socket.on("sfu:vote-results", handleVoteResults);
         socket.on("sfu:active-vote", handleActiveVote);
@@ -249,7 +319,9 @@ export const SecretVotingDialog = ({
         socket.on("sfu:vote-ended", handleVoteEnded);
 
         // Get active vote when dialog opens
-        socket.emit("sfu:get-active-vote", { roomId });
+        if (isOpen) {
+            socket.emit("sfu:get-active-vote", { roomId });
+        }
 
         return () => {
             socket.off("sfu:vote-created", handleVoteCreated);
@@ -259,84 +331,97 @@ export const SecretVotingDialog = ({
             socket.off("sfu:vote-updated", handleVoteUpdated);
             socket.off("sfu:vote-ended", handleVoteEnded);
         };
-    }, [roomId, socket, user.username, isOpen]);
+    }, [
+        socket,
+        isOpen,
+        roomId,
+        handleVoteCreated,
+        handleVoteResults,
+        handleActiveVote,
+        handleVoteError,
+        handleVoteUpdated,
+        handleVoteEnded,
+    ]);
 
-    const handleSubmit = (values: z.infer<typeof voteSchema>) => {
-        if (values.options.length < 2) {
-            toast.error("At least 2 options are required");
-            return;
-        }
-        if (!user.isCreator) {
-            toast.error("Only the creator can create a voting session");
-            return;
-        }
+    const handleSubmit = useCallback(
+        (values: z.infer<typeof voteSchema>) => {
+            if (values.options.length < 2) {
+                toast.error("At least 2 options are required");
+                return;
+            }
+            if (!user.isCreator) {
+                toast.error("Only the creator can create a voting session");
+                return;
+            }
 
-        if (!socket) {
-            toast.error("Socket is not available");
-            return;
-        }
+            if (!socket) {
+                toast.error("Socket is not available");
+                return;
+            }
 
-        if (!socket.connected) {
-            toast.error("Cannot connect to server");
-            return;
-        }
+            if (!socket.connected) {
+                toast.error("Cannot connect to server");
+                return;
+            }
 
-        setIsSubmitting(true);
+            setIsSubmitting(true);
 
-        const options = values.options.map((option) => ({
-            id: Math.random().toString(36).substring(2, 9),
-            text: option,
-            votes: 0,
-        }));
+            const options = values.options.map((option) => ({
+                id: Math.random().toString(36).substring(2, 9),
+                text: option,
+                votes: 0,
+            }));
 
-        const payload = {
-            roomId,
-            question: values.question,
-            options,
-            creatorId: user.username,
-        };
+            const payload = {
+                roomId,
+                question: values.question,
+                options,
+                creatorId: user.username,
+            };
 
-        // Define event handlers first
-        const handleVoteCreatedOnce = (data: VoteSession) => {
-            clearTimeout(timeoutId);
-            setIsSubmitting(false);
-            setActiveVote(data);
-            setActiveTab("vote");
-            toast.success("Vote created successfully");
-            socket.off("sfu:vote-created", handleVoteCreatedOnce);
-            socket.off("sfu:vote-error", handleVoteErrorOnce);
-        };
+            // Define event handlers first
+            const handleVoteCreatedOnce = (data: VoteSession) => {
+                clearTimeout(timeoutId);
+                setIsSubmitting(false);
+                setActiveVote(data);
+                setActiveTab("vote");
+                toast.success("Vote created successfully");
+                socket.off("sfu:vote-created", handleVoteCreatedOnce);
+                socket.off("sfu:vote-error", handleVoteErrorOnce);
+            };
 
-        // Listen for error response
-        const handleVoteErrorOnce = (error: {
-            message: string;
-            code: string;
-        }) => {
-            clearTimeout(timeoutId);
-            setIsSubmitting(false);
-            toast.error(error.message || "Has error with voting session");
-            socket.off("sfu:vote-created", handleVoteCreatedOnce);
-            socket.off("sfu:vote-error", handleVoteErrorOnce);
-        };
+            // Listen for error response
+            const handleVoteErrorOnce = (error: {
+                message: string;
+                code: string;
+            }) => {
+                clearTimeout(timeoutId);
+                setIsSubmitting(false);
+                toast.error(error.message || "Has error with voting session");
+                socket.off("sfu:vote-created", handleVoteCreatedOnce);
+                socket.off("sfu:vote-error", handleVoteErrorOnce);
+            };
 
-        // Add timeout to handle no response
-        const timeoutId = setTimeout(() => {
-            setIsSubmitting(false);
-            toast.error("Timeout - Server no response");
-            // Clean up event listeners
-            socket.off("sfu:vote-created", handleVoteCreatedOnce);
-            socket.off("sfu:vote-error", handleVoteErrorOnce);
-        }, 10000); // 10 second timeout
+            // Add timeout to handle no response
+            const timeoutId = setTimeout(() => {
+                setIsSubmitting(false);
+                toast.error("Timeout - Server no response");
+                // Clean up event listeners
+                socket.off("sfu:vote-created", handleVoteCreatedOnce);
+                socket.off("sfu:vote-error", handleVoteErrorOnce);
+            }, 10000); // 10 second timeout
 
-        // Set up event listeners
-        socket.on("sfu:vote-created", handleVoteCreatedOnce);
-        socket.on("sfu:vote-error", handleVoteErrorOnce);
+            // Set up event listeners
+            socket.on("sfu:vote-created", handleVoteCreatedOnce);
+            socket.on("sfu:vote-error", handleVoteErrorOnce);
 
-        // Emit the create vote event (no callback expected)
-        socket.emit("sfu:create-vote", payload);
-    };
+            // Emit the create vote event (no callback expected)
+            socket.emit("sfu:create-vote", payload);
+        },
+        [roomId, user.isCreator, user.username, socket]
+    );
 
-    const handleVote = () => {
+    const handleVote = useCallback(() => {
         if (!selectedOption || !activeVote) return;
 
         if (!socket || !socket.connected) {
@@ -353,9 +438,9 @@ export const SecretVotingDialog = ({
             optionId: selectedOption,
             voterId: user.username,
         });
-    };
+    }, [selectedOption, activeVote, socket, roomId, user.username]);
 
-    const handleEndVote = () => {
+    const handleEndVote = useCallback(() => {
         if (!activeVote) return;
 
         if (!socket || !socket.connected) {
@@ -365,44 +450,47 @@ export const SecretVotingDialog = ({
 
         setIsSubmitting(true);
 
-        // Emit the end vote without callback - will get response via sfu:vote-ended event
+        // Emit the end vote without callback
         socket.emit("sfu:end-vote", {
             roomId,
             voteId: activeVote.id,
             creatorId: user.username,
         });
-    };
+    }, [activeVote, socket, roomId, user.username]);
 
-    const addOption = () => {
+    const addOption = useCallback(() => {
         if (fields.length >= 5) return;
         append("");
-    };
+    }, [fields.length, append]);
 
-    const removeOption = (index: number) => {
-        if (fields.length <= 2) return;
-        remove(index);
-    };
+    const removeOption = useCallback(
+        (index: number) => {
+            if (fields.length <= 2) return;
+            remove(index);
+        },
+        [fields.length, remove]
+    );
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-md overflow-hidden">
+            <DialogContent className='sm:max-w-md overflow-hidden'>
                 <DialogHeader>
                     <motion.div
                         initial={{ y: -20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ duration: 0.3 }}
                     >
-                        <DialogTitle className="text-center flex items-center justify-center gap-2">
+                        <DialogTitle className='text-center flex items-center justify-center gap-2'>
                             <motion.div
                                 initial={{ rotate: -10, scale: 0.9 }}
                                 animate={{ rotate: 0, scale: 1 }}
                                 transition={{ duration: 0.4, type: "spring" }}
                             >
-                                <Vote className="h-5 w-5" />
+                                <Vote className='h-5 w-5' />
                             </motion.div>
                             Secret Voting
                         </DialogTitle>
-                        <DialogDescription className="text-center">
+                        <DialogDescription className='text-center'>
                             {activeTab === "create" &&
                                 "Create a secret vote to gather opinions"}
                             {activeTab === "vote" && "Participate in the vote"}
@@ -414,21 +502,22 @@ export const SecretVotingDialog = ({
                 {/* Show connection status */}
                 {(!socket || !socket.connected) && (
                     <motion.div
-                        className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4"
+                        className='bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4'
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                     >
-                        <div className="flex items-center gap-2 text-yellow-800">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="text-sm">
-                                Connecting to server... Voting feature may not be available.
+                        <div className='flex items-center gap-2 text-yellow-800'>
+                            <AlertTriangle className='h-4 w-4' />
+                            <span className='text-sm'>
+                                Connecting to server... Voting feature may not
+                                be available.
                             </span>
                         </div>
                     </motion.div>
                 )}
 
                 <motion.div
-                    className="flex border-b mb-4"
+                    className='flex border-b mb-4'
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.1, duration: 0.3 }}
@@ -445,8 +534,8 @@ export const SecretVotingDialog = ({
                         Create
                         {activeTab === "create" && (
                             <motion.div
-                                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"
-                                layoutId="activeTab"
+                                className='absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500'
+                                layoutId='activeTab'
                                 transition={{
                                     type: "spring",
                                     stiffness: 500,
@@ -467,8 +556,8 @@ export const SecretVotingDialog = ({
                         Voting
                         {activeTab === "vote" && (
                             <motion.div
-                                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"
-                                layoutId="activeTab"
+                                className='absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500'
+                                layoutId='activeTab'
                                 transition={{
                                     type: "spring",
                                     stiffness: 500,
@@ -489,8 +578,8 @@ export const SecretVotingDialog = ({
                         Result
                         {activeTab === "results" && (
                             <motion.div
-                                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"
-                                layoutId="activeTab"
+                                className='absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500'
+                                layoutId='activeTab'
                                 transition={{
                                     type: "spring",
                                     stiffness: 500,
@@ -501,18 +590,18 @@ export const SecretVotingDialog = ({
                     </button>
                 </motion.div>
 
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode='wait'>
                     {activeTab === "create" && (
                         <motion.div
-                            key="create"
-                            initial="visible"
-                            animate="visible"
+                            key='create'
+                            initial='visible'
+                            animate='visible'
                             exit={{ opacity: 0, y: -10 }}
                             variants={fadeIn}
                         >
                             {!user.isCreator ? (
                                 <motion.div
-                                    className="flex flex-col items-center justify-center py-6 text-center"
+                                    className='flex flex-col items-center justify-center py-6 text-center'
                                     variants={slideUp}
                                 >
                                     <motion.div
@@ -524,20 +613,21 @@ export const SecretVotingDialog = ({
                                             damping: 17,
                                         }}
                                     >
-                                        <AlertTriangle className="h-12 w-12 text-amber-500 mb-3" />
+                                        <AlertTriangle className='h-12 w-12 text-amber-500 mb-3' />
                                     </motion.div>
-                                    <h3 className="text-lg font-medium mb-2">
+                                    <h3 className='text-lg font-medium mb-2'>
                                         No permission to create a voting session
                                     </h3>
-                                    <p className="text-sm text-gray-500 mb-4">
-                                        Only the meeting host can create a voting session.
+                                    <p className='text-sm text-gray-500 mb-4'>
+                                        Only the meeting host can create a
+                                        voting session.
                                     </p>
                                     <Button
-                                        type="button"
-                                        variant="outline"
+                                        type='button'
+                                        variant='outline'
                                         onClick={onClose}
                                     >
-                                        Đóng
+                                        Close
                                     </Button>
                                 </motion.div>
                             ) : (
@@ -546,12 +636,12 @@ export const SecretVotingDialog = ({
                                         onSubmit={form.handleSubmit(
                                             handleSubmit
                                         )}
-                                        className="space-y-4"
+                                        className='space-y-4'
                                     >
                                         <motion.div variants={slideUp}>
                                             <FormField
                                                 control={form.control}
-                                                name="question"
+                                                name='question'
                                                 render={({ field }) => (
                                                     <FormItem>
                                                         <FormLabel>
@@ -559,8 +649,8 @@ export const SecretVotingDialog = ({
                                                         </FormLabel>
                                                         <FormControl>
                                                             <Input
-                                                                placeholder="Enter voting question"
-                                                                className="w-full focus-visible:outline-blue-400 focus-visible:ring-0"
+                                                                placeholder='Enter voting question'
+                                                                className='w-full focus-visible:outline-blue-400 focus-visible:ring-0'
                                                                 {...field}
                                                                 autoFocus
                                                             />
@@ -572,30 +662,30 @@ export const SecretVotingDialog = ({
                                         </motion.div>
 
                                         <motion.div
-                                            className="space-y-2"
+                                            className='space-y-2'
                                             variants={staggerContainer}
-                                            initial="visible"
-                                            animate="visible"
+                                            initial='visible'
+                                            animate='visible'
                                         >
                                             <FormLabel>Options</FormLabel>
                                             {fields.map((field, index) => (
                                                 <motion.div
                                                     key={field.id}
-                                                    className="flex items-center gap-2"
+                                                    className='flex items-center gap-2'
                                                     variants={listItem}
                                                 >
                                                     <FormField
                                                         control={form.control}
                                                         name={`options.${index}`}
                                                         render={({ field }) => (
-                                                            <FormItem className="flex-1">
+                                                            <FormItem className='flex-1'>
                                                                 <FormControl>
                                                                     <Input
                                                                         placeholder={`Option ${
                                                                             index +
                                                                             1
                                                                         }`}
-                                                                        className="w-full focus-visible:outline-blue-400 focus-visible:ring-0"
+                                                                        className='w-full focus-visible:outline-blue-400 focus-visible:ring-0'
                                                                         {...field}
                                                                     />
                                                                 </FormControl>
@@ -604,9 +694,9 @@ export const SecretVotingDialog = ({
                                                         )}
                                                     />
                                                     <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
+                                                        type='button'
+                                                        variant='ghost'
+                                                        size='icon'
                                                         onClick={() =>
                                                             removeOption(index)
                                                         }
@@ -614,7 +704,7 @@ export const SecretVotingDialog = ({
                                                             fields.length <= 2
                                                         }
                                                     >
-                                                        <X className="h-4 w-4" />
+                                                        <X className='h-4 w-4' />
                                                     </Button>
                                                 </motion.div>
                                             ))}
@@ -624,17 +714,17 @@ export const SecretVotingDialog = ({
                                                 transition={{ delay: 0.3 }}
                                             >
                                                 <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
+                                                    type='button'
+                                                    variant='outline'
+                                                    size='sm'
                                                     onClick={addOption}
-                                                    className="w-full mt-2"
+                                                    className='w-full mt-2'
                                                     disabled={
                                                         fields.length >= 5
                                                     }
-                                                    title="Add option"
+                                                    title='Add option'
                                                 >
-                                                    <Plus className="h-4 w-4 mr-2" />{" "}
+                                                    <Plus className='h-4 w-4 mr-2' />{" "}
                                                     Add option
                                                 </Button>
                                             </motion.div>
@@ -642,12 +732,12 @@ export const SecretVotingDialog = ({
 
                                         <motion.div
                                             variants={fadeIn}
-                                            className="pt-2"
+                                            className='pt-2'
                                         >
-                                            <DialogFooter className="sm:justify-center gap-2">
+                                            <DialogFooter className='sm:justify-center gap-2'>
                                                 <Button
-                                                    type="button"
-                                                    variant="outline"
+                                                    type='button'
+                                                    variant='outline'
                                                     onClick={onClose}
                                                 >
                                                     Cancel
@@ -657,7 +747,7 @@ export const SecretVotingDialog = ({
                                                     whileTap={{ scale: 0.98 }}
                                                 >
                                                     <Button
-                                                        type="submit"
+                                                        type='submit'
                                                         disabled={
                                                             isSubmitting ||
                                                             form.getValues(
@@ -666,7 +756,7 @@ export const SecretVotingDialog = ({
                                                             !socket ||
                                                             !socket.connected
                                                         }
-                                                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus-visible:outline-blue-400 focus-visible:ring-0"
+                                                        className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus-visible:outline-blue-400 focus-visible:ring-0'
                                                     >
                                                         {isSubmitting
                                                             ? "Processing..."
@@ -686,15 +776,15 @@ export const SecretVotingDialog = ({
 
                     {activeTab === "vote" && activeVote && (
                         <motion.div
-                            key="vote"
-                            className="space-y-4"
-                            initial="hidden"
-                            animate="visible"
+                            key='vote'
+                            className='space-y-4'
+                            initial='hidden'
+                            animate='visible'
                             exit={{ opacity: 0, y: -10 }}
                             variants={fadeIn}
                         >
                             <motion.div
-                                className="text-center font-medium text-lg"
+                                className='text-center font-medium text-lg'
                                 variants={slideUp}
                             >
                                 {activeVote.question}
@@ -702,7 +792,7 @@ export const SecretVotingDialog = ({
 
                             {hasVoted ? (
                                 <motion.div
-                                    className="text-center text-green-600 flex items-center justify-center gap-2"
+                                    className='text-center text-green-600 flex items-center justify-center gap-2'
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
                                     transition={{
@@ -711,11 +801,11 @@ export const SecretVotingDialog = ({
                                         damping: 17,
                                     }}
                                 >
-                                    <Check className="h-5 w-5" /> You have voted
+                                    <Check className='h-5 w-5' /> You have voted
                                 </motion.div>
                             ) : (
                                 <motion.div
-                                    className="space-y-2"
+                                    className='space-y-2'
                                     variants={staggerContainer}
                                 >
                                     {activeVote.options.map((option) => (
@@ -750,7 +840,7 @@ export const SecretVotingDialog = ({
                                                         damping: 30,
                                                     }}
                                                 >
-                                                    <Check className="h-4 w-4 inline-block ml-2 text-blue-500" />
+                                                    <Check className='h-4 w-4 inline-block ml-2 text-blue-500' />
                                                 </motion.span>
                                             )}
                                         </motion.div>
@@ -759,24 +849,24 @@ export const SecretVotingDialog = ({
                             )}
 
                             <motion.div variants={fadeIn}>
-                                <DialogFooter className="sm:justify-center gap-2">
+                                <DialogFooter className='sm:justify-center gap-2'>
                                     {isCurrentUserCreator(activeVote) && (
                                         <motion.div
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
                                         >
                                             <Button
-                                                type="button"
-                                                variant="destructive"
+                                                type='button'
+                                                variant='destructive'
                                                 onClick={handleEndVote}
-                                                className="flex items-center gap-2"
+                                                className='flex items-center gap-2'
                                                 disabled={
                                                     isSubmitting ||
                                                     !socket ||
                                                     !socket.connected
                                                 }
                                             >
-                                                <Trash2 className="h-4 w-4" />{" "}
+                                                <Trash2 className='h-4 w-4' />{" "}
                                                 End
                                             </Button>
                                         </motion.div>
@@ -788,7 +878,7 @@ export const SecretVotingDialog = ({
                                             whileTap={{ scale: 0.98 }}
                                         >
                                             <Button
-                                                type="button"
+                                                type='button'
                                                 disabled={
                                                     !selectedOption ||
                                                     isSubmitting ||
@@ -796,7 +886,7 @@ export const SecretVotingDialog = ({
                                                     !socket.connected
                                                 }
                                                 onClick={handleVote}
-                                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus-visible:outline-blue-400 focus-visible:ring-0"
+                                                className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus-visible:outline-blue-400 focus-visible:ring-0'
                                             >
                                                 {isSubmitting
                                                     ? "Processing..."
@@ -814,14 +904,22 @@ export const SecretVotingDialog = ({
                                             whileTap={{ scale: 0.98 }}
                                         >
                                             <Button
-                                                type="button"
+                                                type='button'
                                                 onClick={() =>
+                                                    hasVoted &&
                                                     setActiveTab("results")
                                                 }
-                                                className="flex items-center gap-2"
+                                                className={`flex items-center gap-2 ${
+                                                    !hasVoted
+                                                        ? "opacity-50 cursor-not-allowed"
+                                                        : ""
+                                                }`}
+                                                disabled={!hasVoted}
                                             >
-                                                <BarChart3 className="h-4 w-4" />{" "}
-                                                View results
+                                                <BarChart3 className='h-4 w-4' />{" "}
+                                                {hasVoted
+                                                    ? "View results"
+                                                    : "Vote first to see results"}
                                             </Button>
                                         </motion.div>
                                     )}
@@ -832,31 +930,31 @@ export const SecretVotingDialog = ({
 
                     {activeTab === "results" && activeVote && (
                         <motion.div
-                            key="results"
-                            className="space-y-4"
-                            initial="hidden"
-                            animate="visible"
+                            key='results'
+                            className='space-y-4'
+                            initial='hidden'
+                            animate='visible'
                             exit={{ opacity: 0, y: -10 }}
                             variants={fadeIn}
                         >
                             <motion.div
-                                className="text-center font-medium text-lg"
+                                className='text-center font-medium text-lg'
                                 variants={slideUp}
                             >
                                 {activeVote.question}
                             </motion.div>
                             <motion.div
-                                className="text-sm text-gray-500 text-center"
+                                className='text-sm text-gray-500 text-center'
                                 variants={slideUp}
                             >
                                 {totalVotes} votes
                             </motion.div>
 
                             <motion.div
-                                className="space-y-3"
+                                className='space-y-3'
                                 variants={staggerContainer}
                             >
-                                {voteResults.map((option) => {
+                                {sortedVoteResults.map((option) => {
                                     const percentage =
                                         totalVotes > 0
                                             ? Math.round(
@@ -868,13 +966,13 @@ export const SecretVotingDialog = ({
                                     return (
                                         <motion.div
                                             key={option.id}
-                                            className="space-y-1"
+                                            className='space-y-1'
                                             variants={listItem}
                                         >
-                                            <div className="flex justify-between text-sm">
+                                            <div className='flex justify-between text-sm'>
                                                 <span>{option.text}</span>
                                                 <motion.span
-                                                    className="font-medium"
+                                                    className='font-medium'
                                                     initial={{ opacity: 0 }}
                                                     animate={{ opacity: 1 }}
                                                     transition={{
@@ -885,9 +983,9 @@ export const SecretVotingDialog = ({
                                                     {percentage}%
                                                 </motion.span>
                                             </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                            <div className='w-full bg-gray-200 rounded-full h-2.5 overflow-hidden'>
                                                 <motion.div
-                                                    className="bg-blue-600 h-2.5 rounded-full"
+                                                    className='bg-blue-600 h-2.5 rounded-full'
                                                     initial={{ width: 0 }}
                                                     animate={{
                                                         width: `${percentage}%`,
@@ -900,7 +998,7 @@ export const SecretVotingDialog = ({
                                                 ></motion.div>
                                             </div>
                                             <motion.div
-                                                className="text-xs text-gray-500"
+                                                className='text-xs text-gray-500'
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
                                                 transition={{
@@ -916,22 +1014,22 @@ export const SecretVotingDialog = ({
                             </motion.div>
 
                             <motion.div variants={fadeIn}>
-                                <DialogFooter className="sm:justify-center gap-2">
+                                <DialogFooter className='sm:justify-center gap-2'>
                                     {isCurrentUserCreator(activeVote) && (
                                         <motion.div
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
                                         >
                                             <Button
-                                                type="button"
-                                                variant="destructive"
+                                                type='button'
+                                                variant='destructive'
                                                 onClick={handleEndVote}
-                                                className="flex items-center gap-2"
+                                                className='flex items-center gap-2'
                                                 disabled={
                                                     !socket || !socket.connected
                                                 }
                                             >
-                                                <Trash2 className="h-4 w-4" />{" "}
+                                                <Trash2 className='h-4 w-4' />{" "}
                                                 End voting session
                                             </Button>
                                         </motion.div>
@@ -941,8 +1039,8 @@ export const SecretVotingDialog = ({
                                         whileTap={{ scale: 0.98 }}
                                     >
                                         <Button
-                                            type="button"
-                                            variant="outline"
+                                            type='button'
+                                            variant='outline'
                                             onClick={onClose}
                                         >
                                             Close

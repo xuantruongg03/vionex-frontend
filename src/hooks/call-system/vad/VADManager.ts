@@ -1,4 +1,3 @@
-
 import { CallSystemContext } from "../types";
 import {
     VoiceActivityDetector,
@@ -21,7 +20,7 @@ export class VADManager {
     private sendIntervalTimer: NodeJS.Timeout | null = null;
     private readonly CHUNK_DURATION = 10000; // 10 seconds
 
-    // Audio recordings storage for debugging
+    // Audio recordings storage for debugging (với giới hạn memory)
     private recordings: Array<{
         id: string;
         timestamp: number;
@@ -30,10 +29,15 @@ export class VADManager {
         sampleRate: number;
         channels: number;
     }> = [];
+    private readonly MAX_RECORDINGS = 5; // Giảm từ 5 xuống 3 để tiết kiệm memory
+    private readonly MAX_RECORDING_SIZE = 48000; // Giới hạn size mỗi recording (3s at 16kHz)
 
     constructor(context: CallSystemContext, useRawAudio = false) {
         this.context = context;
         this.useRawAudio = useRawAudio;
+
+        // Cleanup any existing timers để tránh memory leak
+        this.cleanup();
     }
 
     /**
@@ -57,9 +61,14 @@ export class VADManager {
             const vadEvents = {
                 onSpeechStart: () => {
                     console.log("[VADManager] Speech started");
-                    this.context.setters.setIsSpeaking(true);
-                    this.handleSpeechStart();
-                    this.startPeriodicSending();
+                    // Only set speaking to true if microphone is enabled
+                    if (this.isMicrophoneEnabled()) {
+                        this.context.setters.setIsSpeaking(true);
+                        this.handleSpeechStart();
+                        this.startPeriodicSending();
+                    } else {
+                        console.log("[VADManager] Mic disabled, ignoring speech start");
+                    }
                 },
 
                 onSpeechEnd: (audioBuffer: Uint8Array, duration: number) => {
@@ -73,7 +82,11 @@ export class VADManager {
 
                     // Stop periodic sending and send final chunk
                     this.stopPeriodicSending();
-                    this.handleSpeechEnd(audioBuffer, duration);
+                    
+                    // Only send to server if mic was enabled during recording
+                    if (this.isMicrophoneEnabled()) {
+                        this.handleSpeechEnd(audioBuffer, duration);
+                    }
                 },
 
                 // Placeholder for future periodic chunk support
@@ -121,10 +134,7 @@ export class VADManager {
             console.log("[VADManager] VAD initialized successfully");
 
             // Auto-start listening if microphone is enabled
-            const microphoneEnabled = audioTracks.some(
-                (track) => track.enabled
-            );
-            if (microphoneEnabled) {
+            if (this.isMicrophoneEnabled()) {
                 this.startListening();
             }
         } catch (error) {
@@ -147,10 +157,9 @@ export class VADManager {
 
         // Check if microphone is enabled (check if local stream has audio tracks)
         const localStream = this.context.refs.localStreamRef.current;
-        const audioTracks = localStream?.getAudioTracks() || [];
-        const microphoneEnabled = audioTracks.some((track) => track.enabled);
+        const microphoneEnabled = this.isMicrophoneEnabled();
 
-        if (!microphoneEnabled) {
+        if (!this.isMicrophoneEnabled()) {
             console.log("[VADManager] Microphone disabled, not starting VAD");
             return;
         }
@@ -184,34 +193,40 @@ export class VADManager {
                 this.vadInstance.stopListening();
                 // Also stop any periodic sending
                 this.stopPeriodicSending();
+                // IMPORTANT: Set speaking to false when mic is turned off
+                this.context.setters.setIsSpeaking(false);
             }
         }
     }
 
     /**
-     * Store recording for debugging purposes
+     * Store recording for debugging purposes với memory management
      */
     private storeRecording(audioBuffer: Uint8Array, duration: number): void {
-        if (this.recordings.length >= 5) {
-            this.recordings.shift();
-        }
-        const recording = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            timestamp: Date.now(),
-            duration,
-            audioBuffer: new Uint8Array(audioBuffer), // Create a copy
-            sampleRate: 16000,
-            channels: 1,
-        };
-
-        // Keep only last 10 recordings to prevent memory issues
-        // this.recordings.push(recording);
         if (audioBuffer.length > 1000 && duration > 500) {
+            let bufferToStore = audioBuffer;
+            if (audioBuffer.length > this.MAX_RECORDING_SIZE) {
+                bufferToStore = audioBuffer.slice(0, this.MAX_RECORDING_SIZE);
+            }
+
+            // Remove oldest recordings để giới hạn memory usage
+            while (this.recordings.length >= this.MAX_RECORDINGS) {
+                this.recordings.shift();
+            }
+
+            const recording = {
+                id:
+                    Date.now().toString() +
+                    Math.random().toString(36).substr(2, 9),
+                timestamp: Date.now(),
+                duration,
+                audioBuffer: bufferToStore,
+                sampleRate: 16000,
+                channels: 1,
+            };
+
             this.recordings.push(recording);
         }
-        // if (this.recordings.length > 10) {
-        //     this.recordings.shift();
-        // }
     }
 
     /**
@@ -222,11 +237,19 @@ export class VADManager {
     }
 
     /**
+     * Check if microphone is enabled
+     */
+    private isMicrophoneEnabled(): boolean {
+        const localStream = this.context.refs.localStreamRef.current;
+        const audioTracks = localStream?.getAudioTracks() || [];
+        return audioTracks.some((track) => track.enabled);
+    }
+
+    /**
      * Clear stored recordings
      */
     clearRecordings(): void {
         this.recordings = [];
-        console.log("[VADManager] Cleared all stored recordings");
     }
     private handleSpeechStart(): void {
         const socket = this.context.refs.socketRef.current;
@@ -272,32 +295,17 @@ export class VADManager {
 
         // For final chunks, always send even if microphone is disabled
         // (because user might have disabled mic after speaking)
-        if (!isFinal) {
-            // Check if microphone is actually enabled (only for periodic chunks)
-            const localStream = this.context.refs.localStreamRef.current;
-            const audioTracks = localStream?.getAudioTracks() || [];
-            const microphoneEnabled = audioTracks.some(
-                (track) => track.enabled
+        if (!isFinal && !this.isMicrophoneEnabled()) {
+            console.log(
+                "[VADManager] Microphone disabled, not sending periodic audio buffer"
             );
-
-            if (!microphoneEnabled) {
-                console.log(
-                    "[VADManager] Microphone disabled, not sending periodic audio buffer"
-                );
-                return;
-            }
+            return;
         }
 
-        // Check for silence - count non-zero bytes and detect clipping
+        // Check for silence - count non-zero bytes
         const nonZeroBytes = audioBuffer.filter((b) => b !== 0).length;
         const silencePercentage =
             ((audioBuffer.length - nonZeroBytes) / audioBuffer.length) * 100;
-
-        // Check for clipped audio (255, 127 pattern indicates clipping)
-        // const clippedBytes = audioBuffer.filter(
-        //     (b) => b === 255 || b === 127
-        // ).length;
-        // const clippingPercentage = (clippedBytes / audioBuffer.length) * 100;
 
         if (silencePercentage > 95) {
             return;
@@ -320,7 +328,7 @@ export class VADManager {
             sampleRate: 16000,
             channels: 1,
             isFinal, // Indicate if this is the final chunk or periodic chunk
-            orgId: room.organizationId || null
+            orgId: room.organizationId || null,
         };
 
         // Listen for audio errors from server
@@ -357,22 +365,16 @@ export class VADManager {
         this.sendIntervalTimer = setInterval(() => {
             this.sendCurrentRecordingChunk();
         }, this.CHUNK_DURATION);
-
-        console.log(
-            "[VADManager] Started periodic audio sending (10s intervals)"
-        );
     }
 
     /**
-     * Stop periodic sending
+     * Stop periodic sending với improved cleanup
      */
     private stopPeriodicSending(): void {
         if (this.sendIntervalTimer) {
             clearInterval(this.sendIntervalTimer);
             this.sendIntervalTimer = null;
         }
-
-        console.log("[VADManager] Stopped periodic audio sending");
     }
 
     /**
@@ -385,14 +387,7 @@ export class VADManager {
         }
 
         // Check if microphone is actually enabled
-        const localStream = this.context.refs.localStreamRef.current;
-        const audioTracks = localStream?.getAudioTracks() || [];
-        const microphoneEnabled = audioTracks.some((track) => track.enabled);
-
-        if (!microphoneEnabled) {
-            console.log(
-                "[VADManager] Microphone disabled, stopping periodic sending"
-            );
+        if (!this.isMicrophoneEnabled()) {
             this.stopPeriodicSending();
             return;
         }
@@ -411,7 +406,6 @@ export class VADManager {
         const actualDuration = Math.round(
             (currentBuffer.length / 2 / 16000) * 1000
         ); // bytes ÷ 2 ÷ sampleRate * 1000
-        const reportedDuration = Date.now() - this.chunkStartTime;
 
         // Send the chunk with actual duration from buffer
         this.sendAudioBuffer(currentBuffer, actualDuration, false); // false = not final chunk
@@ -457,28 +451,20 @@ export class VADManager {
     }
 
     /**
-     * Cleanup VAD resources
+     * Cleanup VAD resources với improved memory management
      */
     cleanup(): void {
         // Stop periodic sending
         this.stopPeriodicSending();
+
+        // Clear recordings to free memory
         this.clearRecordings();
 
         if (this.vadInstance) {
             this.vadInstance.cleanup();
             this.vadInstance = null;
-            console.log("[VADManager] Cleaned up VAD");
         }
-        this.isInitialized = false;
-    }
 
-    /**
-     * Get current microphone state for debugging
-     */
-    private getCurrentMicrophoneState(): string {
-        const localStream = this.context.refs.localStreamRef.current;
-        const audioTracks = localStream?.getAudioTracks() || [];
-        const microphoneEnabled = audioTracks.some((track) => track.enabled);
-        return microphoneEnabled ? "enabled" : "disabled";
+        this.isInitialized = false;
     }
 }

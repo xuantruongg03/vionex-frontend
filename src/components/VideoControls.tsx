@@ -166,27 +166,27 @@ export const VideoControls = ({
                   },
               ]
             : []),
-        {
-            key: "record",
-            title: "Record meeting",
-            onClick: isProcessing ? undefined : onToggleRecording,
-            icon: isProcessing ? (
-                <Icon.Loader2 className="animate-spin dark:text-gray-300" />
-            ) : isRecording ? (
-                <Icon.Disc2
-                    className="dark:text-red-400"
-                    color={isMobile ? "red" : undefined}
-                />
-            ) : (
-                <Icon.DiscAlbum className="dark:text-gray-300" />
-            ),
-            className: isProcessing
-                ? "bg-yellow-100 cursor-not-allowed dark:bg-yellow-900/30 dark:text-gray-300"
-                : isRecording
-                ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200"
-                : "",
-            variant: "outline" as const,
-        },
+        // {
+        //     key: "record",
+        //     title: "Record meeting",
+        //     onClick: isProcessing ? undefined : onToggleRecording,
+        //     icon: isProcessing ? (
+        //         <Icon.Loader2 className="animate-spin dark:text-gray-300" />
+        //     ) : isRecording ? (
+        //         <Icon.Disc2
+        //             className="dark:text-red-400"
+        //             color={isMobile ? "red" : undefined}
+        //         />
+        //     ) : (
+        //         <Icon.DiscAlbum className="dark:text-gray-300" />
+        //     ),
+        //     className: isProcessing
+        //         ? "bg-yellow-100 cursor-not-allowed dark:bg-yellow-900/30 dark:text-gray-300"
+        //         : isRecording
+        //         ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200"
+        //         : "",
+        //     variant: "outline" as const,
+        // },
         {
             key: "whiteboard",
             title: "Whiteboard",

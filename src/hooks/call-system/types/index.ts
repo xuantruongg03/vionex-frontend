@@ -61,6 +61,7 @@ export interface CallSystemRefs {
 // State setters interface
 export interface CallSystemSetters {
     setStreams: React.Dispatch<React.SetStateAction<StreamInfo[]>>;
+    setScreenStreams: React.Dispatch<React.SetStateAction<StreamInfo[]>>;
     setIsScreenSharing: React.Dispatch<React.SetStateAction<boolean>>;
     setSpeakingPeers: React.Dispatch<React.SetStateAction<Set<string>>>;
     setIsSpeaking: React.Dispatch<React.SetStateAction<boolean>>;
@@ -75,6 +76,7 @@ export interface CallSystemSetters {
 // Current state values interface
 export interface CallSystemState {
     streams: StreamInfo[];
+    screenStreams: StreamInfo[];
     isScreenSharing: boolean;
     speakingPeers: Set<string>;
     isSpeaking: boolean;

@@ -3,27 +3,31 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import ApiService from "../services/signalService";
-import { getSocket } from "./use-call-hybrid-new";
-
-const API_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3000";
+import { useSocket } from "@/contexts/SocketContext";
 
 interface User {
     peerId: string;
     isCreator: boolean;
     timeArrive: Date;
+    userInfo?: {
+        id: string;
+        email: string;
+        name: string;
+        avatar?: string;
+    };
 }
 
 function useUser(roomId: string) {
     const [users, setUsers] = useState<User[] | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [apiService] = useState(() => new ApiService(API_BASE_URL));
+    const [apiService] = useState(() => new ApiService());
 
     const room = useSelector((state: any) => state.room);
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
-    // Use global socket from useCall
-    const socket = getSocket();
+    // Use Socket Context instead of global socket
+    const { socket, isConnected } = useSocket();
 
     // Set peerId for API authentication
     useEffect(() => {
@@ -60,54 +64,72 @@ function useUser(roomId: string) {
         }
     }, [roomId, getUsers]);
 
-    // Remove user via HTTP API (for creators)
-    const removeUser = useCallback(
+    // Kick user via WebSocket (for creators)
+    const kickUser = useCallback(
         async (participantId: string) => {
-            if (!apiService || !roomId) return false;
+            if (!socket || !roomId) return false;
 
             try {
-                if (room.username) {
-                    apiService.setPeerId(room.username);
-                }
-                await apiService.removeUser(roomId, participantId);
-                toast.success(`User ${participantId} removed successfully`);
+                // Emit kick user event via WebSocket
+                socket.emit("sfu:kick-user", {
+                    roomId: roomId,
+                    participantId: participantId,
+                });
 
-                // Update local users list
-                setUsers((prev) =>
-                    prev
-                        ? prev.filter((user) => user.peerId !== participantId)
-                        : null
-                );
-                return true;
+                // Wait for response
+                return new Promise<boolean>((resolve) => {
+                    const handleResponse = (response: {
+                        success: boolean;
+                        message: string;
+                    }) => {
+                        socket.off("sfu:kick-user-response", handleResponse);
+
+                        if (response.success) {
+                            toast.success(
+                                `User ${participantId} kicked successfully`
+                            );
+                            // Note: Don't update local users list here - it will be handled by sfu:user-removed event
+                            resolve(true);
+                        } else {
+                            toast.error(
+                                response.message || "Failed to kick user"
+                            );
+                            resolve(false);
+                        }
+                    };
+
+                    socket.on("sfu:kick-user-response", handleResponse);
+
+                    // Timeout after 5 seconds
+                    setTimeout(() => {
+                        socket.off("sfu:kick-user-response", handleResponse);
+                        toast.error("Kick user request timeout");
+                        resolve(false);
+                    }, 5000);
+                });
             } catch (error) {
-                console.error("Error removing user:", error);
-                toast.error("Failed to remove user");
+                console.error("Error kicking user:", error);
+                toast.error("Failed to kick user");
                 return false;
             }
         },
-        [roomId, room.username, apiService]
+        [roomId, socket]
     );
 
-    const handleRemoveUser = useCallback(
+    const handleKickUser = useCallback(
         (participantId: string) => {
-            removeUser(participantId);
+            kickUser(participantId);
         },
-        [removeUser]
+        [kickUser]
     );
 
     useEffect(() => {
         if (!roomId || !socket) return;
-
-        const onReceiveUsers = (users: User[]) => {
+        const onReceiveUsers = (data: { users: User[] } | User[]) => {
             try {
-                console.log("👥 [use-user] Received users:", users);
+                // Handle format from backend: { users: User[] }
+                const users = Array.isArray(data) ? data : data.users || [];
                 setUsers(users);
-
-                // Do NOT update isCreator from users list - wait for sfu:join-success
-                // This prevents overriding the authoritative value from the backend
-                console.log(
-                    "👥 [use-user] Not updating isCreator from users list, waiting for sfu:join-success"
-                );
             } catch (err) {
                 console.error("Error in onReceiveUsers:", err);
             }
@@ -120,68 +142,41 @@ function useUser(roomId: string) {
             roomId: string;
         }) => {
             try {
-                console.log("✅ [use-user] Join success received:", data);
-                console.log("✅ [use-user] Current room state:", {
-                    username: room.username,
-                    isCreator: room.isCreator,
-                });
-
                 if (data.peerId === room.username) {
-                    console.log(
-                        "✅ [use-user] Updating isCreator from join-success:",
-                        data.isCreator
-                    );
-                    console.log("✅ [use-user] Dispatching SET_CREATOR with:", {
-                        isCreator: data.isCreator,
-                    });
-
                     dispatch({
                         type: "SET_CREATOR",
                         payload: { isCreator: data.isCreator },
                     });
-
-                    // Log state after dispatch
-                    setTimeout(() => {
-                        console.log(
-                            "✅ [use-user] Room state after SET_CREATOR dispatch should be updated in next render"
-                        );
-                    }, 100);
-                } else {
-                    console.log(
-                        "✅ [use-user] Join success for different user:",
-                        {
-                            eventPeerId: data.peerId,
-                            myUsername: room.username,
-                            match: data.peerId === room.username,
-                        }
-                    );
                 }
             } catch (err) {
                 console.error("Error in onJoinSuccess:", err);
             }
         };
 
-        const onUserRemoved = ({ peerId }: { peerId: string }) => {
+        const onUserRemoved = ({
+            peerId,
+            reason,
+        }: {
+            peerId: string;
+            reason?: string;
+        }) => {
             try {
-                console.log(
-                    "🗑️ [use-user] User removed event received:",
-                    peerId
-                );
                 const myName = room.username;
                 if (peerId === myName) {
-                    toast.success(`Bạn đã bị xoá khỏi phòng`);
+                    toast.success(`You have been removed from the room`);
                     socket.emit("sfu:leave-room", { roomId });
                     navigate("/");
                 } else {
-                    toast.success(`${peerId} đã bị xoá khỏi phòng`);
+                    // Only show toast for actual kicks, not voluntary disconnects
+                    if (reason === "kicked") {
+                        toast.success(
+                            `${peerId} has been removed from the room`
+                        );
+                    }
                     setUsers((prevUsers) => {
                         if (!prevUsers) return null;
                         const filtered = prevUsers.filter(
                             (user) => user.peerId !== peerId
-                        );
-                        console.log(
-                            "🗑️ [use-user] Updated users list after user removed:",
-                            filtered
                         );
                         return filtered;
                     });
@@ -214,10 +209,10 @@ function useUser(roomId: string) {
                             type: "SET_CREATOR",
                             payload: { isCreator: true },
                         });
-                        toast.success("Bạn đã trở thành chủ phòng");
+                        toast.success("You have become the room creator");
                     }
                 } else {
-                    toast.info(`${data.peerId} đã trở thành chủ phòng`);
+                    toast.info(`${data.peerId} has become the room creator`);
                 }
                 setUsers((prevUsers) => {
                     if (!prevUsers) return null;
@@ -239,15 +234,10 @@ function useUser(roomId: string) {
 
         const onPeerLeft = (data: { peerId: string }) => {
             try {
-                console.log("🚪 [use-user] Peer left event received:", data);
                 setUsers((prevUsers) => {
                     if (!prevUsers) return null;
                     const filtered = prevUsers.filter(
                         (user) => user.peerId !== data.peerId
-                    );
-                    console.log(
-                        "🚪 [use-user] Updated users list after peer left:",
-                        filtered
                     );
                     return filtered;
                 });
@@ -259,39 +249,21 @@ function useUser(roomId: string) {
         // Setup WebSocket event listeners
         const setupSocketListeners = () => {
             if (!socket) return;
-
-            console.log(
-                "🔌 [use-user] Setting up socket listeners, connected:",
-                socket.connected
-            );
-
             try {
-                socket.on("sfu:users", onReceiveUsers);
+                socket.on("sfu:users-updated", onReceiveUsers);
                 socket.on("sfu:user-removed", onUserRemoved);
                 socket.on("sfu:new-peer-join", onUserJoined);
                 socket.on("sfu:creator-changed", onCreatorChanged);
                 socket.on("sfu:peer-left", onPeerLeft);
                 socket.on("sfu:join-success", onJoinSuccess);
-
-                console.log(
-                    "✅ [use-user] Socket listeners set up successfully"
-                );
-
-                // Fetch users when the hook is initialized and socket is connected
-                if (socket.connected) {
-                    socket.emit("sfu:get-users", { roomId });
-                }
             } catch (err) {
                 console.error("Error setting up socket events:", err);
-                setError("Lỗi thiết lập sự kiện socket");
+                setError("Error setting up socket events");
             }
         };
 
         // Handle socket connection and disconnection
-        const handleSocketConnect = () => {
-            console.log("🔌 [use-user] Socket connected, fetching users");
-            socket?.emit("sfu:get-users", { roomId });
-        };
+        const handleSocketConnect = () => {};
 
         if (socket) {
             // Set up listeners immediately
@@ -299,37 +271,33 @@ function useUser(roomId: string) {
 
             // Listen for connection events
             socket.on("connect", handleSocketConnect);
-
-            // If already connected, fetch users
-            if (socket.connected) {
-                socket.emit("sfu:get-users", { roomId });
-            }
-        } else {
-            console.log(
-                "⚠️ [use-user] No socket available, falling back to HTTP API"
-            );
-            // Fallback to HTTP API if no socket available
-            fetchUsers();
         }
 
         return () => {
             if (socket) {
-                socket.off("sfu:users", onReceiveUsers);
+                socket.off("sfu:users-updated", onReceiveUsers);
                 socket.off("sfu:user-removed", onUserRemoved);
                 socket.off("sfu:new-peer-join", onUserJoined);
                 socket.off("sfu:creator-changed", onCreatorChanged);
                 socket.off("sfu:peer-left", onPeerLeft);
                 socket.off("sfu:join-success", onJoinSuccess);
                 socket.off("connect", handleSocketConnect);
-                console.log("🧹 [use-user] Cleaned up socket listeners");
             }
         };
-    }, [roomId, room.username, dispatch, navigate, fetchUsers]);
+    }, [
+        roomId,
+        room.username,
+        dispatch,
+        navigate,
+        fetchUsers,
+        socket,
+        isConnected,
+    ]);
 
     return {
         users,
-        handleRemoveUser,
-        removeUser,
+        handleKickUser,
+        kickUser,
         getUsers,
         fetchUsers,
         error,

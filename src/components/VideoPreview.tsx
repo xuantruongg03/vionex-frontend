@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useSelector } from "react-redux";
 import { toast } from "sonner";
 
 const VideoPreview = memo(
@@ -31,7 +31,9 @@ const VideoPreview = memo(
         const videoRef = useRef<HTMLVideoElement>(null);
         const analyserRef = useRef<AnalyserNode | null>(null);
         const animationFrameRef = useRef<number | null>(null);
-        const location = useLocation();
+
+        // Redux
+        const user = useSelector((state: any) => state.auth.user);
 
         const cleanupMediaResources = useCallback(() => {
             if (animationFrameRef.current) {
@@ -65,34 +67,58 @@ const VideoPreview = memo(
                 const source =
                     audioContextRef.current.createMediaStreamSource(stream);
                 analyserRef.current = audioContextRef.current.createAnalyser();
-                analyserRef.current.fftSize = 256;
+                analyserRef.current.fftSize = 128; // Reduced for better performance
+                analyserRef.current.smoothingTimeConstant = 0.8;
 
                 source.connect(analyserRef.current);
 
                 const dataArray = new Uint8Array(
                     analyserRef.current.frequencyBinCount
                 );
-                const updateAudioLevel = () => {
-                    if (analyserRef.current) {
-                        analyserRef.current.getByteFrequencyData(dataArray);
-                        const average =
-                            dataArray.reduce((a, b) => a + b) /
-                            dataArray.length;
-                        const normalizedLevel = Math.min(average / 128, 1);
-                        setAudioLevel(normalizedLevel);
-                        setIsSpeaking(normalizedLevel > 0.1);
-                    }
-                    if (analyserRef.current) {
+
+                // Throttled audio level update for better performance
+                let lastUpdateTime = 0;
+                const UPDATE_INTERVAL = 150; // Update every 150ms instead of 100ms
+
+                const updateAudioLevel = (currentTime: number) => {
+                    if (!analyserRef.current) return;
+
+                    // Throttle updates for better performance
+                    if (currentTime - lastUpdateTime < UPDATE_INTERVAL) {
                         animationFrameRef.current =
                             requestAnimationFrame(updateAudioLevel);
+                        return;
                     }
+
+                    lastUpdateTime = currentTime;
+                    analyserRef.current.getByteFrequencyData(dataArray);
+
+                    // Optimized average calculation with reduced samples
+                    let sum = 0;
+                    const step = 4; // Sample every 4th element for better performance
+                    for (let i = 0; i < dataArray.length; i += step) {
+                        sum += dataArray[i];
+                    }
+                    const average = sum / (dataArray.length / step);
+
+                    const normalizedLevel = Math.min(average / 128, 1);
+                    const speaking = normalizedLevel > 0.1;
+
+                    // Batch state updates to reduce re-renders
+                    setAudioLevel(normalizedLevel);
+                    setIsSpeaking(speaking);
+
+                    animationFrameRef.current =
+                        requestAnimationFrame(updateAudioLevel);
                 };
 
-                updateAudioLevel();
+                animationFrameRef.current =
+                    requestAnimationFrame(updateAudioLevel);
             } catch (error) {
                 console.error("Error setting up audio analyser:", error);
             }
         }, []);
+
         const cleanupAudioAnalyser = useCallback(() => {
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
@@ -109,7 +135,7 @@ const VideoPreview = memo(
             setAudioLevel(0);
             analyserRef.current = null;
         }, []);
-        
+
         const toggleCamera = useCallback(async () => {
             if (externalToggleVideo) {
                 // Use external toggle function from hook
@@ -194,11 +220,13 @@ const VideoPreview = memo(
             cleanupAudioAnalyser,
             externalToggleAudio,
         ]);
-        // Use external stream or initialize local stream
+        
+        // Combined effect for stream management and cleanup
         useEffect(() => {
-            if (externalStream) {
-                // Use external stream from hook
-                console.log("[VideoPreview] Using external stream from hook");
+            let mounted = true;
+
+            // Handle external stream setup
+            if (externalStream && mounted) {
                 setLocalStream(externalStream);
                 setIsInitializing(false);
 
@@ -217,120 +245,101 @@ const VideoPreview = memo(
                 if (audioTracks.length > 0 && audioTracks[0].enabled) {
                     setupAudioAnalyser(externalStream);
                 }
-            } else {
-                // Fallback to local initialization
-                console.log("[VideoPreview] Initializing local stream");
-                const init = async () => {
-                    try {
-                        const stream =
-                            await navigator.mediaDevices.getUserMedia({
-                                video: {
-                                    width: { ideal: 1280 },
-                                    height: { ideal: 720 },
-                                },
-                                audio: true,
-                            });
-                        setLocalStream(stream);
 
-                        // Check if video track exists and is enabled
-                        const videoTracks = stream.getVideoTracks();
-                        const audioTracks = stream.getAudioTracks();
-
-                        setIsVideoEnabled(
-                            videoTracks.length > 0 && videoTracks[0].enabled
-                        );
-                        setIsAudioEnabled(
-                            audioTracks.length > 0 && audioTracks[0].enabled
-                        );
-
-                        // Setup audio analyser if audio is available
-                        if (audioTracks.length > 0 && audioTracks[0].enabled) {
-                            setupAudioAnalyser(stream);
-                        }
-                    } catch (error) {
-                        console.error("Error accessing camera:", error);
-                        setIsVideoEnabled(false);
-                        setIsAudioEnabled(false);
-                        toast.error(
-                            "Could not access camera/microphone. Please check permissions."
-                        );
-                    } finally {
-                        setIsInitializing(false);
-                    }
-                };
-
-                init();
+                // Setup video element
+                if (videoRef.current) {
+                    videoRef.current.srcObject = externalStream;
+                }
             }
-        }, [externalStream, setupAudioAnalyser]); // Depend on external stream
 
-        // Cleanup on component unmount - but don't stop external streams
-        useEffect(() => {
-            return () => {
-                if (!externalStream) {
-                    // Only cleanup if we're managing our own stream
-                    cleanupMediaResources();
-                } else {
-                    // Just cleanup audio analyser for external streams
-                    cleanupAudioAnalyser();
-                }
-            };
-        }, [cleanupMediaResources, cleanupAudioAnalyser, externalStream]);
-
-        // Cleanup when route changes (navigation away from current page)
-        useEffect(() => {
-            return () => {
-                if (!externalStream) {
-                    // Only cleanup local streams, external stream cleanup is handled by global service
-                    cleanupMediaResources();
-                }
-            };
-        }, [location.pathname, cleanupMediaResources, externalStream]);
-
-        // Cleanup on page unload/reload
-        useEffect(() => {
+            // Setup cleanup handlers
             const handleBeforeUnload = () => {
                 if (!externalStream) {
-                    // Only cleanup local streams, external stream cleanup is handled by global service
                     cleanupMediaResources();
                 }
             };
 
             const handleVisibilityChange = () => {
                 if (document.visibilityState === "hidden" && !externalStream) {
-                    // Only cleanup local streams
                     cleanupMediaResources();
                 }
             };
 
+            // Add event listeners only once
             window.addEventListener("beforeunload", handleBeforeUnload);
             document.addEventListener(
                 "visibilitychange",
                 handleVisibilityChange
             );
 
+            // Cleanup function
             return () => {
+                mounted = false;
+
+                // Remove event listeners
                 window.removeEventListener("beforeunload", handleBeforeUnload);
                 document.removeEventListener(
                     "visibilitychange",
                     handleVisibilityChange
                 );
+
+                // Cleanup resources based on stream type
+                if (!externalStream) {
+                    cleanupMediaResources();
+                } else {
+                    cleanupAudioAnalyser();
+                }
             };
-        }, [cleanupMediaResources, externalStream]);
+        }, [
+            externalStream,
+            setupAudioAnalyser,
+            cleanupMediaResources,
+            cleanupAudioAnalyser,
+        ]);
+
+        // Separate effect for video element updates only when localStream changes
         useEffect(() => {
             if (videoRef.current && localStream) {
                 videoRef.current.srcObject = localStream;
-                // Ensure video plays when stream is available
                 videoRef.current.play().catch((error) => {
                     console.log("Video autoplay prevented:", error);
                 });
             }
         }, [localStream]);
 
-        const displayName = useMemo(() => userName || "Your Name", [userName]);
-        const avatarInitial = useMemo(
-            () => userName.charAt(0).toUpperCase() || "U",
-            [userName]
+        // Optimized memoization - combine related calculations
+        const displayInfo = useMemo(
+            () => ({
+                name: userName || user?.name || "Your Name",
+                initial: (userName || user?.name || "U")
+                    .charAt(0)
+                    .toUpperCase(),
+                avatar: user?.avatar,
+            }),
+            [userName, user?.name, user?.avatar]
         );
+
+        // Memoize speaking-related styles and animations together
+        const speakingStyles = useMemo(() => {
+            const isSpeakingActive = isSpeaking && isAudioEnabled;
+
+            return {
+                avatarClassName: `w-20 h-20 rounded-full mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-2xl relative z-10 transition-colors duration-300 ${
+                    isSpeakingActive
+                        ? "bg-gradient-to-r from-green-500 to-green-600 ring-2 ring-green-400/50 shadow-lg shadow-green-400/20"
+                        : "bg-gradient-to-r from-blue-500 to-purple-500"
+                }`,
+                avatarAnimation: isSpeakingActive
+                    ? { scale: [1, 1.05, 1] }
+                    : { scale: 1 },
+                avatarTransition: {
+                    duration: 0.8,
+                    repeat: isSpeakingActive ? Infinity : 0,
+                    ease: "easeInOut",
+                    repeatType: "loop" as const,
+                },
+            };
+        }, [isSpeaking, isAudioEnabled]);
 
         return (
             <motion.div
@@ -342,7 +351,7 @@ const VideoPreview = memo(
                 transition={{ delay: 0.1, duration: 0.5 }}
             >
                 <motion.div
-                    className="relative w-full h-full"
+                    className='relative w-full h-full'
                     animate={{
                         scale: isSpeaking ? 1.02 : 1,
                     }}
@@ -362,91 +371,209 @@ const VideoPreview = memo(
                     <AnimatePresence>
                         {(!isVideoEnabled || isInitializing) && (
                             <motion.div
-                                className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900"
+                                className='absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900'
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                <div className="text-center">
+                                <div className='text-center'>
                                     {isInitializing ? (
                                         <motion.div
-                                            className="flex flex-col items-center gap-4"
+                                            className='flex flex-col items-center gap-4'
                                             initial={{ scale: 0.8, opacity: 0 }}
                                             animate={{ scale: 1, opacity: 1 }}
                                             transition={{ duration: 0.5 }}
                                         >
-                                            <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
-                                            <p className="text-white text-sm font-medium">
+                                            <Loader2 className='h-12 w-12 text-blue-500 animate-spin' />
+                                            <p className='text-white text-sm font-medium'>
                                                 Initializing camera and
                                                 microphone...
                                             </p>
                                         </motion.div>
                                     ) : (
                                         <motion.div
-                                            className="relative mx-auto mb-6"
+                                            className='relative mx-auto mb-6'
                                             whileHover={{ scale: 1.05 }}
                                             transition={{ duration: 0.2 }}
                                         >
-                                            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-2xl">
-                                                {avatarInitial}
-                                            </div>
-                                            {/* Breathing effect */}
+                                            {/* Sound wave animation when speaking (optimized) */}
+                                            <AnimatePresence>
+                                                {isSpeaking &&
+                                                    isAudioEnabled && (
+                                                        <motion.div
+                                                            className='absolute inset-0 flex items-center justify-center'
+                                                            initial={{
+                                                                opacity: 0,
+                                                            }}
+                                                            animate={{
+                                                                opacity: 1,
+                                                            }}
+                                                            exit={{
+                                                                opacity: 0,
+                                                            }}
+                                                            transition={{
+                                                                duration: 0.2,
+                                                            }}
+                                                        >
+                                                            <motion.div
+                                                                className='absolute w-24 h-24 rounded-full border-2 border-green-400/30'
+                                                                animate={{
+                                                                    scale: [
+                                                                        1, 1.4,
+                                                                        1,
+                                                                    ],
+                                                                    opacity: [
+                                                                        0.3,
+                                                                        0.6,
+                                                                        0.3,
+                                                                    ],
+                                                                }}
+                                                                transition={{
+                                                                    duration: 1.5,
+                                                                    repeat: Infinity,
+                                                                    ease: "easeInOut",
+                                                                    repeatType:
+                                                                        "loop",
+                                                                }}
+                                                            />
+                                                            <motion.div
+                                                                className='absolute w-28 h-28 rounded-full border-2 border-green-400/20'
+                                                                animate={{
+                                                                    scale: [
+                                                                        1, 1.6,
+                                                                        1,
+                                                                    ],
+                                                                    opacity: [
+                                                                        0.2,
+                                                                        0.4,
+                                                                        0.2,
+                                                                    ],
+                                                                }}
+                                                                transition={{
+                                                                    duration: 2,
+                                                                    repeat: Infinity,
+                                                                    ease: "easeInOut",
+                                                                    delay: 0.3,
+                                                                    repeatType:
+                                                                        "loop",
+                                                                }}
+                                                            />
+                                                            <motion.div
+                                                                className='absolute w-32 h-32 rounded-full border-2 border-green-400/10'
+                                                                animate={{
+                                                                    scale: [
+                                                                        1, 1.8,
+                                                                        1,
+                                                                    ],
+                                                                    opacity: [
+                                                                        0.1,
+                                                                        0.3,
+                                                                        0.1,
+                                                                    ],
+                                                                }}
+                                                                transition={{
+                                                                    duration: 2.5,
+                                                                    repeat: Infinity,
+                                                                    ease: "easeInOut",
+                                                                    delay: 0.6,
+                                                                    repeatType:
+                                                                        "loop",
+                                                                }}
+                                                            />
+                                                        </motion.div>
+                                                    )}
+                                            </AnimatePresence>
+
+                                            {/* Avatar with enhanced styling when speaking */}
                                             <motion.div
-                                                className="absolute inset-0 w-20 h-20 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 mx-auto opacity-30"
-                                                animate={{
-                                                    scale: [1, 1.2, 1],
-                                                    opacity: [0.3, 0.1, 0.3],
-                                                }}
-                                                transition={{
-                                                    duration: 2,
-                                                    repeat: Infinity,
-                                                    ease: "easeInOut",
-                                                }}
-                                            />
+                                                className={
+                                                    speakingStyles.avatarClassName
+                                                }
+                                                animate={
+                                                    speakingStyles.avatarAnimation
+                                                }
+                                                transition={
+                                                    speakingStyles.avatarTransition
+                                                }
+                                            >
+                                                {displayInfo.avatar ? (
+                                                    <img
+                                                        src={displayInfo.avatar}
+                                                        alt={displayInfo.name}
+                                                        className='w-full h-full object-cover rounded-full'
+                                                        onError={(e) => {
+                                                            // Fallback to initial if image fails to load
+                                                            const target =
+                                                                e.target as HTMLImageElement;
+                                                            const parent =
+                                                                target.parentElement;
+                                                            if (parent) {
+                                                                parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-white text-2xl font-bold">${displayInfo.initial}</div>`;
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className='w-full h-full flex items-center justify-center text-white text-2xl font-bold'>
+                                                        {displayInfo.initial}
+                                                    </div>
+                                                )}
+                                            </motion.div>
                                         </motion.div>
                                     )}
                                 </div>
                             </motion.div>
                         )}
-                    </AnimatePresence>{" "}
+                    </AnimatePresence>
                 </motion.div>
                 {/* Name overlay - always visible */}
                 <motion.div
-                    className="absolute left-4 bottom-4 px-3 py-1.5 text-xs text-white bg-black/60 rounded-lg"
+                    className='absolute left-4 bottom-4 px-3 py-1.5 text-xs text-white bg-black/60 rounded-lg'
                     animate={{
                         scale: isSpeaking ? 1.05 : 1,
                     }}
                     transition={{ duration: 0.2 }}
                 >
-                    <p className="text-white text-sm font-medium flex items-center gap-2">
-                        {displayName}
+                    <p className='text-white text-sm font-medium flex items-center gap-2'>
+                        {displayInfo.avatar && (
+                            <img
+                                src={displayInfo.avatar}
+                                alt={displayInfo.name}
+                                className='w-6 h-6 object-cover rounded-full border border-white/30'
+                                onError={(e) => {
+                                    // Hide avatar if fails to load
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                }}
+                            />
+                        )}
+                        {displayInfo.name}
                     </p>
                 </motion.div>{" "}
                 {/* Status icons in top-right corner */}
                 {!isInitializing && (
-                    <div className="absolute top-2 right-2 flex gap-1">
+                    <div className='absolute top-2 right-2 flex gap-1'>
                         {!isVideoEnabled && (
-                            <div className="bg-black/60 p-1 rounded-full">
-                                <VideoOff className="h-4 w-4 text-white" />
+                            <div className='bg-black/60 p-1 rounded-full'>
+                                <VideoOff className='h-4 w-4 text-white' />
                             </div>
                         )}
                         {!isAudioEnabled && (
-                            <div className="bg-black/60 p-1 rounded-full">
-                                <MicOff className="h-4 w-4 text-white" />
+                            <div className='bg-black/60 p-1 rounded-full'>
+                                <MicOff className='h-4 w-4 text-white' />
                             </div>
                         )}
                     </div>
                 )}
                 {/* Enhanced Camera Controls */}
-                <div className="absolute bottom-3 right-3 flex gap-4 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out transform translate-y-2 group-hover:translate-y-0">
+                <div className='absolute bottom-3 right-3 flex gap-4 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out transform translate-y-2 group-hover:translate-y-0'>
                     <motion.div
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         transition={{ duration: 0.2 }}
                     >
                         <Button
-                            size="sm"
+                            size='sm'
                             variant={isVideoEnabled ? "default" : "destructive"}
                             className={`rounded-full w-14 h-14 p-0 shadow-2xl backdrop-blur-md border-2 transition-all duration-300 ${
                                 isVideoEnabled
@@ -457,11 +584,11 @@ const VideoPreview = memo(
                             disabled={isLoadingVideo || isInitializing}
                         >
                             {isLoadingVideo ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <Loader2 className='w-5 h-5 animate-spin' />
                             ) : isVideoEnabled ? (
-                                <Video className="w-5 h-5" />
+                                <Video className='w-5 h-5' />
                             ) : (
-                                <VideoOff className="w-5 h-5" />
+                                <VideoOff className='w-5 h-5' />
                             )}
                         </Button>
                     </motion.div>
@@ -469,16 +596,9 @@ const VideoPreview = memo(
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        animate={{
-                            boxShadow: isSpeaking
-                                ? `0 0 20px rgba(34, 197, 94, ${
-                                      0.5 + audioLevel * 0.3
-                                  })`
-                                : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                        }}
                     >
                         <Button
-                            size="sm"
+                            size='sm'
                             variant={isAudioEnabled ? "default" : "destructive"}
                             className={`rounded-full w-14 h-14 p-0 shadow-2xl backdrop-blur-md border-2 transition-all duration-300 ${
                                 isAudioEnabled
@@ -489,11 +609,11 @@ const VideoPreview = memo(
                             disabled={isLoadingAudio || isInitializing}
                         >
                             {isLoadingAudio ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <Loader2 className='w-5 h-5 animate-spin' />
                             ) : isAudioEnabled ? (
-                                <Mic className="w-5 h-5" />
+                                <Mic className='w-5 h-5' />
                             ) : (
-                                <MicOff className="w-5 h-5" />
+                                <MicOff className='w-5 h-5' />
                             )}
                         </Button>
                     </motion.div>

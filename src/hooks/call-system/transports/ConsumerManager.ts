@@ -32,7 +32,6 @@ export class ConsumerManager {
      * @param data Consumer data from MediaSoup
      */
     createConsumer = async (data: any) => {
-        console.log('data: ', data);
         if (!this.context.refs.recvTransportRef.current) {
             return;
         }
@@ -107,8 +106,12 @@ export class ConsumerManager {
                 mediaType = parts[1]; // "audio" or "video" etc
             }
 
-            // Double check that this is not our own stream (including screen share)
-            if (publisherId === this.context.room.username) {
+            // Double check stream ownership and determine if we should skip
+            const isOwnStream = publisherId === this.context.room.username;
+            const isScreenShare = mediaType === "screen" || mediaType === "screen_audio";
+            
+            if (isOwnStream && !isScreenShare) {
+                // Skip own regular streams (audio/video) but allow own screen shares
                 this.streamManager.removeFromConsuming(streamId);
 
                 // Cleanup the consumer that was created
@@ -117,12 +120,7 @@ export class ConsumerManager {
                 }
                 return;
             }
-
-            // Determine if this is a screen share stream
-            const isScreenShare =
-                mediaType === "screen" ||
-                mediaType === "screen_audio"
-
+            
             // Determine if this is a translation stream
             const isTranslationStream = streamId.startsWith("translated_");
 
@@ -164,9 +162,6 @@ export class ConsumerManager {
 
             // Process the stream based on type
             if (isTranslationStream) {
-                console.log(
-                    `[ConsumerManager] Handling translation stream for ${publisherId}`
-                );
                 // Handle translation stream - replace/pause original user's audio
                 const targetUserId = publisherId;
                 this.handleTranslationStream(
@@ -256,9 +251,6 @@ export class ConsumerManager {
 
         // Pause original audio consumers to stop consuming original stream
         existingConsumers.forEach(([consumerId, consumerInfo]) => {
-            console.log(
-                `[ConsumerManager] Pausing original audio consumer for ${targetUserId}: ${consumerId}`
-            );
             consumerInfo.consumer.pause();
         });
 
@@ -286,10 +278,6 @@ export class ConsumerManager {
                 });
             });
         }, 50);
-
-        console.log(
-            `[ConsumerManager] Replaced audio stream for user ${targetUserId} with translation in streams list`
-        );
     };
 
     /**
@@ -316,9 +304,6 @@ export class ConsumerManager {
 
         // Resume original audio consumers
         pausedConsumers.forEach(([consumerId, consumerInfo]) => {
-            console.log(
-                `[ConsumerManager] Resuming original audio consumer for ${targetUserId}: ${consumerId}`
-            );
             consumerInfo.consumer.resume();
         });
 
@@ -364,10 +349,6 @@ export class ConsumerManager {
                 });
             });
         }, 50);
-
-        console.log(
-            `[ConsumerManager] Reverted translation stream for user ${targetUserId} back to original audio in streams list`
-        );
     };
 
     /**

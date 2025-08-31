@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import VideoPreview from "@/components/VideoPreview";
 import useCreateRoomOrg from "@/hooks/org/use-create-room";
-import { useCall } from "@/hooks/use-call-hybrid-new";
+import { useCallRefactored as useCall } from "@/hooks/use-call-refactored";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -89,6 +89,7 @@ export const CreateRoomDialog = ({
                         isOrganizationRoom: true,
                         organizationId: organizationId,
                         roomId: roomId,
+                        userInfo: user,
                     },
                 });
 

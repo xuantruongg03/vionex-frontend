@@ -3,7 +3,7 @@ const CONSTANT = {
     PASSWORD: "password",
     ROOM_ID: "roomId",
     IS_LOCKED: "isLocked",
-    TIME_FORMAT: "HH:mm:ss",
+    TIME_FORMAT: "HH:mm",
     DATE_FORMAT: "DD/MM/YYYY",
     ROOM_ID_LENGTH: 6,
     USER_NAME_MAX_LENGTH: 20,
@@ -22,6 +22,9 @@ const CONSTANT = {
     MAX_COLUMNS_IN_GRID_DEFAULT: 4,
     MAX_USERS_IN_GRID_DEFAULT_MOBILE: 6,
     MAX_COLUMNS_IN_GRID_DEFAULT_MOBILE: 2,
+    // Quiz timeouts and delays
+    QUIZ_CREATE_TIMEOUT: 10000,
+    QUIZ_SOCKET_DELAY: 500,
 };
 
 export default CONSTANT;

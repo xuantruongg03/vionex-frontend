@@ -45,7 +45,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { toast } from "sonner";
 import { throttle } from "lodash";
-import { getSocket } from "./use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
 
 type PointerData = {
     pointer: { x: number; y: number; tool: string };
@@ -89,8 +89,8 @@ export const useWhiteboardSync = ({
     const drawingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSentVersionRef = useRef<number>(0);
 
-    // Use global socket like use-chat does
-    const socket = getSocket();
+    // Use Socket Context
+    const { socket } = useSocket();
 
     // Throttled pointer emission to prevent spamming server
     const throttledEmitPointer = useRef(

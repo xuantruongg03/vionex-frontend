@@ -46,8 +46,9 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     };
 
     // Peer management handlers
-    handlePeerLeft = async (data: { peerId: string }) => {
-        this.streamManager.removePeerStreams(data.peerId);
+    handlePeerLeft = async (data: { peerId: string; reason?: string }) => {
+        // Pass reason to StreamManager so it can show appropriate message
+        this.streamManager.removePeerStreams(data.peerId, data.reason);
     };
 
     // Stream handlers
@@ -125,8 +126,8 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             metadata.isScreenShare ||
             metadata.type === "screen" ||
             metadata.type === "screen_audio" ||
-            streamId.includes("_screen_") ||
-            streamId.includes("_screen_audio_");
+            (streamId && streamId.includes("_screen_")) ||
+            (streamId && streamId.includes("_screen_audio_"));
 
         if (isOwnStream && !isScreenShare) {
             return;
@@ -199,14 +200,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         }
 
         try {
-            // Validate streamId before consuming
-            if (
-                !streamId ||
-                streamId === "undefined" ||
-                typeof streamId !== "string"
-            ) {
-                return;
-            }
             // Mark as consuming
             this.streamManager.markStreamAsConsuming(streamId);
 
@@ -244,9 +237,20 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
     // Transport handlers
     handleRouterCapabilities = async (data: { routerRtpCapabilities: any }) => {
-        await this.transportManager.initializeDevice(
+        if (!data.routerRtpCapabilities) {
+            console.warn("No router RTP capabilities in data");
+            return;
+        }
+
+        const deviceInitialized = await this.transportManager.initializeDevice(
             data.routerRtpCapabilities
         );
+
+        if (deviceInitialized) {
+            this.transportManager.createTransports();
+        } else {
+            console.error("Device initialization failed");
+        }
 
         // Add timeout fallback in case sfu:rtp-capabilities-set is not received
         setTimeout(() => {
@@ -270,6 +274,14 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     handleTransportConnected = (data: { transportId: string }) => {
         this.transportManager.handleTransportConnected(data);
 
+        // Process pending streams when receive transport is connected
+        if (
+            this.context.refs.recvTransportRef.current &&
+            this.context.refs.recvTransportRef.current.id === data.transportId
+        ) {
+            this.streamManager.processPendingStreams();
+        }
+
         // Also trigger auto-publish if we have media ready
         if (
             this.context.refs.sendTransportRef.current &&
@@ -289,7 +301,63 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         this.producerManager.handleProducerCreated(data);
     };
 
-    // Pin/Unpin handlers
+    // Pin/Unpin response handlers
+    handlePinResponse = (data: {
+        success: boolean;
+        message: string;
+        consumersCreated?: any[];
+        alreadyPriority?: boolean;
+        existingConsumer?: boolean;
+    }) => {
+        if (data.success) {
+            if (data.alreadyPriority) {
+                toast.info(`User is already in priority view`);
+            } else {
+                toast.success(`Successfully pinned user`);
+            }
+            // Note: pinnedPeerId should be managed in RoomManager.togglePinUser
+        } else {
+            toast.error(`Failed to pin user: ${data.message}`);
+        }
+    };
+
+    handleUnpinResponse = (data: {
+        success: boolean;
+        message: string;
+        consumersRemoved?: string[];
+        stillInPriority?: boolean;
+    }) => {
+        if (data.success) {
+            if (data.stillInPriority) {
+                toast.info(`User unpinned but still in priority view`);
+            } else {
+                toast.success(`Successfully unpinned user`);
+            }
+        } else {
+            toast.error(`Failed to unpin user: ${data.message}`);
+        }
+    };
+
+    // Broadcast event handlers (when other users pin/unpin)
+    handleUserPinned = (data: {
+        pinnerPeerId: string;
+        pinnedPeerId: string;
+        roomId: string;
+    }) => {
+        // Optional: Show notification when someone else pins a user
+        console.log(`${data.pinnerPeerId} pinned ${data.pinnedPeerId}`);
+    };
+
+    handleUserUnpinned = (data: {
+        unpinnerPeerId: string;
+        unpinnedPeerId: string;
+        roomId: string;
+    }) => {
+        // Optional: Show notification when someone else unpins a user
+        console.log(`${data.unpinnerPeerId} unpinned ${data.unpinnedPeerId}`);
+    };
+
+    // Legacy handlers (keeping for compatibility)
     handlePinSuccess = (data: {
         pinnedPeerId: string;
         consumersCreated: any[];
@@ -388,6 +456,46 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         toast.info(`Room unlocked by ${data.unlockedBy}`);
     };
 
+    // ENHANCED: Speaking activity handlers for visual indicators
+    handleUserSpeaking = (data: { peerId: string }) => {
+        console.log(
+            `[SocketEventHandlers] User ${data.peerId} started speaking`
+        );
+
+        // Add user to speaking peers set for visual indicators
+        this.context.setters.setSpeakingPeers((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(data.peerId);
+            return newSet;
+        });
+
+        // ENHANCED: Auto-remove speaking indicator after 3 seconds
+        // This handles cases where stop-speaking event is missed
+        setTimeout(() => {
+            this.context.setters.setSpeakingPeers((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(data.peerId);
+                return newSet;
+            });
+            console.log(
+                `[SocketEventHandlers] Auto-removed speaking indicator for ${data.peerId}`
+            );
+        }, 3000);
+    };
+
+    handleUserStoppedSpeaking = (data: { peerId: string }) => {
+        console.log(
+            `[SocketEventHandlers] User ${data.peerId} stopped speaking`
+        );
+
+        // Remove user from speaking peers set
+        this.context.setters.setSpeakingPeers((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(data.peerId);
+            return newSet;
+        });
+    };
+
     // Screen share handlers
     handleScreenShareStarted = (data: { peerId: string; streamId: string }) => {
         toast.info(`${data.peerId} started screen sharing`);
@@ -417,7 +525,23 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             this.handleStreamMetadataUpdated
         );
         socket.on("sfu:stream-removed", (data: any) => {
-            this.streamManager.removeStream(data.streamId || data.stream_id);
+            const streamId = data.streamId || data.stream_id;
+            if (streamId) {
+                console.log(`Removing stream: ${streamId}`);
+                this.streamManager.removeStream(streamId);
+
+                // Also remove from consuming tracking
+                this.streamManager.removeFromConsuming(streamId);
+
+                // Parse stream ID to show appropriate toast for screen share
+                const parts = streamId.split("_");
+                const publisherId = parts[0];
+                const mediaType = parts[1];
+
+                if (mediaType === "screen" || mediaType === "screen_audio") {
+                    toast.info(`${publisherId} stopped screen sharing`);
+                }
+            }
         });
 
         // Consumer handlers
@@ -435,8 +559,13 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.on("sfu:producer-created", this.handleProducerCreated);
 
         // Pin/Unpin handlers
-        socket.on("sfu:pin-success", this.handlePinSuccess);
-        socket.on("sfu:pin-error", this.handlePinError);
+        // Pin/Unpin response handlers
+        socket.on("sfu:pin-user-response", this.handlePinResponse);
+        socket.on("sfu:unpin-user-response", this.handleUnpinResponse);
+
+        // Pin/Unpin broadcast events (when other users pin/unpin)
+        socket.on("sfu:user-pinned", this.handleUserPinned);
+        socket.on("sfu:user-unpinned", this.handleUserUnpinned);
         socket.on("sfu:unpin-success", this.handleUnpinSuccess);
         socket.on("sfu:unpin-error", this.handleUnpinError);
 
@@ -447,6 +576,10 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.on("sfu:unlock-error", this.handleUnlockError);
         socket.on("sfu:room-locked", this.handleRoomLocked);
         socket.on("sfu:room-unlocked", this.handleRoomUnlocked);
+
+        // ENHANCED: Speaking activity handlers for visual indicators
+        socket.on("sfu:user-speaking", this.handleUserSpeaking);
+        socket.on("sfu:user-stopped-speaking", this.handleUserStoppedSpeaking);
 
         // Screen share handlers
         socket.on("sfu:screen-share-started", this.handleScreenShareStarted);
@@ -489,6 +622,15 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.off("sfu:producer-created", this.handleProducerCreated);
 
         // Pin/Unpin handlers
+        // Pin/Unpin response handlers
+        socket.off("sfu:pin-user-response", this.handlePinResponse);
+        socket.off("sfu:unpin-user-response", this.handleUnpinResponse);
+
+        // Pin/Unpin broadcast events
+        socket.off("sfu:user-pinned", this.handleUserPinned);
+        socket.off("sfu:user-unpinned", this.handleUserUnpinned);
+
+        // Legacy handlers
         socket.off("sfu:pin-success", this.handlePinSuccess);
         socket.off("sfu:pin-error", this.handlePinError);
         socket.off("sfu:unpin-success", this.handleUnpinSuccess);
@@ -501,6 +643,10 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.off("sfu:unlock-error", this.handleUnlockError);
         socket.off("sfu:room-locked", this.handleRoomLocked);
         socket.off("sfu:room-unlocked", this.handleRoomUnlocked);
+
+        // ENHANCED: Speaking activity handlers for visual indicators
+        socket.off("sfu:user-speaking", this.handleUserSpeaking);
+        socket.off("sfu:user-stopped-speaking", this.handleUserStoppedSpeaking);
 
         // Screen share handlers
         socket.off("sfu:screen-share-started", this.handleScreenShareStarted);

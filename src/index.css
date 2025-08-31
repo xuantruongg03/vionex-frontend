@@ -70,6 +70,41 @@
       animation: progress 2.5s ease-in-out infinite;
     }
   }
+.scrollbar-thin {
+  overflow: auto; /* hoặc scroll */
+  
+  /* Firefox */
+  scrollbar-width: thin;                /* mỏng */
+  scrollbar-color: #888 transparent;    /* thumb màu xám, nền trong suốt */
+}
+
+/* Chrome, Edge, Safari */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;   /* scrollbar dọc */
+  height: 6px;  /* scrollbar ngang */
+  background: transparent; /* nền trong suốt */
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent; /* bỏ nền track */
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #888;     /* màu thanh trượt */
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #555;     /* hover đậm hơn */
+}
+
+/* Ẩn hẳn 2 đầu mũi tên */
+.scrollbar-thin::-webkit-scrollbar-button {
+  display: none;
+  background: transparent;
+  width: 0;
+  height: 0;
+}
 
   video {
     -webkit-transform: scaleX(-1);

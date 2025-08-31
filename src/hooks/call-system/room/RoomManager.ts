@@ -12,6 +12,7 @@ import { isOrganizationRoomToken } from "@/utils/roomSecurity";
 export class RoomManager {
     private context: CallSystemContext;
     private mediaManager?: any;
+    private transportManager?: any;
 
     constructor(context: CallSystemContext) {
         this.context = context;
@@ -22,6 +23,13 @@ export class RoomManager {
      */
     setMediaManager(mediaManager: any) {
         this.mediaManager = mediaManager;
+    }
+
+    /**
+     * Set transport manager reference
+     */
+    setTransportManager(transportManager: any) {
+        this.transportManager = transportManager;
     }
 
     /**
@@ -43,7 +51,6 @@ export class RoomManager {
 
         // Prevent duplicate joins using ref
         if (this.context.refs.isJoiningRef.current) {
-            console.log("[RoomManager] Already joining (ref check), skipping");
             return false;
         }
 
@@ -53,111 +60,63 @@ export class RoomManager {
             this.context.setters.setLoading(true);
             this.context.setters.setError(null);
 
-            // Set peerId BEFORE making any HTTP requests
-            this.context.refs.apiServiceRef.current.setPeerId(
-                this.context.room.username
-            );
-
-            // Check if this is an organization room (starts with org_)
-            const isOrgRoom = this.context.roomId.startsWith("org_");
-            let joinResult: any;
-
-            if (isOrgRoom) {
-                // Join organization room - verification happens on backend
-                joinResult =
-                    await this.context.refs.apiServiceRef.current.joinOrgRoom(
-                        this.context.roomId, // direct room ID (org_xxxx)
-                        this.context.room.username
-                    );
-
-                console.log(
-                    `[RoomManager] Org room join attempt. RoomId: ${this.context.roomId}`
-                );
-            } else {
-                // Join regular room
-                joinResult =
-                    await this.context.refs.apiServiceRef.current.joinRoom(
-                        this.context.roomId,
-                        this.context.room.username,
-                        password
-                    );
+            // Check socket connection
+            if (!this.context.refs.socketRef.current?.connected) {
+                throw new Error("Socket is not connected");
             }
 
-            if (joinResult.success) {
-                if (!this.context.refs.deviceRef.current) {
-                    this.context.refs.deviceRef.current = new Device();
-                }
+            // Join directly via WebSocket only
+            this.context.refs.socketRef.current.emit("sfu:join", {
+                roomId: this.context.roomId,
+                peerId: this.context.room.username,
+                password: password,
+                userInfo: this.context.room.userInfo, // Add user info
+            });
 
-                // Get router capabilities
-                let rtpCapabilities;
-                if (isOrgRoom) {
-                    // Get router capabilities using the room ID
-                    const routerResult =
-                        await this.context.refs.apiServiceRef.current.getRouterRtpCapabilities(
-                            this.context.roomId
-                        );
-                    if (routerResult.success) {
-                        rtpCapabilities = routerResult.data;
-                    }
-                } else {
-                    rtpCapabilities = joinResult.rtpCapabilities;
-                }
+            // Wait for join success and router capabilities
+            const joinSuccess = await new Promise<boolean>(
+                (resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error("Join timeout"));
+                    }, 10000);
 
-                if (
-                    !this.context.refs.deviceRef.current.loaded &&
-                    rtpCapabilities
-                ) {
-                    await this.context.refs.deviceRef.current.load({
-                        routerRtpCapabilities: rtpCapabilities,
-                    });
+                    const handleJoinSuccess = () => {
+                        clearTimeout(timeout);
+                        this.context.setters.setIsConnected(true);
+                        this.context.setters.setIsJoined(true);
+                        resolve(true);
+                    };
 
-                    // Verify that device capabilities are compatible with router
-                    const deviceCodecs =
-                        this.context.refs.deviceRef.current.rtpCapabilities
-                            .codecs || [];
-                    const routerCodecs = rtpCapabilities.codecs || [];
+                    const handleJoinError = (error: any) => {
+                        clearTimeout(timeout);
+                        reject(new Error(error.message || "Join failed"));
+                    };
 
-                    // Check for common codecs
-                    const commonCodecs = deviceCodecs.filter((deviceCodec) =>
-                        routerCodecs.some(
-                            (routerCodec) =>
-                                routerCodec.mimeType.toLowerCase() ===
-                                deviceCodec.mimeType.toLowerCase()
-                        )
+                    this.context.refs.socketRef.current?.once(
+                        "sfu:join-success",
+                        handleJoinSuccess
                     );
-
-                    if (commonCodecs.length === 0) {
-                        throw new Error(
-                            "Device and router have no compatible codecs"
-                        );
-                    }
+                    this.context.refs.socketRef.current?.once(
+                        "sfu:error",
+                        handleJoinError
+                    );
                 }
+            );
 
-                this.context.setters.setIsJoined(true);
-
-                // Connect WebSocket and wait for connection
-                this.context.refs.socketRef.current?.connect();
-
-                // Wait for WebSocket connection to be established before proceeding
-                await this.waitForConnection();
-
-                this.context.refs.socketRef.current?.emit("sfu:join", {
-                    roomId: this.context.roomId,
-                    peerId: this.context.room.username,
-                    password: password,
-                });
-
-                this.context.setters.setIsConnected(true);
+            if (joinSuccess) {
                 toast.success("Joined room successfully");
 
-                // Auto-initialize local media after joining (like old logic)
+                // Auto-initialize local media after joining
                 setTimeout(async () => {
-                    if (!this.context.refs.localStreamRef.current) {
-                        if (this.mediaManager) {
-                            await this.mediaManager.initializeLocalMedia();
-                        } else {
-                            console.warn("[RoomManager] MediaManager not set!");
-                        }
+                    if (
+                        !this.context.refs.localStreamRef.current &&
+                        this.mediaManager
+                    ) {
+                        await this.mediaManager.initializeLocalMedia();
+                        // Force sync metadata after initialization to ensure correct state
+                        setTimeout(async () => {
+                            await this.mediaManager.forceSyncMetadata();
+                        }, 2000);
                     }
                 }, 1000);
 
@@ -165,7 +124,6 @@ export class RoomManager {
             }
             return false;
         } catch (error: any) {
-            console.error("Join room error:", error);
             let errorMessage = "Failed to join room";
 
             if (error.message?.includes("ECONNREFUSED")) {
@@ -194,6 +152,11 @@ export class RoomManager {
      */
     leaveRoom = async () => {
         try {
+            // Cleanup screen share if active before leaving
+            if (this.context.state.isScreenSharing && this.mediaManager) {
+                this.mediaManager.handleScreenShareEnded();
+            }
+
             // Cleanup local references but don't cleanup global media service
             this.context.refs.sendTransportRef.current?.close();
             this.context.refs.recvTransportRef.current?.close();
@@ -203,6 +166,8 @@ export class RoomManager {
             this.context.setters.setIsConnected(false);
             this.context.setters.setIsWebSocketJoined(false);
             this.context.setters.setStreams([]);
+            this.context.setters.setScreenStreams([]);
+            this.context.setters.setIsScreenSharing(false);
             this.context.refs.isInitializedRef.current = false;
             this.context.refs.isPublishingRef.current = false;
             this.context.refs.localStreamRef.current = null;
@@ -214,7 +179,6 @@ export class RoomManager {
             this.context.refs.currentStreamIdsRef.current = {};
             this.context.refs.pendingStreamsRef.current = [];
             this.context.refs.screenStreamRef.current = null;
-            this.context.setters.setIsScreenSharing(false);
 
             this.context.dispatch({
                 type: ActionRoomType.RESET,
@@ -272,16 +236,13 @@ export class RoomManager {
     togglePinUser = (peerId: string) => {
         if (!this.context.setters.setIsJoined || !this.context.roomId) return;
 
-        if (
-            this.context.room.pinnedUsers.some((arr: any) =>
-                arr.includes(peerId)
-            )
-        ) {
+        if (this.context.room.pinnedUsers.includes(peerId)) {
+            // Unpin user
             this.context.refs.socketRef.current?.emit(
                 "sfu:unpin-user",
                 {
                     roomId: this.context.roomId,
-                    peerId,
+                    unpinnedPeerId: peerId, // Use proper field name
                 },
                 (res: any) => {
                     if (res.success) {
@@ -289,10 +250,34 @@ export class RoomManager {
                             type: ActionRoomType.REMOVE_PINNED_USER,
                             payload: peerId,
                         });
+
+                        // Show appropriate message
+                        if (res.stillInPriority) {
+                            toast.success(
+                                `Unpinned user ${peerId} (still in priority view)`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} unpinned - still in priority, consumers maintained`
+                            );
+                        } else {
+                            toast.success(
+                                `Unpinned user ${peerId} - ${
+                                    res.consumersRemoved?.length || 0
+                                } consumers removed`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} unpinned - removed ${
+                                    res.consumersRemoved?.length || 0
+                                } consumers`
+                            );
+                        }
+                    } else {
+                        toast.error(res.message || "Failed to unpin user");
                     }
                 }
             );
         } else {
+            // Pin user
             if (!this.context.refs.recvTransportRef.current) {
                 toast.error("Receive transport not ready for pinning");
                 return;
@@ -301,14 +286,39 @@ export class RoomManager {
                 "sfu:pin-user",
                 {
                     roomId: this.context.roomId,
-                    peerId,
+                    pinnedPeerId: peerId, // Use proper field name
+                    transportId: this.context.refs.recvTransportRef.current.id,
                 },
                 (res: any) => {
                     if (res.success) {
+                        // Update Redux state regardless of whether it's already in priority
                         this.context.dispatch({
                             type: ActionRoomType.SET_PINNED_USERS,
-                            payload: { pinnedUsers: [peerId] },
+                            payload: { pinnedUsers: peerId },
                         });
+
+                        // Show appropriate message
+                        if (res.alreadyPriority) {
+                            toast.success(
+                                `Pinned user ${peerId} (already in priority view)`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} pinned - already in priority, no new consumers created`
+                            );
+                        } else {
+                            toast.success(
+                                `Pinned user ${peerId} - ${
+                                    res.consumersCreated?.length || 0
+                                } consumers created`
+                            );
+                            console.log(
+                                `[RoomManager] User ${peerId} pinned - created ${
+                                    res.consumersCreated?.length || 0
+                                } consumers`
+                            );
+                        }
+                    } else {
+                        toast.error(res.message || "Failed to pin user");
                     }
                 }
             );

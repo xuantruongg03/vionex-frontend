@@ -16,7 +16,7 @@ const LAYOUT_TEMPLATES: LayoutTemplate[] = [
     {
         id: "auto",
         name: "Auto",
-        description: "Tự động sắp xếp tối ưu",
+        description: "Auto layout",
         icon: "⚡",
         layout: (users: User[], cols: number) => {
             // Layout mặc định hiện tại
@@ -37,7 +37,7 @@ const LAYOUT_TEMPLATES: LayoutTemplate[] = [
     {
         id: "sidebar",
         name: "Sidebar",
-        description: "Người chính ở giữa, phụ ở cạnh",
+        description: "Main speaker in the center, others on the side",
         icon: "📱",
         layout: (users: User[], cols: number) => {
             if (users.length === 0) return [];
@@ -97,10 +97,10 @@ const LAYOUT_TEMPLATES: LayoutTemplate[] = [
     {
         id: "spotlight",
         name: "Spotlight",
-        description: "Chỉ hiện người đang nói",
+        description: "Only show the active speaker",
         icon: "🎯",
         layout: (users: User[], cols: number) => {
-            // Chỉ hiện người đầu tiên (có thể là người đang nói)
+            // Only show the first user (who may be the active speaker)
             if (users.length === 0) return [];
 
             return [
@@ -122,7 +122,7 @@ const LAYOUT_TEMPLATES: LayoutTemplate[] = [
     {
         id: "top-hero-bar",
         name: "Top Hero + Bottom Bar",
-        description: "Khung lớn chiếm 2 hàng trên, 4 khung nhỏ hàng dưới",
+        description: "Large frame occupies 2 rows on top, 4 small frames on bottom",
         icon: "🧊",
         layout: (users: User[], cols: number) => {
             const layout: any[] = [];

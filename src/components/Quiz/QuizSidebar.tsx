@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { getSocket } from "@/hooks/use-call-hybrid-new";
+import { useSocket } from "@/contexts/SocketContext";
+import { useQuizValidation } from "@/hooks/useQuizValidation";
 import {
     QuizOption,
     QuizResultsData,
@@ -32,7 +33,7 @@ import {
     User,
 } from "lucide-react";
 import { nanoid } from "nanoid";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
@@ -63,19 +64,14 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
     const [allStudentResults, setAllStudentResults] = useState<
         { participantId: string; results: QuizResultsData }[]
     >([]);
-    const [individualSubmissions, setIndividualSubmissions] = useState<
-        { participantId: string; results: QuizResultsData }[]
-    >([]);
-    const [selectedStudentResult, setSelectedStudentResult] = useState<
-        string | null
-    >(null);
     const [hasSubmittedQuiz, setHasSubmittedQuiz] = useState(false);
     const [submittedQuizzes, setSubmittedQuizzes] = useState<Set<string>>(
         new Set()
     );
 
-    // Use global socket like use-chat does
-    const socket = getSocket();
+    // Use Socket Context
+    const { socket } = useSocket();
+    const { validateQuizAccess } = useQuizValidation();
 
     // Load submitted quizzes from localStorage on component mount
     useEffect(() => {
@@ -96,42 +92,49 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
     }, [user?.username, roomId]);
 
     // Helper function to mark quiz as submitted and save to localStorage
-    const markQuizAsSubmitted = (quizId: string) => {
-        setSubmittedQuizzes((prev) => {
-            const newSet = new Set(prev);
-            newSet.add(quizId);
+    const markQuizAsSubmitted = useCallback(
+        (quizId: string) => {
+            setSubmittedQuizzes((prev) => {
+                const newSet = new Set(prev);
+                newSet.add(quizId);
 
-            // Save to localStorage
-            try {
-                localStorage.setItem(
-                    `submittedQuizzes_${user?.username || "unknown"}_${roomId}`,
-                    JSON.stringify(Array.from(newSet))
-                );
-            } catch (error) {
-                console.error(
-                    "Error saving submitted quizzes to localStorage:",
-                    error
-                );
-            }
+                // Save to localStorage
+                try {
+                    localStorage.setItem(
+                        `submittedQuizzes_${
+                            user?.username || "unknown"
+                        }_${roomId}`,
+                        JSON.stringify(Array.from(newSet))
+                    );
+                } catch (error) {
+                    console.error(
+                        "Error saving submitted quizzes to localStorage:",
+                        error
+                    );
+                }
 
-            return newSet;
-        });
-        setHasSubmittedQuiz(true);
-    };
+                return newSet;
+            });
+            setHasSubmittedQuiz(true);
+        },
+        [user?.username, roomId]
+    );
 
     // Helper function to check if user has submitted a specific quiz
-    const hasUserSubmittedQuiz = (quizId: string) => {
-        return submittedQuizzes.has(quizId);
-    };
+    const hasUserSubmittedQuiz = useCallback(
+        (quizId: string) => {
+            return submittedQuizzes.has(quizId);
+        },
+        [submittedQuizzes]
+    );
 
-    const form = useForm<z.infer<typeof quizSchema>>({
-        resolver: zodResolver(quizSchema),
-        defaultValues: {
+    const defaultFormValues = useMemo(
+        () => ({
             title: "",
             questions: [
                 {
                     text: "",
-                    type: "one-choice",
+                    type: "one-choice" as const,
                     options: [
                         { text: "", isCorrect: false },
                         { text: "", isCorrect: false },
@@ -139,7 +142,13 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                     answer: "",
                 },
             ],
-        },
+        }),
+        []
+    );
+
+    const form = useForm<z.infer<typeof quizSchema>>({
+        resolver: zodResolver(quizSchema),
+        defaultValues: defaultFormValues,
     });
 
     const {
@@ -330,18 +339,18 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
 
                 form.setValue("questions", questions as any);
                 toast.success(
-                    `Đã tải lên ${questions.length} câu hỏi thành công`
+                    `Successfully uploaded ${questions.length} questions`
                 );
             } catch (error) {
                 console.error("Error parsing Excel file:", error);
                 toast.error(
-                    "Có lỗi xảy ra khi đọc file. Vui lòng kiểm tra định dạng file."
+                    "An error occurred while reading the file. Please check the file format."
                 );
             }
         };
 
         reader.onerror = () => {
-            toast.error("Có lỗi xảy ra khi đọc file");
+            toast.error("An error occurred while reading the file");
         };
 
         reader.readAsBinaryString(file);
@@ -389,7 +398,7 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
 
         if (!socket || !socket.connected) {
             setIsSubmitting(false);
-            toast.error("Kết nối socket bị ngắt, không thể tạo bài kiểm tra");
+            toast.error("Socket connection is lost, unable to create quiz");
             return;
         }
 
@@ -403,20 +412,26 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
             };
 
             socket.emit("quiz:create", payload);
-        }, 500);
+        }, CONSTANT.QUIZ_SOCKET_DELAY);
 
         // Set up timeout for response
         const timeout = setTimeout(() => {
             setIsSubmitting(false);
-            toast.error("Timeout: Không thể tạo bài kiểm tra");
-        }, 10000); // 10 second timeout
+            toast.error("Timeout: Unable to create quiz");
+        }, CONSTANT.QUIZ_CREATE_TIMEOUT);
 
         const handleQuizCreated = (data: any) => {
-            console.log("[QuizSidebar] Quiz created:", data);
             clearTimeout(timeout);
             setIsSubmitting(false);
-            setActiveQuiz(data);
-            toast.success("Đã tạo bài kiểm tra thành công");
+
+            // Transform backend response to match frontend interface
+            const quizSession = {
+                ...data,
+                creatorId: (data as any).creator_id || data.creatorId,
+            };
+
+            setActiveQuiz(quizSession);
+            toast.success("Quiz created successfully");
             setActiveTab("results"); // Creator should see results after creating
             socket.off("quiz:created", handleQuizCreated);
             socket.off("quiz:error", handleQuizError);
@@ -426,7 +441,7 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
             console.error("[QuizSidebar] Quiz creation error:", error);
             clearTimeout(timeout);
             setIsSubmitting(false);
-            toast.error(error.message || "Không thể tạo bài kiểm tra");
+            toast.error(error.message || "Unable to create quiz");
             socket.off("quiz:created", handleQuizCreated);
             socket.off("quiz:error", handleQuizError);
         };
@@ -435,14 +450,17 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
         socket.on("quiz:error", handleQuizError);
     };
 
-    const handleQuizComplete = (results: QuizResultsData) => {
-        setQuizResults(results);
-        setIsQuizInProgress(false);
-        if (results.quizId) {
-            markQuizAsSubmitted(results.quizId); // Use the new helper function
-        }
-        setActiveTab("results");
-    };
+    const handleQuizComplete = useCallback(
+        (results: QuizResultsData) => {
+            setQuizResults(results);
+            setIsQuizInProgress(false);
+            if (results.quizId) {
+                markQuizAsSubmitted(results.quizId); // Use the new helper function
+            }
+            setActiveTab("results");
+        },
+        [markQuizAsSubmitted]
+    );
 
     useEffect(() => {
         if (!socket || !socket.connected) {
@@ -666,7 +684,6 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                     }
                 }
             } else {
-                console.log("[QuizSidebar] No active quiz found");
                 setActiveQuiz(null);
 
                 // Set default tab when no active quiz
@@ -697,7 +714,7 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
         isOpen,
         hasSubmittedQuiz,
         socket,
-        activeQuiz,
+        // activeQuiz removed to prevent infinite loop
     ]);
 
     const handleEndQuiz = () => {
@@ -732,63 +749,40 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
         socket.on("quiz:error", handleQuizError);
     };
 
-    const handleTabChange = (value: string) => {
-        const isQuizCreator = activeQuiz?.creatorId === user.username;
+    const handleTabChange = useCallback(
+        (value: string) => {
+            if (
+                !validateQuizAccess(
+                    value,
+                    activeTab,
+                    activeQuiz,
+                    user,
+                    isQuizInProgress,
+                    hasSubmittedQuiz,
+                    quizResults
+                )
+            ) {
+                return;
+            }
 
-        // Prevent tab switching during quiz
-        if (
-            isQuizInProgress &&
-            !isQuizCreator &&
-            value !== activeTab &&
-            value !== "results"
-        ) {
-            toast.error("Cannot switch tabs while quiz is in progress");
-            return;
-        }
+            setActiveTab(value as any);
+        },
+        [
+            validateQuizAccess,
+            activeTab,
+            activeQuiz,
+            user,
+            isQuizInProgress,
+            hasSubmittedQuiz,
+            quizResults,
+        ]
+    );
 
-        // Prevent non-creators from accessing create tab
-        if (!user.isCreator && value === "create") {
-            toast.error("Only the organizer can create quizzes");
-            return;
-        }
-
-        // Prevent accessing take tab when no quiz or already submitted
-        if (!activeQuiz && value === "take") {
-            toast.error("No quiz has been created");
-            return;
-        }
-
-        if (hasSubmittedQuiz && value === "take" && !isQuizCreator) {
-            toast.error("You have submitted the quiz and cannot retake it");
-            return;
-        }
-
-        // Prevent creating new quiz when one is active
-        if (activeQuiz && value === "create" && isQuizCreator) {
-            toast.error(
-                "There is an ongoing quiz. Please end the current quiz first"
-            );
-            return;
-        }
-
-        // Prevent accessing results when no results available
-        if (
-            !quizResults &&
-            !(isQuizCreator && activeQuiz) &&
-            value === "results"
-        ) {
-            toast.error("No quiz results available");
-            return;
-        }
-
-        setActiveTab(value as any);
-    };
-
-    const handleStartQuiz = () => {
+    const handleStartQuiz = useCallback(() => {
         setIsQuizInProgress(true);
-    };
+    }, []);
 
-    const disabledResultsTab = () => {
+    const disabledResultsTab = useMemo(() => {
         const isQuizCreator = activeQuiz?.creatorId === user.username;
 
         if (isQuizCreator) {
@@ -798,56 +792,62 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
             // Non-quiz-creator can only see results if they have submitted the quiz
             return !quizResults || isQuizInProgress || !hasSubmittedQuiz;
         }
-    };
+    }, [
+        activeQuiz,
+        user.username,
+        quizResults,
+        isQuizInProgress,
+        hasSubmittedQuiz,
+    ]);
 
     return (
         <>
             <Sheet open={isOpen} onOpenChange={onClose}>
                 <SheetContent
-                    side="right"
-                    className="w-full sm:max-w-[750px] md:max-w-[900px] p-0 border-l"
+                    side='right'
+                    className='w-full sm:max-w-[750px] md:max-w-[900px] p-0 border-l'
                 >
-                    <div className="h-full flex flex-col">
-                        <SheetHeader className="p-3 sm:p-4 border-b">
-                            <div className="flex justify-between items-center">
+                    <div className='h-full flex flex-col'>
+                        <SheetHeader className='p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700'>
+                            <div className='flex justify-between items-center'>
                                 <div>
-                                    <SheetTitle className="text-base sm:text-lg">
+                                    <SheetTitle className='text-base sm:text-lg text-gray-900 dark:text-white'>
                                         Quiz
                                     </SheetTitle>
-                                    <SheetDescription className="text-xs sm:text-sm">
+                                    <SheetDescription className='text-xs sm:text-sm text-gray-600 dark:text-gray-400'>
                                         Create or join a quiz to test your
                                         knowledge.
                                     </SheetDescription>
                                 </div>
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
+                                    variant='ghost'
+                                    size='icon'
                                     onClick={onClose}
-                                    className="border"
+                                    className='border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
                                 >
-                                    <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                                    <ChevronRight className='h-4 w-4 sm:h-5 sm:w-5' />
                                 </Button>
                             </div>
                         </SheetHeader>
 
-                        <div className="flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-sm">
+                        <div className='flex-1 overflow-y-auto p-3 sm:p-6 scrollbar-sm'>
                             <Tabs
                                 value={activeTab}
                                 onValueChange={handleTabChange}
-                                className="w-full"
+                                className='w-full'
                             >
-                                <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6">
+                                <TabsList className='grid w-full grid-cols-3 mb-4 sm:mb-6'>
                                     <TabsTrigger
-                                        value="create"
+                                        value='create'
                                         disabled={
                                             !user.isCreator || !!activeQuiz // Disable if there's any active quiz
                                         }
-                                        className="text-xs sm:text-sm"
+                                        className='text-xs sm:text-sm'
                                     >
                                         Create Quiz
                                     </TabsTrigger>
                                     <TabsTrigger
-                                        value="take"
+                                        value='take'
                                         disabled={(() => {
                                             // Check if current user is the quiz creator
                                             const isQuizCreator =
@@ -860,33 +860,33 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                 isQuizCreator; // Quiz creator cannot take their own quiz
                                             return isDisabled;
                                         })()}
-                                        className="text-xs sm:text-sm"
+                                        className='text-xs sm:text-sm'
                                     >
                                         Take Quiz
                                     </TabsTrigger>
                                     <TabsTrigger
-                                        value="results"
-                                        disabled={disabledResultsTab()}
-                                        className="text-xs sm:text-sm"
+                                        value='results'
+                                        disabled={disabledResultsTab}
+                                        className='text-xs sm:text-sm'
                                     >
                                         Results
                                     </TabsTrigger>
                                 </TabsList>
 
-                                <TabsContent value="create">
+                                <TabsContent value='create'>
                                     <form
                                         onSubmit={form.handleSubmit(
                                             handleCreateQuiz
                                         )}
-                                        className="space-y-4 sm:space-y-8 py-2 sm:py-4 max-w-4xl mx-auto focus-within:ring-0"
+                                        className='space-y-4 sm:space-y-8 py-2 sm:py-4 max-w-4xl mx-auto focus-within:ring-0'
                                     >
                                         {activeQuiz ? (
-                                            <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-md border border-orange-200 dark:border-orange-800 mb-4">
-                                                <div className="text-center">
-                                                    <h3 className="text-base sm:text-lg font-medium text-orange-700 dark:text-orange-400">
+                                            <div className='bg-orange-50 dark:bg-orange-900/20 p-4 rounded-md border border-orange-200 dark:border-orange-800 mb-4'>
+                                                <div className='text-center'>
+                                                    <h3 className='text-base sm:text-lg font-medium text-orange-700 dark:text-orange-400'>
                                                         Has an active quiz
                                                     </h3>
-                                                    <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
+                                                    <p className='text-sm text-orange-600 dark:text-orange-300 mt-1'>
                                                         Please go to the
                                                         "Results" tab to manage
                                                         the current quiz.
@@ -895,24 +895,24 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                             </div>
                                         ) : (
                                             <>
-                                                <div className="space-y-2 sm:space-y-3">
+                                                <div className='space-y-2 sm:space-y-3'>
                                                     <Label
-                                                        htmlFor="title"
-                                                        className="text-sm sm:text-lg"
+                                                        htmlFor='title'
+                                                        className='text-sm sm:text-lg text-gray-900 dark:text-white'
                                                     >
                                                         Quiz Title
                                                     </Label>
                                                     <Input
-                                                        id="title"
-                                                        placeholder="Enter quiz title"
-                                                        className="text-sm sm:text-lg py-2 sm:py-6 focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-900"
+                                                        id='title'
+                                                        placeholder='Enter quiz title'
+                                                        className='text-sm sm:text-lg py-2 sm:py-6 focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400'
                                                         {...form.register(
                                                             "title"
                                                         )}
                                                     />
                                                     {form.formState.errors
                                                         .title && (
-                                                        <p className="text-xs sm:text-sm text-red-500 dark:text-red-400">
+                                                        <p className='text-xs sm:text-sm text-red-500 dark:text-red-400'>
                                                             {
                                                                 form.formState
                                                                     .errors
@@ -923,16 +923,16 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                     )}
                                                 </div>
 
-                                                <div className="space-y-4 sm:space-y-6">
-                                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
-                                                        <Label className="text-sm sm:text-lg">
+                                                <div className='space-y-4 sm:space-y-6'>
+                                                    <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0'>
+                                                        <Label className='text-sm sm:text-lg text-gray-900 dark:text-white'>
                                                             Question List
                                                         </Label>
-                                                        <div className="flex flex-wrap gap-2 sm:space-x-3">
+                                                        <div className='flex flex-wrap gap-2 sm:space-x-3'>
                                                             <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="outline"
+                                                                type='button'
+                                                                size='sm'
+                                                                variant='outline'
                                                                 onClick={() => {
                                                                     const input =
                                                                         document.createElement(
@@ -958,44 +958,44 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                         };
                                                                     input.click();
                                                                 }}
-                                                                className="text-xs sm:text-sm py-1 px-2 sm:py-5 sm:px-4 flex-1 sm:flex-auto dark:border-slate-700 dark:hover:bg-slate-800"
+                                                                className='text-xs sm:text-sm py-1 px-2 sm:py-5 sm:px-4 flex-1 sm:flex-auto border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
                                                             >
-                                                                <Upload className="h-3 w-3 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                                                                <span className="whitespace-nowrap">
+                                                                <Upload className='h-3 w-3 sm:h-5 sm:w-5 mr-1 sm:mr-2' />
+                                                                <span className='whitespace-nowrap'>
                                                                     Import file
                                                                 </span>
                                                             </Button>
                                                             <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="outline"
+                                                                type='button'
+                                                                size='sm'
+                                                                variant='outline'
                                                                 onClick={() =>
                                                                     addQuestion(
                                                                         "multiple-choice"
                                                                     )
                                                                 }
-                                                                className="text-xs sm:text-sm py-1 px-2 sm:py-5 sm:px-4 flex-1 sm:flex-auto dark:border-slate-700 dark:hover:bg-slate-800"
+                                                                className='text-xs sm:text-sm py-1 px-2 sm:py-5 sm:px-4 flex-1 sm:flex-auto border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
                                                             >
-                                                                <CheckCircle className="h-3 w-3 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                                                                <span className="whitespace-nowrap">
+                                                                <CheckCircle className='h-3 w-3 sm:h-5 sm:w-5 mr-1 sm:mr-2' />
+                                                                <span className='whitespace-nowrap'>
                                                                     Add
                                                                     multiple-choice
                                                                     question
                                                                 </span>
                                                             </Button>
                                                             <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="outline"
+                                                                type='button'
+                                                                size='sm'
+                                                                variant='outline'
                                                                 onClick={() =>
                                                                     addQuestion(
                                                                         "essay"
                                                                     )
                                                                 }
-                                                                className="text-xs sm:text-sm py-1 px-2 sm:py-5 sm:px-4 flex-1 sm:flex-auto dark:border-slate-700 dark:hover:bg-slate-800"
+                                                                className='text-xs sm:text-sm py-1 px-2 sm:py-5 sm:px-4 flex-1 sm:flex-auto border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
                                                             >
-                                                                <FileText className="h-3 w-3 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-                                                                <span className="whitespace-nowrap">
+                                                                <FileText className='h-3 w-3 sm:h-5 sm:w-5 mr-1 sm:mr-2' />
+                                                                <span className='whitespace-nowrap'>
                                                                     Add essay
                                                                     question
                                                                 </span>
@@ -1010,12 +1010,12 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                         ) => (
                                                             <div
                                                                 key={field.id}
-                                                                className="border p-3 sm:p-6 rounded-md space-y-3 sm:space-y-4 bg-slate-50 dark:bg-slate-900/50 dark:border-slate-700"
+                                                                className='border border-gray-200 dark:border-gray-700 p-3 sm:p-6 rounded-md space-y-3 sm:space-y-4 bg-gray-50 dark:bg-gray-800'
                                                             >
-                                                                <div className="flex justify-between items-start">
+                                                                <div className='flex justify-between items-start'>
                                                                     <Label
                                                                         htmlFor={`question-${questionIndex}`}
-                                                                        className="text-sm sm:text-base font-medium"
+                                                                        className='text-sm sm:text-base font-medium text-gray-900 dark:text-white'
                                                                     >
                                                                         Question{" "}
                                                                         {questionIndex +
@@ -1024,26 +1024,26 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                     {questionFields.length >
                                                                         1 && (
                                                                         <Button
-                                                                            type="button"
-                                                                            size="sm"
-                                                                            variant="destructive"
+                                                                            type='button'
+                                                                            size='sm'
+                                                                            variant='destructive'
                                                                             onClick={() =>
                                                                                 removeQuestion(
                                                                                     questionIndex
                                                                                 )
                                                                             }
-                                                                            className="h-7 w-7 sm:h-8 sm:w-8 p-0 dark:bg-red-900 dark:hover:bg-red-800"
+                                                                            className='h-7 w-7 sm:h-8 sm:w-8 p-0 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800'
                                                                         >
-                                                                            <Trash className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                                            <Trash className='h-3 w-3 sm:h-4 sm:w-4' />
                                                                         </Button>
                                                                     )}
                                                                 </div>
 
-                                                                <div className="space-y-2 sm:space-y-3">
+                                                                <div className='space-y-2 sm:space-y-3'>
                                                                     <Input
                                                                         id={`question-${questionIndex}`}
-                                                                        placeholder="Enter question content"
-                                                                        className="text-sm sm:text-base py-2 sm:py-5 focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800"
+                                                                        placeholder='Enter question content'
+                                                                        className='text-sm sm:text-base py-2 sm:py-5 focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400'
                                                                         {...form.register(
                                                                             `questions.${questionIndex}.text`
                                                                         )}
@@ -1054,7 +1054,7 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                         .questions?.[
                                                                         questionIndex
                                                                     ]?.text && (
-                                                                        <p className="text-xs sm:text-sm text-red-500 dark:text-red-400">
+                                                                        <p className='text-xs sm:text-sm text-red-500 dark:text-red-400'>
                                                                             {
                                                                                 form
                                                                                     .formState
@@ -1069,8 +1069,8 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                     )}
                                                                 </div>
 
-                                                                <div className="space-y-1 sm:space-y-2">
-                                                                    <Label className="text-sm sm:text-base">
+                                                                <div className='space-y-1 sm:space-y-2'>
+                                                                    <Label className='text-sm sm:text-base text-gray-900 dark:text-white'>
                                                                         Question
                                                                         type
                                                                     </Label>
@@ -1150,29 +1150,29 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                                     field.value
                                                                                 }
                                                                             >
-                                                                                <SelectTrigger className="w-full focus:ring-1 focus:ring-blue-500 sm:w-[250px] text-xs sm:text-sm focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800">
-                                                                                    <SelectValue placeholder="Choose question type" />
+                                                                                <SelectTrigger className='w-full focus:ring-1 focus:ring-blue-500 sm:w-[250px] text-xs sm:text-sm focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800'>
+                                                                                    <SelectValue placeholder='Choose question type' />
                                                                                 </SelectTrigger>
-                                                                                <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
+                                                                                <SelectContent className='dark:bg-slate-900 dark:border-slate-700'>
                                                                                     <SelectItem
-                                                                                        value="one-choice"
-                                                                                        className="text-xs sm:text-sm"
+                                                                                        value='one-choice'
+                                                                                        className='text-xs sm:text-sm'
                                                                                     >
                                                                                         Choice
                                                                                         1
                                                                                         answer
                                                                                     </SelectItem>
                                                                                     <SelectItem
-                                                                                        value="multiple-choice"
-                                                                                        className="text-xs sm:text-sm"
+                                                                                        value='multiple-choice'
+                                                                                        className='text-xs sm:text-sm'
                                                                                     >
                                                                                         Multiple
                                                                                         choice
                                                                                         answers
                                                                                     </SelectItem>
                                                                                     <SelectItem
-                                                                                        value="essay"
-                                                                                        className="text-xs sm:text-sm"
+                                                                                        value='essay'
+                                                                                        className='text-xs sm:text-sm'
                                                                                     >
                                                                                         Essay
                                                                                         question
@@ -1192,28 +1192,28 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                         `questions.${questionIndex}.type`
                                                                     ) ===
                                                                         "one-choice") && (
-                                                                    <div className="space-y-3 sm:space-y-4 mt-3 sm:mt-4">
-                                                                        <div className="flex justify-between items-center">
-                                                                            <Label className="text-sm sm:text-base">
+                                                                    <div className='space-y-3 sm:space-y-4 mt-3 sm:mt-4'>
+                                                                        <div className='flex justify-between items-center'>
+                                                                            <Label className='text-sm sm:text-base text-gray-900 dark:text-white'>
                                                                                 Options
                                                                             </Label>
                                                                             <Button
-                                                                                type="button"
-                                                                                size="sm"
-                                                                                variant="outline"
+                                                                                type='button'
+                                                                                size='sm'
+                                                                                variant='outline'
                                                                                 onClick={() =>
                                                                                     addOption(
                                                                                         questionIndex
                                                                                     )
                                                                                 }
-                                                                                className="text-xs sm:text-sm py-1 px-2 sm:py-2 sm:px-3 dark:border-slate-700 dark:hover:bg-slate-800"
+                                                                                className='text-xs sm:text-sm py-1 px-2 sm:py-2 sm:px-3 dark:border-slate-700 dark:hover:bg-slate-800'
                                                                             >
-                                                                                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                                                                <Plus className='h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2' />
                                                                                 Add
                                                                             </Button>
                                                                         </div>
 
-                                                                        <div className="grid gap-2 sm:gap-4">
+                                                                        <div className='grid gap-2 sm:gap-4'>
                                                                             {form
                                                                                 .watch(
                                                                                     `questions.${questionIndex}.options`
@@ -1227,9 +1227,9 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                                             key={
                                                                                                 optionIndex
                                                                                             }
-                                                                                            className="flex items-start space-x-2 sm:space-x-3 bg-white dark:bg-slate-800 p-2 sm:p-3 rounded-md dark:border dark:border-slate-700"
+                                                                                            className='flex items-start space-x-2 sm:space-x-3 bg-white dark:bg-slate-800 p-2 sm:p-3 rounded-md dark:border dark:border-slate-700'
                                                                                         >
-                                                                                            <div className="mt-2 sm:mt-3">
+                                                                                            <div className='mt-2 sm:mt-3'>
                                                                                                 <Controller
                                                                                                     control={
                                                                                                         form.control
@@ -1251,18 +1251,18 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                                                                     checked as boolean
                                                                                                                 )
                                                                                                             }
-                                                                                                            className="h-4 w-4 sm:h-5 sm:w-5 dark:border-slate-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:bg-blue-500"
+                                                                                                            className='h-4 w-4 sm:h-5 sm:w-5 dark:border-slate-600 data-[state=checked]:bg-blue-600 dark:data-[state=checked]:bg-blue-500'
                                                                                                         />
                                                                                                     )}
                                                                                                 />
                                                                                             </div>
-                                                                                            <div className="flex-1">
+                                                                                            <div className='flex-1'>
                                                                                                 <Input
                                                                                                     placeholder={`Lựa chọn ${
                                                                                                         optionIndex +
                                                                                                         1
                                                                                                     }`}
-                                                                                                    className="text-sm sm:text-base py-1 sm:py-4 focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-900"
+                                                                                                    className='text-sm sm:text-base py-1 sm:py-4 focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-900'
                                                                                                     {...form.register(
                                                                                                         `questions.${questionIndex}.options.${optionIndex}.text`
                                                                                                     )}
@@ -1277,7 +1277,7 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                                                     optionIndex
                                                                                                 ]
                                                                                                     ?.text && (
-                                                                                                    <p className="text-xs sm:text-sm text-red-500 dark:text-red-400 mt-1">
+                                                                                                    <p className='text-xs sm:text-sm text-red-500 dark:text-red-400 mt-1'>
                                                                                                         {
                                                                                                             form
                                                                                                                 .formState
@@ -1300,18 +1300,18 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                                                 ?.length >
                                                                                                 2 && (
                                                                                                 <Button
-                                                                                                    type="button"
-                                                                                                    size="sm"
-                                                                                                    variant="destructive"
+                                                                                                    type='button'
+                                                                                                    size='sm'
+                                                                                                    variant='destructive'
                                                                                                     onClick={() =>
                                                                                                         removeOption(
                                                                                                             questionIndex,
                                                                                                             optionIndex
                                                                                                         )
                                                                                                     }
-                                                                                                    className="h-7 w-7 sm:h-8 sm:w-8 p-0 dark:bg-red-900 dark:hover:bg-red-800"
+                                                                                                    className='h-7 w-7 sm:h-8 sm:w-8 p-0 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800'
                                                                                                 >
-                                                                                                    <Trash className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                                                                    <Trash className='h-3 w-3 sm:h-4 sm:w-4' />
                                                                                                 </Button>
                                                                                             )}
                                                                                         </div>
@@ -1325,10 +1325,10 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                     `questions.${questionIndex}.type`
                                                                 ) ===
                                                                     "essay" && (
-                                                                    <div className="space-y-2 sm:space-y-3 mt-3 sm:mt-4">
+                                                                    <div className='space-y-2 sm:space-y-3 mt-3 sm:mt-4'>
                                                                         <Label
                                                                             htmlFor={`answer-${questionIndex}`}
-                                                                            className="text-sm sm:text-base"
+                                                                            className='text-sm sm:text-base text-gray-900 dark:text-white'
                                                                         >
                                                                             Example
                                                                             answer
@@ -1336,8 +1336,8 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                         </Label>
                                                                         <Textarea
                                                                             id={`answer-${questionIndex}`}
-                                                                            placeholder="Enter example answer (if any)"
-                                                                            className="min-h-[100px] sm:min-h-[150px] text-sm sm:text-base focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 dark:border-slate-700 dark:bg-slate-800"
+                                                                            placeholder='Enter example answer (if any)'
+                                                                            className='min-h-[100px] sm:min-h-[150px] text-sm sm:text-base focus-visible:outline-blue-400 dark:focus-visible:outline-blue-500 focus-visible:ring-0 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400'
                                                                             {...form.register(
                                                                                 `questions.${questionIndex}.answer`
                                                                             )}
@@ -1349,11 +1349,11 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                     )}
                                                 </div>
 
-                                                <div className="flex justify-end">
+                                                <div className='flex justify-end'>
                                                     <Button
-                                                        type="submit"
+                                                        type='submit'
                                                         disabled={isSubmitting}
-                                                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:from-blue-700 dark:to-indigo-700 dark:hover:from-blue-800 dark:hover:to-indigo-800 py-2 px-4 sm:py-6 sm:px-8 text-sm sm:text-base"
+                                                        className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 dark:from-blue-700 dark:to-indigo-700 dark:hover:from-blue-800 dark:hover:to-indigo-800 py-2 px-4 sm:py-6 sm:px-8 text-sm sm:text-base'
                                                     >
                                                         {isSubmitting
                                                             ? "Processing..."
@@ -1365,12 +1365,12 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                     </form>
                                 </TabsContent>
 
-                                <TabsContent value="take">
-                                    <div className="space-y-4 py-2 sm:py-4 max-w-4xl mx-auto">
+                                <TabsContent value='take'>
+                                    <div className='space-y-4 py-2 sm:py-4 max-w-4xl mx-auto'>
                                         {activeQuiz ? (
                                             <div>
                                                 {isQuizInProgress ? (
-                                                    <div className="bg-slate-50 p-3 sm:p-6 rounded-lg">
+                                                    <div className='bg-gray-50 dark:bg-gray-800 p-3 sm:p-6 rounded-lg border border-gray-200 dark:border-gray-700'>
                                                         <QuizTakingView
                                                             roomId={roomId}
                                                             username={
@@ -1383,12 +1383,12 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <div className="text-center py-8 sm:py-16 bg-slate-50 rounded-lg">
-                                                        <h3 className="text-base sm:text-xl font-semibold mb-1 sm:mb-2">
+                                                    <div className='text-center py-8 sm:py-16 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700'>
+                                                        <h3 className='text-base sm:text-xl font-semibold mb-1 sm:mb-2 text-gray-900 dark:text-white'>
                                                             Quiz:{" "}
                                                             {activeQuiz.title}
                                                         </h3>
-                                                        <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
+                                                        <p className='text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4 sm:mb-6'>
                                                             The quiz consists of{" "}
                                                             {
                                                                 activeQuiz
@@ -1404,14 +1404,14 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                                     onClick={
                                                                         handleStartQuiz
                                                                     }
-                                                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 py-2 px-4 sm:py-4 sm:px-6 text-sm sm:text-base"
+                                                                    className='bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 py-2 px-4 sm:py-4 sm:px-6 text-sm sm:text-base'
                                                                 >
                                                                     Start Quiz
                                                                 </Button>
                                                             )}
                                                         {!user.isCreator &&
                                                             quizResults && (
-                                                                <div className="mt-2 text-green-600 text-sm">
+                                                                <div className='mt-2 text-green-600 text-sm'>
                                                                     You have
                                                                     completed
                                                                     this quiz.
@@ -1421,14 +1421,14 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="text-center py-8 sm:py-16 bg-slate-50 rounded-lg">
-                                                <p className="text-gray-500 text-sm sm:text-lg">
+                                            <div className='text-center py-8 sm:py-16 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700'>
+                                                <p className='text-gray-500 dark:text-gray-400 text-sm sm:text-lg'>
                                                     No quizzes have been created
                                                     yet.
                                                 </p>
                                                 {user.isCreator && (
                                                     <Button
-                                                        className="mt-4 sm:mt-6 py-2 px-4 sm:py-5 sm:px-6 text-xs sm:text-base"
+                                                        className='mt-4 sm:mt-6 py-2 px-4 sm:py-5 sm:px-6 text-xs sm:text-base'
                                                         onClick={() =>
                                                             setActiveTab(
                                                                 "create"
@@ -1443,38 +1443,38 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="results">
-                                    <div className="space-y-4 py-2 sm:py-4 max-w-4xl mx-auto">
+                                <TabsContent value='results'>
+                                    <div className='space-y-4 py-2 sm:py-4 max-w-4xl mx-auto'>
                                         {/* End Quiz Button for Creator */}
                                         {activeQuiz &&
                                             activeQuiz.creatorId ===
                                                 user.username && (
-                                                <div className="bg-orange-50 p-4 rounded-md border border-orange-200 mb-4">
-                                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                                                <div className='bg-orange-50 p-4 rounded-md border border-orange-200 mb-4'>
+                                                    <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2'>
                                                         <div>
-                                                            <h3 className="text-base sm:text-lg font-medium text-orange-700">
+                                                            <h3 className='text-base sm:text-lg font-medium text-orange-700'>
                                                                 Quiz:{" "}
                                                                 {
                                                                     activeQuiz.title
                                                                 }
                                                             </h3>
-                                                            <p className="text-sm text-orange-600 mt-1">
+                                                            <p className='text-sm text-orange-600 mt-1'>
                                                                 End the quiz to
                                                                 complete the
                                                                 exam process.
                                                             </p>
                                                         </div>
                                                         <Button
-                                                            type="button"
-                                                            variant="destructive"
-                                                            size="sm"
+                                                            type='button'
+                                                            variant='destructive'
+                                                            size='sm'
                                                             onClick={
                                                                 handleEndQuiz
                                                             }
                                                             disabled={
                                                                 isSubmitting
                                                             }
-                                                            className="whitespace-nowrap text-xs sm:text-sm"
+                                                            className='whitespace-nowrap text-xs sm:text-sm'
                                                         >
                                                             {isSubmitting
                                                                 ? "Processing..."
@@ -1487,29 +1487,29 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                         {/* Results Display for Creator: List all students and scores */}
                                         {user.isCreator &&
                                         allStudentResults.length > 0 ? (
-                                            <div className="bg-slate-50 p-3 sm:p-6 rounded-lg">
-                                                <h4 className="text-sm sm:text-base font-semibold mb-4">
+                                            <div className='bg-gray-50 dark:bg-gray-800 p-3 sm:p-6 rounded-lg border border-gray-200 dark:border-gray-700'>
+                                                <h4 className='text-sm sm:text-base font-semibold mb-4 text-gray-900 dark:text-white'>
                                                     List of users who have
                                                     submitted their work
                                                 </h4>
-                                                <ul className="divide-y divide-gray-200">
+                                                <ul className='divide-y divide-gray-200 dark:divide-gray-700'>
                                                     {allStudentResults.map(
                                                         (student) => (
                                                             <li
                                                                 key={
                                                                     student.participantId
                                                                 }
-                                                                className="flex items-center justify-between py-2"
+                                                                className='flex items-center justify-between py-2'
                                                             >
-                                                                <div className="flex items-center">
-                                                                    <User className="h-4 w-4 mr-2" />
-                                                                    <span className="font-medium">
+                                                                <div className='flex items-center'>
+                                                                    <User className='h-4 w-4 mr-2' />
+                                                                    <span className='font-medium'>
                                                                         {
                                                                             student.participantId
                                                                         }
                                                                     </span>
                                                                 </div>
-                                                                <span className="text-sm text-gray-700 font-semibold">
+                                                                <span className='text-sm text-gray-700 dark:text-white font-semibold'>
                                                                     {
                                                                         student
                                                                             .results
@@ -1528,21 +1528,21 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                 </ul>
                                             </div>
                                         ) : user.isCreator && activeQuiz ? (
-                                            <div className="text-center py-8 sm:py-16 bg-slate-50 rounded-lg">
-                                                <p className="text-gray-500 text-sm sm:text-lg mb-4">
+                                            <div className='text-center py-8 sm:py-16 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700'>
+                                                <p className='text-gray-500 dark:text-gray-400 text-sm sm:text-lg mb-4'>
                                                     No users have completed the
                                                     quiz yet.
                                                 </p>
                                             </div>
                                         ) : quizResults ? (
-                                            <div className="bg-slate-50 p-3 sm:p-6 rounded-lg">
+                                            <div className='bg-gray-50 dark:bg-gray-800 p-3 sm:p-6 rounded-lg border border-gray-200 dark:border-gray-700'>
                                                 <QuizResultsView
                                                     results={quizResults}
                                                 />
                                             </div>
                                         ) : (
-                                            <div className="text-center py-8 sm:py-16 bg-slate-50 rounded-lg">
-                                                <p className="text-gray-500 text-sm sm:text-lg">
+                                            <div className='text-center py-8 sm:py-16 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700'>
+                                                <p className='text-gray-500 dark:text-gray-400 text-sm sm:text-lg'>
                                                     {user.isCreator
                                                         ? "No users have completed the quiz yet."
                                                         : "You have not completed any quizzes yet."}
@@ -1550,7 +1550,7 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                                                 {activeQuiz &&
                                                     !user.isCreator && (
                                                         <Button
-                                                            className="mt-4 sm:mt-6 py-2 px-4 sm:py-5 sm:px-6 text-xs sm:text-base"
+                                                            className='mt-4 sm:mt-6 py-2 px-4 sm:py-5 sm:px-6 text-xs sm:text-base'
                                                             onClick={() =>
                                                                 setActiveTab(
                                                                     "take"

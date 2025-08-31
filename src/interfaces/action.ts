@@ -12,6 +12,13 @@ export interface ActionRoom {
         isOrganizationRoom?: boolean;
         organizationId?: string;
         roomId?: string;
+        // User info for sharing with other participants
+        userInfo?: {
+            id: string;
+            email: string;
+            name: string;
+            avatar?: string;
+        };
     };
 }
 
@@ -68,5 +75,24 @@ export interface ActionAuth {
         };
         accessToken?: string;
         refreshToken?: string;
+    };
+}
+
+export enum ActionLayoutType {
+    SET_SELECTED_LAYOUT = "SET_SELECTED_LAYOUT",
+    RESET_LAYOUT = "RESET_LAYOUT",
+    SET_LAYOUT_PREFERENCES = "SET_LAYOUT_PREFERENCES",
+}
+
+export interface ActionLayout {
+    type: ActionLayoutType;
+    payload?: {
+        selectedLayoutTemplate?: string;
+        autoSaveToStorage?: boolean;
+        preferences?: {
+            preferredLayout?: string;
+            enableAutoLayout?: boolean;
+            saveToStorage?: boolean;
+        };
     };
 }

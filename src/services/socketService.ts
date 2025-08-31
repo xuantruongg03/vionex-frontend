@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 
-const WEBSOCKET_URL = "http://localhost:3005"; 
+const WEBSOCKET_URL = "http://localhost:3005";
 
 class WebSocketService {
     private socket: Socket | null = null;
@@ -52,9 +52,14 @@ class WebSocketService {
         }
     }
 
-    joinRoom(roomId: string, peerId: string, password?: string) {
-        this.socket?.emit("sfu:join", { roomId, peerId, password });
+    joinRoom(
+        roomId: string,
+        peerId: string,
+        password?: string,
+        userInfo?: any
+    ) {
+        this.socket?.emit("sfu:join", { roomId, peerId, password, userInfo });
     }
 }
 
-export default WebSocketService
+export default WebSocketService;

@@ -10,6 +10,8 @@ const initialState = {
     isOrganizationRoom: false,
     organizationId: null,
     roomId: null,
+    // User info for sharing with other participants
+    userInfo: null,
 };
 
 const roomReducer = (state = initialState, action: ActionRoom) => {
@@ -35,6 +37,8 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                 organizationId:
                     action.payload?.organizationId || state.organizationId,
                 roomId: action.payload?.roomId || state.roomId,
+                // User info for sharing with other participants
+                userInfo: action.payload?.userInfo || state.userInfo,
             };
             return state;
         case ActionRoomType.LEAVE_ROOM:
@@ -48,6 +52,8 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                 isOrganizationRoom: false,
                 organizationId: null,
                 roomId: null,
+                // Reset user info
+                userInfo: null,
             };
             return state;
         case ActionRoomType.SET_CREATOR:
@@ -63,20 +69,24 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
 
             return state;
         case ActionRoomType.SET_PINNED_USERS:
-            const newPinnedUsers = [
-                ...state.pinnedUsers,
-                action.payload?.pinnedUsers,
-            ];
-            return {
-                ...state,
-                pinnedUsers: newPinnedUsers,
-            };
+            const pinnedUser = action.payload?.pinnedUsers || action.payload;
+            // Ensure we don't add duplicate pins
+            const existingPins = Array.isArray(state.pinnedUsers)
+                ? state.pinnedUsers
+                : [];
+            if (!existingPins.includes(pinnedUser)) {
+                return {
+                    ...state,
+                    pinnedUsers: [...existingPins, pinnedUser],
+                };
+            }
+            return state;
 
         case ActionRoomType.REMOVE_PINNED_USER:
             return {
                 ...state,
                 pinnedUsers: state.pinnedUsers.filter(
-                    ([user]) => user !== action.payload
+                    (user) => user !== action.payload
                 ),
             };
 

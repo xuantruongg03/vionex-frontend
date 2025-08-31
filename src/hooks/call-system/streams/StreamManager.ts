@@ -1,14 +1,3 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
 import { StreamMetadata } from "@/interfaces/signal";
 import { toast } from "sonner";
 import { CallSystemContext, PendingStreamData } from "../types";
@@ -71,85 +60,58 @@ export class StreamManager {
         data: any
     ) => {
         if (mediaType === "screen") {
-            // Screen video stream
-            this.context.setters.setStreams((prev) => {
-                const existing = prev.find(
-                    (s) => s.id === `screen-${publisherId}`
+            // Screen video stream - use separate screen streams state
+            this.context.setters.setScreenStreams((prev) => {
+                // Remove any duplicate screen streams for this publisher first
+                const filteredStreams = prev.filter(
+                    (s) => s.id !== `screen-${publisherId}`
                 );
-                if (existing) {
-                    // Update existing stream
-                    return prev.map((s) =>
-                        s.id === `screen-${publisherId}`
-                            ? {
-                                  ...s,
-                                  stream: mediaStream,
-                                  metadata: {
-                                      ...s.metadata,
-                                      video: true,
-                                      type: "screen",
-                                      isScreenShare: true,
-                                      peerId: publisherId,
-                                  },
-                              }
-                            : s
-                    );
-                } else {
-                    // Add new screen share stream
-                    return [
-                        ...prev,
-                        {
-                            id: `screen-${publisherId}`,
-                            stream: mediaStream,
-                            metadata: {
-                                video: true,
-                                audio: false,
-                                type: "screen",
-                                isScreenShare: true,
-                                peerId: publisherId,
-                                ...data.metadata,
-                            },
-                        },
-                    ];
-                }
+
+                // Always create/recreate the stream to avoid duplicates
+                const newStream = {
+                    id: `screen-${publisherId}`,
+                    stream: mediaStream,
+                    metadata: {
+                        video: true,
+                        audio: false,
+                        type: "screen",
+                        isScreenShare: true,
+                        peerId: publisherId,
+                        publisherId: publisherId,
+                        ...data.metadata,
+                    },
+                };
+
+                return [...filteredStreams, newStream];
             });
         } else if (mediaType === "screen_audio") {
-            // Screen audio stream - update existing screen stream or create audio-only
-            this.context.setters.setStreams((prev) => {
-                const existing = prev.find(
+            // Screen audio stream - update existing screen stream in screen streams state
+            this.context.setters.setScreenStreams((prev) => {
+                // Remove any duplicate screen streams for this publisher first
+                const filteredStreams = prev.filter(
+                    (s) => s.id !== `screen-${publisherId}`
+                );
+
+                // Find if we have existing screen stream to preserve video
+                const existingStream = prev.find(
                     (s) => s.id === `screen-${publisherId}`
                 );
-                if (existing) {
-                    // Update existing screen stream with audio
-                    return prev.map((s) =>
-                        s.id === `screen-${publisherId}`
-                            ? {
-                                  ...s,
-                                  stream: mediaStream,
-                                  metadata: {
-                                      ...s.metadata,
-                                      audio: true,
-                                  },
-                              }
-                            : s
-                    );
-                } else {
-                    // Create audio-only screen share stream (rare case)
-                    return [
-                        ...prev,
-                        {
-                            id: `screen-${publisherId}`,
-                            stream: mediaStream,
-                            metadata: {
-                                video: false,
-                                audio: true,
-                                type: "screen",
-                                isScreenShare: true,
-                                peerId: publisherId,
-                                ...data.metadata,
-                            },
-                        },
-                    ];
-                }
+
+                const newStream = {
+                    id: `screen-${publisherId}`,
+                    stream: mediaStream,
+                    metadata: {
+                        video: existingStream?.metadata?.video || false,
+                        audio: true,
+                        type: "screen",
+                        isScreenShare: true,
+                        peerId: publisherId,
+                        publisherId: publisherId,
+                        ...data.metadata,
+                    },
+                };
+
+                return [...filteredStreams, newStream];
             });
         }
     };
@@ -260,8 +222,19 @@ export class StreamManager {
             mediaType === "screen" || mediaType === "screen_audio";
 
         if (isScreenShare) {
-            // Remove screen share stream
+            // Remove screen share stream from regular streams
             this.context.setters.setStreams((prev) =>
+                prev.filter((stream) => {
+                    const isScreenFromThisPeer =
+                        stream.id === `screen-${publisherId}` ||
+                        (stream.metadata?.peerId === publisherId &&
+                            stream.metadata?.isScreenShare);
+                    return !isScreenFromThisPeer;
+                })
+            );
+
+            // Remove screen share stream from dedicated screen streams state
+            this.context.setters.setScreenStreams((prev) =>
                 prev.filter((stream) => {
                     const isScreenFromThisPeer =
                         stream.id === `screen-${publisherId}` ||
@@ -294,11 +267,28 @@ export class StreamManager {
     /**
      * Remove streams from a specific peer
      */
-    removePeerStreams = (peerId: string) => {
-        // Remove streams from this peer
+    removePeerStreams = (peerId: string, reason?: string) => {
+        // Remove regular streams from this peer
         this.context.setters.setStreams((prev) => {
             const filteredStreams = prev.filter((s) => !s.id.includes(peerId));
             return filteredStreams;
+        });
+
+        // Remove screen share streams from this peer
+        this.context.setters.setScreenStreams((prev) => {
+            const filteredStreams = prev.filter((s) => !s.id.includes(peerId));
+            return filteredStreams;
+        });
+
+        // Clean up remote streams map for all streams from this peer
+        const streamsToDelete = [];
+        for (const [key] of this.context.refs.remoteStreamsMapRef.current) {
+            if (key.includes(peerId)) {
+                streamsToDelete.push(key);
+            }
+        }
+        streamsToDelete.forEach((key) => {
+            this.context.refs.remoteStreamsMapRef.current.delete(key);
         });
 
         // Remove from speaking peers
@@ -308,7 +298,13 @@ export class StreamManager {
             return newSet;
         });
 
-        toast.info(`${peerId} left the room`);
+        // Show appropriate message based on reason
+        if (reason === "kicked") {
+            toast.info(`${peerId} was removed from the room`);
+        } else {
+            // voluntary or undefined (default to voluntary)
+            toast.info(`${peerId} left the room`);
+        }
     };
 
     /**
@@ -317,8 +313,20 @@ export class StreamManager {
     removeScreenShareStreams = (peerId: string) => {
         toast.info(`${peerId} stopped screen sharing`);
 
-        // Remove screen share streams from this peer
+        // Remove screen share streams from regular streams state
         this.context.setters.setStreams((prev) =>
+            prev.filter((stream) => {
+                // Remove streams that match this peer's screen share
+                const isScreenFromThisPeer =
+                    stream.id === `screen-${peerId}` ||
+                    (stream.metadata?.peerId === peerId &&
+                        stream.metadata?.isScreenShare);
+                return !isScreenFromThisPeer;
+            })
+        );
+
+        // Remove screen share streams from dedicated screen streams state
+        this.context.setters.setScreenStreams((prev) =>
             prev.filter((stream) => {
                 // Remove streams that match this peer's screen share
                 const isScreenFromThisPeer =
@@ -343,6 +351,7 @@ export class StreamManager {
      */
     processPendingStreams = () => {
         const pendingStreams = this.context.refs.pendingStreamsRef.current;
+
         if (pendingStreams.length > 0) {
             for (const streamData of pendingStreams) {
                 // Validate streamId
