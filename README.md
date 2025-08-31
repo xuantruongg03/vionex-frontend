@@ -142,14 +142,13 @@ Ensure you have the following installed:
     Create a `.env` file in the root directory:
 
     ```env
-    # Backend API Configuration
-    VITE_SERVER_URL=https://your-backend-url/api/v1
+    VITE_SERVER_URL=YOUR_SERVER_URL
 
-    # SFU Server Configuration
-    VITE_SFU_URL=wss://your-sfu-server:3002
+    VITE_CLOUDINARY_CLOUD_NAME=YOUR_CLOUDINARY_CLOUD_NAME
+    VITE_CLOUDINARY_UPLOAD_PRESET=YOUR_CLOUDINARY_UPLOAD_PRESET
 
-    # Optional: Development settings
-    VITE_APP_ENV=development
+    # Google OAuth
+    VITE_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
     ```
 
 4. **Start Development Server**
@@ -175,39 +174,6 @@ npm run build
 # Preview production build locally
 npm run preview
 ```
-
-## 🐳 Docker Deployment
-
-### Quick Deployment
-
-```bash
-# Build the Docker image
-docker build -t vionex-frontend:latest .
-
-# Run the container
-docker run -d \
-  --name vionex-frontend \
-  -p 80:80 \
-  -e VITE_SERVER_URL=https://your-backend-url/api/v1 \
-  -e VITE_SFU_URL=wss://your-sfu-server:3002 \
-  vionex-frontend:latest
-```
-
-### Docker Compose (Recommended)
-
-```yaml
-version: "3.8"
-services:
-    vionex-frontend:
-        build: .
-        ports:
-            - "80:80"
-        environment:
-            - VITE_SERVER_URL=https://your-backend-url/api/v1
-            - VITE_SFU_URL=wss://your-sfu-server:3002
-        restart: unless-stopped
-```
-
 ### Production Considerations
 
 The included Nginx configuration is optimized for:
