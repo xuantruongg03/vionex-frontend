@@ -180,11 +180,7 @@ export const useWhiteboardSync = ({ isOpen, roomId, excalidrawAPI, canDraw = fal
         (payload: any) => {
             if (!excalidrawAPI || !socket || !socket.connected) return;
 
-            // Only send pointer updates if user has permission to draw
-            if (!canDraw) {
-                return;
-            }
-
+            // Send pointer updates for all users to show cursors, not just those who can draw
             const currentTool = excalidrawAPI.getAppState().activeTool.type || "selection";
             const position = {
                 x: payload.pointer.x,
@@ -201,7 +197,7 @@ export const useWhiteboardSync = ({ isOpen, roomId, excalidrawAPI, canDraw = fal
             // Use throttled emission to prevent spamming
             throttledEmitPointer(roomId, position);
         },
-        [excalidrawAPI, roomId, throttledEmitPointer, canDraw]
+        [excalidrawAPI, roomId, throttledEmitPointer]
     );
 
     // Optimized send function with better performance
