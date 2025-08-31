@@ -2,7 +2,7 @@ import { FaceMesh } from "@mediapipe/face_mesh";
 import { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 
-export default function useDetectEye() {
+export default function useDetectEye(isExamMode = false) {
     const [isLookingAtScreen, setIsLookingAtScreen] = useState(true);
     const [lastDetectionResult, setLastDetectionResult] = useState(true);
     const canvas = useRef<HTMLCanvasElement>(document.createElement("canvas"));
@@ -12,9 +12,8 @@ export default function useDetectEye() {
     const isDetecting = useRef(false);
     const lostFrames = useRef(0);
     const [isInitialized, setIsInitialized] = useState(false);
-    const [isEyeClosed, setIsEyeClosed] = useState(false);
-    const [isEyeOpen, setIsEyeOpen] = useState(false);
     const [hasCamera, setHasCamera] = useState(false);
+    const currentExamMode = useRef(isExamMode); // Track current mode
     const localVideoRef = useSelector(
         (state: any) => state.video.localVideoRef
     );
@@ -135,17 +134,73 @@ export default function useDetectEye() {
                         "Eye detection completed, result:",
                         lastDetectionResult
                     );
-                }, 3000); 
+                }, 3000);
             };
 
-            // Run detection every 15s
-            detectionIntervalRef.current = setInterval(() => {
-                console.log("Starting eye detection cycle...");
-                startDetection();
-            }, 18000);
+            // Function to update detection interval based on mode
+            const updateDetectionInterval = (examMode: boolean) => {
+                // Clear existing interval
+                if (detectionIntervalRef.current) {
+                    clearInterval(detectionIntervalRef.current);
+                    detectionIntervalRef.current = null;
+                }
 
-            // Run detection immediately in init
+                // Set new interval based on mode
+                const detectionInterval = examMode ? 6000 : 18000;
+                console.log(
+                    `[EyeDetection] Switching to ${
+                        examMode ? "EXAM" : "NORMAL"
+                    } mode (${detectionInterval}ms interval)`
+                );
+
+                detectionIntervalRef.current = setInterval(() => {
+                    console.log(
+                        `Starting eye detection cycle... (${
+                            examMode ? "EXAM" : "NORMAL"
+                        } mode)`
+                    );
+                    startDetection();
+                }, detectionInterval);
+
+                currentExamMode.current = examMode;
+            };
+
+            // Initial setup
+            updateDetectionInterval(isExamMode);
+
+            // Run detection immediately on init
             startDetection();
+
+            // Return cleanup and update function
+            const cleanup = () => {
+                // Clean up intervals và timeouts
+                if (detectionIntervalRef.current) {
+                    clearInterval(detectionIntervalRef.current);
+                    detectionIntervalRef.current = null;
+                }
+
+                if (detectionTimeoutRef.current) {
+                    clearTimeout(detectionTimeoutRef.current);
+                    detectionTimeoutRef.current = null;
+                }
+
+                // Dừng detection loop
+                isDetecting.current = false;
+                if (requestRef.current) {
+                    cancelAnimationFrame(requestRef.current);
+                    requestRef.current = undefined;
+                }
+
+                // Clean up FaceMesh detector
+                if (faceMeshDetectorRef.current) {
+                    faceMeshDetectorRef.current = null;
+                }
+            };
+
+            // Expose update function for external mode changes
+            (window as any).__updateEyeDetectionMode = updateDetectionInterval;
+
+            return cleanup;
         } catch (error) {
             console.error("Error initializing FaceMesh:", error);
             setHasCamera(false);
@@ -176,13 +231,25 @@ export default function useDetectEye() {
                 faceMeshDetectorRef.current = null;
             }
         };
-    }, [localVideoRef]);
+    }, [localVideoRef]); // Remove isExamMode from dependency
+
+    // Separate effect to handle exam mode changes without reinitializing
+    useEffect(() => {
+        if (isInitialized && currentExamMode.current !== isExamMode) {
+            console.log(
+                `[EyeDetection] Mode change detected: ${currentExamMode.current} → ${isExamMode}`
+            );
+
+            // Use the exposed global function to update mode
+            if ((window as any).__updateEyeDetectionMode) {
+                (window as any).__updateEyeDetectionMode(isExamMode);
+            }
+        }
+    }, [isExamMode, isInitialized]);
 
     return {
         isLookingAtScreen,
         isInitialized,
-        isEyeClosed,
-        isEyeOpen,
         hasCamera,
     };
 }

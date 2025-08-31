@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useSocket } from "@/contexts/SocketContext";
 import { useQuizValidation } from "@/hooks/useQuizValidation";
+import useBehaviorMonitor from "@/hooks/use-behavior-monitor";
 import {
     QuizOption,
     QuizResultsData,
@@ -72,6 +73,17 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
     // Use Socket Context
     const { socket } = useSocket();
     const { validateQuizAccess } = useQuizValidation();
+
+    // Determine if user is in exam mode (taking quiz)
+    const isUserTakingQuiz =
+        activeQuiz && !hasSubmittedQuiz && activeTab === "take";
+
+    // Initialize Behavior Monitoring - simple mode detection
+    useBehaviorMonitor({
+        roomId,
+        isExamMode: !!isUserTakingQuiz,
+        activeQuiz: isUserTakingQuiz ? activeQuiz : null,
+    });
 
     // Load submitted quizzes from localStorage on component mount
     useEffect(() => {
