@@ -264,7 +264,7 @@ export const QuizTakingView = ({
                                         className={`p-2 sm:p-3 border rounded-md mb-2 cursor-pointer transition-colors ${
                                             isSelected
                                                 ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-600"
-                                                : "hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-700"
+                                                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
                                         }`}
                                         onClick={() =>
                                             handleSelectOption(option.id)
@@ -310,7 +310,7 @@ export const QuizTakingView = ({
                                         className={`p-2 sm:p-3 border rounded-md cursor-pointer transition-colors ${
                                             isSelected
                                                 ? "border-green-500 bg-green-50 dark:bg-green-900/30 dark:border-green-600"
-                                                : "hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-700"
+                                                : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
                                         }`}
                                         onClick={() =>
                                             handleSelectOption(option.id)
@@ -336,7 +336,7 @@ export const QuizTakingView = ({
                     <div className='space-y-2'>
                         <Textarea
                             placeholder='Enter your answer...'
-                            className='min-h-[100px] sm:min-h-[150px] text-sm sm:text-base dark:bg-gray-800 dark:border-gray-700'
+                            className='min-h-[100px] sm:min-h-[150px] text-sm sm:text-base bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400'
                             value={
                                 answers.find(
                                     (a) => a.questionId === currentQuestion.id
