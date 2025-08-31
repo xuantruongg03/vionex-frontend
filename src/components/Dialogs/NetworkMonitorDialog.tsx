@@ -10,18 +10,17 @@ import { toast } from "sonner";
 interface NetworkMonitorDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    transport: any;
 }
 
 export const NetworkMonitorDialog = ({
     isOpen,
     onClose,
-    transport,
 }: NetworkMonitorDialogProps) => {
     const [isMonitoringEnabled, setIsMonitoringEnabled] = useState(false);
     const countdownRef = useRef<NodeJS.Timeout | null>(null);
     const [timeLeft, setTimeLeft] = useState<number>(5);
     const monitoringIntervalMs = 5000;
+    const transport = useRef<any>(null);
 
     const {
         networkStats,

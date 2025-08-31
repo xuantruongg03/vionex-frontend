@@ -402,9 +402,6 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         setIsTranslationCabinOpen(!isTranslationCabinOpen);
     };
 
-    // Mock transport for network monitoring
-    const recvTransport = null;
-
     return (
         <div className='flex h-screen bg-gray-50 dark:bg-gray-900 relative'>
             <SelectLayoutTemplate
@@ -422,7 +419,6 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                 <NetworkMonitorDialog
                     isOpen={isNetworkMonitorOpen}
                     onClose={() => setIsNetworkMonitorOpen(false)}
-                    transport={recvTransport}
                 />
             )}
             {isVotingDialogOpen && (

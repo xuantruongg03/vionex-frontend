@@ -31,7 +31,7 @@ interface WhiteboardProps {
 
 export const Whiteboard = React.memo(
     ({ roomId, isOpen, onClose, users }: WhiteboardProps) => {
-        console.log("🎨 [Whiteboard] Received props:", {
+        console.log("[Whiteboard] Received props:", {
             roomId,
             isOpen,
             users: users?.length || 0,
@@ -64,7 +64,7 @@ export const Whiteboard = React.memo(
 
         // Debug permission changes
         useEffect(() => {
-            console.log("🎨 [Whiteboard] Permission calculation:", {
+            console.log("[Whiteboard] Permission calculation:", {
                 myName,
                 isCreator,
                 allowedUsers: allowedUsers || [],
@@ -86,7 +86,7 @@ export const Whiteboard = React.memo(
                     fullRoom: room,
                 },
             });
-            console.log("🎨 [Whiteboard] Button visibility:", {
+            console.log("[Whiteboard] Button visibility:", {
                 shouldShowPermissionButton: isCreator,
                 roomData: room,
             });
@@ -141,7 +141,7 @@ export const Whiteboard = React.memo(
             canDrawRef.current = canDraw;
             if (excalidrawAPI) {
                 console.log(
-                    "🎨 [Whiteboard] Setting viewModeEnabled to:",
+                    "[Whiteboard] Setting viewModeEnabled to:",
                     !canDraw,
                     {
                         canDraw,
@@ -168,10 +168,10 @@ export const Whiteboard = React.memo(
                 data: { allowed?: string[] } | any
             ) => {
                 console.log(
-                    "🎨 [Whiteboard] Received permissions update:",
+                    "[Whiteboard] Received permissions update:",
                     data
                 );
-                console.log("🎨 [Whiteboard] Current state before update:", {
+                console.log("[Whiteboard] Current state before update:", {
                     currentAllowedUsers: allowedUsers,
                     isCreator,
                     myName,
@@ -188,17 +188,17 @@ export const Whiteboard = React.memo(
                     allowedArray = data;
                 } else {
                     console.warn(
-                        "🎨 [Whiteboard] Invalid permissions data format:",
+                        "[Whiteboard] Invalid permissions data format:",
                         data
                     );
                     allowedArray = [];
                 }
 
                 console.log(
-                    "🎨 [Whiteboard] Will set allowedUsers to:",
+                    "[Whiteboard] Will set allowedUsers to:",
                     allowedArray
                 );
-                console.log("🎨 [Whiteboard] After update canDraw will be:", {
+                console.log("[Whiteboard] After update canDraw will be:", {
                     isCreator,
                     willBeInAllowed: allowedArray.includes(myName),
                     finalCanDraw: isCreator || allowedArray.includes(myName),
@@ -281,7 +281,7 @@ export const Whiteboard = React.memo(
 
         const handleUpdatePermissions = useCallback(
             (newAllowedUsers: string[]) => {
-                console.log("🎨 [Whiteboard] Updating permissions:", {
+                console.log("[Whiteboard] Updating permissions:", {
                     newAllowedUsers,
                     currentAllowedUsers: allowedUsers,
                 });
@@ -306,7 +306,7 @@ export const Whiteboard = React.memo(
                                 <div className='flex items-center gap-2'>
                                     {(() => {
                                         console.log(
-                                            "🎨 [Whiteboard] Button render check:",
+                                            "[Whiteboard] Button render check:",
                                             {
                                                 isCreator,
                                                 shouldShow: isCreator,
