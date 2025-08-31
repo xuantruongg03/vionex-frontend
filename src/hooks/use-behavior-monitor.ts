@@ -8,15 +8,25 @@ import useDetectEye from "./use-detect-eye";
 
 interface BehaviorMonitorProps {
     roomId: string;
+    isExamMode?: boolean;
+    activeQuiz?: any;
 }
 
-export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
+export default function useBehaviorMonitor({
+    roomId,
+    isExamMode = false,
+    activeQuiz = null,
+}: BehaviorMonitorProps) {
     const dispatch = useDispatch();
     const { socket: sfuSocket } = useSocket();
-    const { isLookingAtScreen, isInitialized, hasCamera } = useDetectEye();
-    // const isLookingAtScreen = false;
-    // const isInitialized = false;
-    // const hasCamera = false;
+
+    // Determine if user is taking quiz (not just quiz exists)
+    const isUserTakingQuiz =
+        isExamMode && activeQuiz && !activeQuiz.isCompleted;
+    const examModeActive = isUserTakingQuiz;
+
+    const { isLookingAtScreen, isInitialized, hasCamera } =
+        useDetectEye(examModeActive);
     // const interval = useRef<NodeJS.Timeout | null>(null);
     const logSendInterval = useRef<NodeJS.Timeout | null>(null);
     const room = useSelector((state: any) => state.room);
@@ -126,7 +136,7 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
         if (sfuSocket && sfuSocket.connected) {
             try {
                 if (isMonitorActive) {
-                    toast.info("Tắt giám sát, đang tải logs...");
+                    toast.info("Stopping monitoring, downloading logs...");
                     sfuSocket.emit(
                         "sfu:download-room-log",
                         {
@@ -154,17 +164,17 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
                                 }, 100);
 
                                 toast.success(
-                                    "Đã tải xuống file log thành công"
+                                    "Successfully downloaded log file"
                                 );
                             } else if (file && !file.success) {
                                 toast.error(
-                                    file.error || "Không thể tải xuống file log"
+                                    file.error || "Unable to download log file"
                                 );
                             }
                         }
                     );
                 } else {
-                    toast.info("Bắt đầu giám sát...");
+                    toast.info("Starting monitoring...");
                 }
 
                 sfuSocket.emit("sfu:toggle-behavior-monitor", {
@@ -174,11 +184,11 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
                 });
             } catch (err) {
                 console.error("Error sending toggle monitoring command:", err);
-                toast.error("Lỗi khi thay đổi trạng thái giám sát");
+                toast.error("Error changing monitoring status");
             }
         } else {
             console.warn("Socket not connected, can't toggle monitoring");
-            toast.error("Không thể kết nối đến server");
+            toast.error("Cannot connect to server");
         }
     }, [isCreator, roomId, username, isMonitorActive]);
 
@@ -210,6 +220,15 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
         // --- Giám sát người dùng chuyển tab ---
         const handleVisibilityChange = () => {
             const isVisible = document.visibilityState === "visible";
+
+            // Enhanced logging for exam mode
+            if (examModeActive && !isVisible) {
+                console.warn(
+                    "[EXAM] Suspicious: User switched tab during quiz!"
+                );
+                toast.warning("Warning: Tab switching detected during exam");
+            }
+
             dispatch({
                 type: ActionLogType.SET_EVENT_LOG,
                 payload: [
@@ -217,6 +236,13 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
                         type: TypeUserEvent.FOCUS_TAB,
                         value: isVisible,
                         time: new Date(),
+                        context: examModeActive
+                            ? {
+                                  examMode: true,
+                                  severity: !isVisible ? "HIGH" : "LOW",
+                                  quizId: activeQuiz?.id,
+                              }
+                            : undefined,
                     },
                 ],
             });
@@ -241,6 +267,14 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
 
         const handleBlur = () => {
             if (document.visibilityState === "visible") {
+                // Enhanced warning for exam mode
+                if (examModeActive) {
+                    console.warn(
+                        "[EXAM] Suspicious: User lost focus during quiz!"
+                    );
+                    toast.warning("Warning: Window focus lost during exam");
+                }
+
                 // Chỉ ghi blur nếu tab đang active => tức là mất focus do chuyển cửa sổ
                 dispatch({
                     type: ActionLogType.SET_EVENT_LOG,
@@ -249,6 +283,13 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
                             type: TypeUserEvent.FOCUS,
                             value: false,
                             time: new Date(),
+                            context: examModeActive
+                                ? {
+                                      examMode: true,
+                                      severity: "HIGH",
+                                      quizId: activeQuiz?.id,
+                                  }
+                                : undefined,
                         },
                     ],
                 });
@@ -260,31 +301,6 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
         window.addEventListener("blur", handleBlur);
 
         // let eyeTrackingInterval = 10000;
-
-        // Giám sát người dùng có đang nhìn vào màn hình hay không
-        // Sử dụng cơ chế mới: mỗi 15s chạy 3s detection
-        if (isInitialized && hasCamera) {
-            // Logic eye tracking đã được tích hợp vào useDetectEye
-            // Kết quả sẽ được cập nhật tự động qua isLookingAtScreen state
-
-            // Tạo một effect riêng để lắng nghe thay đổi của isLookingAtScreen
-            const logEyeTracking = () => {
-                console.log("Eye tracking result:", isLookingAtScreen);
-                dispatch({
-                    type: ActionLogType.SET_EVENT_LOG,
-                    payload: [
-                        {
-                            type: TypeUserEvent.ATTENTION,
-                            value: isLookingAtScreen,
-                            time: new Date(),
-                        },
-                    ],
-                });
-            };
-
-            // Log kết quả mỗi khi isLookingAtScreen thay đổi
-            logEyeTracking();
-        }
 
         return () => {
             // if (interval.current) {
@@ -299,17 +315,58 @@ export default function useBehaviorMonitor({ roomId }: BehaviorMonitorProps) {
             window.removeEventListener("focus", handleFocus);
             window.removeEventListener("blur", handleBlur);
         };
+    }, [isMonitorActive, isInitialized, hasCamera, dispatch]);
+
+    // Separate effect for eye tracking to avoid infinite loops
+    useEffect(() => {
+        if (!isMonitorActive || !isInitialized || !hasCamera) {
+            return;
+        }
+
+        // Debounce eye tracking logs to avoid spam
+        const timeoutId = setTimeout(() => {
+            const logLevel = examModeActive ? "EXAM" : "NORMAL";
+            console.log(
+                `[${logLevel}] Eye tracking result:`,
+                isLookingAtScreen
+            );
+
+            dispatch({
+                type: ActionLogType.SET_EVENT_LOG,
+                payload: [
+                    {
+                        type: TypeUserEvent.ATTENTION,
+                        value: isLookingAtScreen,
+                        time: new Date(),
+                        // Add exam mode context
+                        context: examModeActive
+                            ? {
+                                  examMode: true,
+                                  quizId: activeQuiz?.id,
+                                  quizTitle: activeQuiz?.title,
+                              }
+                            : undefined,
+                    },
+                ],
+            });
+        }, 100);
+
+        return () => clearTimeout(timeoutId);
     }, [
+        isLookingAtScreen,
         isMonitorActive,
         isInitialized,
         hasCamera,
-        isLookingAtScreen,
         dispatch,
+        examModeActive,
+        activeQuiz,
     ]);
 
     return {
         isMonitorActive,
         toggleBehaviorMonitoring,
         sendLogsToServer,
+        examModeActive,
+        isUserTakingQuiz,
     };
 }

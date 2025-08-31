@@ -1,50 +1,7 @@
-import { useEffect, useRef, useCallback } from "react";
-// import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-// import { toast } from "sonner";
-// import { throttle } from "lodash";
-// import { getSocket } from "./use-call-hybrid-new";
-
-// type PointerData = {
-//     pointer: { x: number; y: number; tool: string };
-//     button: number;
-//     pointersMap: any;
-//     username: string;
-//     userId: string;
-// };
-
-// interface Props {
-//     isOpen: boolean;
-//     roomId: string;
-//     excalidrawAPI: ExcalidrawImperativeAPI | null;
-//     canDraw?: boolean;
-//     onRemoteUpdate?: () => void;
-// }
-
-// export const useWhiteboardSync = ({
-//     isOpen,
-//     roomId,
-//     excalidrawAPI,
-//     canDraw = false,
-//     onRemoteUpdate,
-// }: Props) => {
-//     const pointerDataRef = useRef<PointerData | null>(null);
-//     const lastUpdateRef = useRef<number>(0);
-//     const pendingUpdateRef = useRef<{ elements: any[]; state: any } | null>(
-//         null
-//     );
-//     const lastVersionRef = useRef<number>(0);
-//     const lastElementsCountRef = useRef<number>(0);
-//     const lastPointsHashRef = useRef<string>('');
-//     const SYNC_THROTTLE_MS = 100; // Throttle sync để tránh spam
-
-//     // Track drawing state and local elements
-//     const isDrawingRef = useRef<boolean>(false);
-//     const localElementsRef = useRef<any[]>([]);
-//     const drawingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-//     const lastSentVersionRef = useRef<number>(0);
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { toast } from "sonner";
-import { throttle } from "lodash";
+import { throttle, debounce } from "lodash";
 import { useSocket } from "@/contexts/SocketContext";
 
 type PointerData = {
@@ -62,53 +19,38 @@ type Props = {
     username?: string; // Add username for tracking updates
 };
 
-export const useWhiteboardSync = ({
-    isOpen,
-    roomId,
-    excalidrawAPI,
-    canDraw = false,
-    onRemoteUpdate,
-    username,
-}: Props) => {
-    // Debug canDraw changes
-    useEffect(() => {
-        console.log("🎨 [useWhiteboardSync] canDraw changed:", canDraw);
-    }, [canDraw]);
+// Constants moved outside component to prevent recreation
+const SYNC_THROTTLE_MS = 100;
+const POINTER_THROTTLE_MS = 200;
+const DRAWING_TIMEOUT_MS = 500;
+const ELEMENT_AGE_THRESHOLD = 100;
+
+export const useWhiteboardSync = ({ isOpen, roomId, excalidrawAPI, canDraw = false, onRemoteUpdate, username }: Props) => {
     const pointerDataRef = useRef<PointerData | null>(null);
     const lastUpdateRef = useRef<number>(0);
-    const pendingUpdateRef = useRef<{ elements: any[]; state: any } | null>(
-        null
-    );
+    const pendingUpdateRef = useRef<{ elements: any[]; state: any } | null>(null);
     const lastVersionRef = useRef<number>(0);
     const lastElementsCountRef = useRef<number>(0);
     const lastPointsHashRef = useRef<string>("");
     const isDrawingRef = useRef<boolean>(false);
     const localElementsRef = useRef<any[]>([]);
-    const SYNC_THROTTLE_MS = 100; // Throttle sync để tránh spam
-
     const drawingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSentVersionRef = useRef<number>(0);
+    const lastAppliedUpdateRef = useRef<string>("");
 
     // Use Socket Context
     const { socket } = useSocket();
 
-    // Throttled pointer emission to prevent spamming server
-    const throttledEmitPointer = useRef(
-        throttle(
-            (
-                roomId: string,
-                position: { x: number; y: number; tool: string }
-            ) => {
-                if (socket && socket.connected) {
+    // Memoized throttled functions to prevent recreation on every render
+    const throttledEmitPointer = useMemo(
+        () =>
+            throttle((roomId: string, position: { x: number; y: number; tool: string }) => {
+                if (socket?.connected) {
                     socket.emit("whiteboard:pointer", { roomId, position });
                 }
-            },
-            200
-        ) // Emit max every 200ms
-    ).current;
-
-    // Track the last applied update to prevent duplicate processing
-    const lastAppliedUpdateRef = useRef<string>("");
+            }, POINTER_THROTTLE_MS),
+        [socket]
+    );
 
     // Khởi tạo socket event listeners
     useEffect(() => {
@@ -117,42 +59,20 @@ export const useWhiteboardSync = ({
 
             // Don't apply our own updates back to ourselves
             if (data.fromUser && data.fromUser === username) {
-                console.log(
-                    "🎨 [handleUpdate] Skipping own update from:",
-                    data.fromUser
-                );
                 return;
             }
 
             // If user is currently drawing, don't apply remote updates
             // to avoid interrupting their drawing experience
             if (isDrawingRef.current) {
-                console.log(
-                    "🎨 [handleUpdate] Skipping remote update - user is drawing"
-                );
                 return;
             }
 
             // Create a unique identifier for this update to prevent duplicates
-            const updateId = `${data.version || Date.now()}-${
-                data.elements?.length || 0
-            }-${data.timestamp || ""}`;
+            const updateId = `${data.version || Date.now()}-${data.elements?.length || 0}-${data.timestamp || ""}`;
             if (lastAppliedUpdateRef.current === updateId) {
-                console.log(
-                    "🎨 [handleUpdate] Skipping duplicate update:",
-                    updateId
-                );
                 return;
             }
-
-            console.log("🎨 [handleUpdate] Applying remote update:", {
-                elementsCount: data.elements?.length,
-                version: data.version,
-                fromUser: data.fromUser,
-                myUsername: username,
-                updateId,
-            });
-
             // Mark this update as processed
             lastAppliedUpdateRef.current = updateId;
 
@@ -160,10 +80,7 @@ export const useWhiteboardSync = ({
             onRemoteUpdate?.(true);
 
             if (data.version) {
-                lastVersionRef.current = Math.max(
-                    lastVersionRef.current,
-                    data.version
-                );
+                lastVersionRef.current = Math.max(lastVersionRef.current, data.version);
             }
 
             try {
@@ -177,36 +94,25 @@ export const useWhiteboardSync = ({
                                 return element;
                             }
 
-                            if (
-                                !element.points ||
-                                !Array.isArray(element.points)
-                            ) {
+                            if (!element.points || !Array.isArray(element.points)) {
                                 return {
                                     ...element,
                                     points: [], // Empty points array
                                     pressures: [], // Add pressures array
                                     simulatePressure: true, // Enable pressure simulation
                                     // Add other required properties for freedraw
-                                    strokeColor:
-                                        element.strokeColor || "#000000",
-                                    backgroundColor:
-                                        element.backgroundColor ||
-                                        "transparent",
+                                    strokeColor: element.strokeColor || "#000000",
+                                    backgroundColor: element.backgroundColor || "transparent",
                                     fillStyle: element.fillStyle || "hachure",
                                     strokeWidth: element.strokeWidth || 1,
                                     strokeStyle: element.strokeStyle || "solid",
                                     roughness: element.roughness || 1,
                                     opacity: element.opacity || 100,
-                                    seed:
-                                        element.seed ||
-                                        Math.floor(Math.random() * 2 ** 31),
+                                    seed: element.seed || Math.floor(Math.random() * 2 ** 31),
                                 };
                             }
                             // Ensure pressures array exists for non-deleted elements
-                            if (
-                                !element.pressures ||
-                                !Array.isArray(element.pressures)
-                            ) {
+                            if (!element.pressures || !Array.isArray(element.pressures)) {
                                 return {
                                     ...element,
                                     pressures: element.points.map(() => 0.5), // Default pressure
@@ -224,8 +130,7 @@ export const useWhiteboardSync = ({
                                 return true;
                             }
                             // Include all freedraw elements that have a valid points array structure
-                            const hasValidStructure =
-                                element.points && Array.isArray(element.points);
+                            const hasValidStructure = element.points && Array.isArray(element.points);
                             if (!hasValidStructure) {
                                 return false;
                             }
@@ -256,7 +161,6 @@ export const useWhiteboardSync = ({
                 // Notify component that remote update is complete
                 setTimeout(() => {
                     onRemoteUpdate?.(false);
-                    console.log("🎨 [handleUpdate] Remote update complete");
                 }, 200); // Increased timeout to ensure onChange doesn't trigger sync
             } catch (err) {
                 console.error("Error applying whiteboard update:", err);
@@ -276,13 +180,8 @@ export const useWhiteboardSync = ({
         (payload: any) => {
             if (!excalidrawAPI || !socket || !socket.connected) return;
 
-            // Only send pointer updates if user has permission to draw
-            if (!canDraw) {
-                return;
-            }
-
-            const currentTool =
-                excalidrawAPI.getAppState().activeTool.type || "selection";
+            // Send pointer updates for all users to show cursors, not just those who can draw
+            const currentTool = excalidrawAPI.getAppState().activeTool.type || "selection";
             const position = {
                 x: payload.pointer.x,
                 y: payload.pointer.y,
@@ -298,52 +197,30 @@ export const useWhiteboardSync = ({
             // Use throttled emission to prevent spamming
             throttledEmitPointer(roomId, position);
         },
-        [excalidrawAPI, roomId, throttledEmitPointer, canDraw]
+        [excalidrawAPI, roomId, throttledEmitPointer]
     );
 
-    // Gửi cập nhật đã lên lịch
+    // Optimized send function with better performance
     const sendPendingUpdate = useCallback(() => {
-        console.log("🎨 [sendPendingUpdate] Called with:", {
-            hasPending: !!pendingUpdateRef.current,
-            hasSocket: !!socket,
-            isConnected: socket?.connected,
-            canDraw,
-            username,
-        });
-
         if (!pendingUpdateRef.current || !socket || !socket.connected) {
-            console.log(
-                "🎨 [sendPendingUpdate] Early return - missing requirements"
-            );
             return;
         }
 
         if (!canDraw) {
-            console.log(
-                "🎨 [sendPendingUpdate] Early return - no draw permission"
-            );
             return;
         }
 
         if (!username) {
-            console.log("🎨 [sendPendingUpdate] Early return - no username");
             return;
         }
 
         const { elements, state } = pendingUpdateRef.current;
 
-        console.log("🎨 [sendPendingUpdate] Raw elements:", {
-            elementsCount: elements?.length || 0,
-            sampleElement: elements?.[0],
-        });
-
-        // Validate elements before sending - include deleted elements for sync
         const validElements =
             elements?.filter((element) => {
                 if (element.type === "freedraw") {
                     // Include freedraw elements that have points array OR are deleted
-                    const hasPoints =
-                        "points" in element && Array.isArray(element.points);
+                    const hasPoints = "points" in element && Array.isArray(element.points);
                     const isDeleted = element.isDeleted === true;
                     return hasPoints || isDeleted;
                 }
@@ -352,17 +229,16 @@ export const useWhiteboardSync = ({
 
         // Don't send if no valid elements
         if (validElements.length === 0) {
-            console.log("🎨 [sendPendingUpdate] No valid elements to send");
             pendingUpdateRef.current = null;
             return;
         }
 
-        console.log("🎨 [sendPendingUpdate] Sending valid elements:", {
-            validElementsCount: validElements.length,
-            sampleValid: validElements[0],
-            fromUser: username,
-            roomId,
-        });
+        // Skip if nothing meaningful changed - sử dụng hash đơn giản
+        const elementsHash = validElements.map((el) => `${el.id}-${el.x}-${el.y}-${el.width}-${el.height}`).join(",");
+        if (elementsHash === lastPointsHashRef.current) {
+            pendingUpdateRef.current = null;
+            return;
+        }
 
         // Tăng phiên bản mỗi khi gửi cập nhật
         lastVersionRef.current++;
@@ -375,8 +251,7 @@ export const useWhiteboardSync = ({
                 ? {
                       viewBackgroundColor: state.viewBackgroundColor,
                       currentItemStrokeColor: state.currentItemStrokeColor,
-                      currentItemBackgroundColor:
-                          state.currentItemBackgroundColor,
+                      currentItemBackgroundColor: state.currentItemBackgroundColor,
                       currentItemFillStyle: state.currentItemFillStyle,
                       currentItemStrokeWidth: state.currentItemStrokeWidth,
                       currentItemRoughness: state.currentItemRoughness,
@@ -392,28 +267,34 @@ export const useWhiteboardSync = ({
             fromUser: username, // Add user tracking
         });
 
-        console.log(
-            "🎨 [sendPendingUpdate] Successfully emitted whiteboard:update"
-        );
-
+        // Update tracking refs
+        lastPointsHashRef.current = elementsHash;
+        lastUpdateRef.current = Date.now();
+        lastSentVersionRef.current = lastVersionRef.current;
         // Xóa cập nhật đang chờ
         pendingUpdateRef.current = null;
     }, [roomId, socket, canDraw, username]);
 
+    // Debounced sync function for performance optimization
+    const debouncedSync = useMemo(
+        () =>
+            debounce(() => {
+                if (pendingUpdateRef.current) {
+                    sendPendingUpdate();
+                }
+            }, SYNC_THROTTLE_MS),
+        [sendPendingUpdate]
+    );
+
+    // Optimized change handler with better performance
     const handleChange = useCallback(
         (elements: any[], state: any) => {
             if (!elements || !Array.isArray(elements)) return;
 
             // Only send updates if user has permission to draw
             if (!canDraw) {
-                console.log("🎨 [handleChange] Skipping - no draw permission");
                 return;
             }
-
-            console.log("🎨 [handleChange] Processing local change:", {
-                elementsCount: elements.length,
-                canDraw,
-            });
 
             // Store local elements immediately for responsive UI
             localElementsRef.current = [...elements];
@@ -422,27 +303,18 @@ export const useWhiteboardSync = ({
             const isCurrentlyDrawing = elements.some((element) => {
                 if (element.type === "freedraw") {
                     // Check if this is an incomplete freedraw (still being drawn)
-                    return (
-                        element.points &&
-                        element.points.length > 0 &&
-                        !element.isDeleted &&
-                        element.id &&
-                        !element.endTimestamp
-                    );
+                    return element.points && element.points.length > 0 && !element.isDeleted && element.id && !element.endTimestamp;
                 } else {
-                    // For other shapes (rectangle, circle, arrow, etc.), check if they're being created
-                    // Elements are considered "being drawn" if they're very new (created in last 100ms)
+                    // For other shapes, check if they're being created recently
                     const now = Date.now();
-                    const elementAge =
-                        now - (element.updated || element.created || 0);
-                    return elementAge < 100; // Element is very new, likely being created
+                    const elementAge = now - (element.updated || element.created || 0);
+                    return elementAge < ELEMENT_AGE_THRESHOLD;
                 }
             });
 
             // Set drawing state and reset timeout
             if (isCurrentlyDrawing && !isDrawingRef.current) {
                 isDrawingRef.current = true;
-                console.log("User started drawing");
             }
 
             // Clear previous timeout
@@ -454,22 +326,15 @@ export const useWhiteboardSync = ({
             if (isCurrentlyDrawing) {
                 drawingTimeoutRef.current = setTimeout(() => {
                     isDrawingRef.current = false;
-                    console.log("User stopped drawing");
 
                     // Send final update when drawing stops - include deleted elements
-                    const validElements = localElementsRef.current.filter(
-                        (element) => {
-                            if (element.type === "freedraw") {
-                                // Include elements with points array OR deleted elements
-                                return (
-                                    (element.points &&
-                                        Array.isArray(element.points)) ||
-                                    element.isDeleted
-                                );
-                            }
-                            return true;
+                    const validElements = localElementsRef.current.filter((element) => {
+                        if (element.type === "freedraw") {
+                            // Include elements with points array OR deleted elements
+                            return (element.points && Array.isArray(element.points)) || element.isDeleted;
                         }
-                    );
+                        return true;
+                    });
 
                     if (validElements.length > 0) {
                         pendingUpdateRef.current = {
@@ -478,7 +343,7 @@ export const useWhiteboardSync = ({
                         };
                         sendPendingUpdate();
                     }
-                }, 500); // 500ms after last change
+                }, DRAWING_TIMEOUT_MS);
             } else {
                 isDrawingRef.current = false;
             }
@@ -487,10 +352,7 @@ export const useWhiteboardSync = ({
             const validElements = elements.filter((element) => {
                 if (element.type === "freedraw") {
                     // Include freedraw elements that have points array OR are marked as deleted
-                    return (
-                        (element.points && Array.isArray(element.points)) ||
-                        element.isDeleted
-                    );
+                    return (element.points && Array.isArray(element.points)) || element.isDeleted;
                 }
                 return true; // Include all other element types (rectangle, circle, etc.)
             });
@@ -503,19 +365,13 @@ export const useWhiteboardSync = ({
                         // Include deletion state in hash
                         const isDeleted = el.isDeleted ? "deleted" : "active";
                         // Only hash every 5th point to reduce sensitivity
-                        const sampledPoints =
-                            el.points?.filter((_, index) => index % 5 === 0) ||
-                            [];
+                        const sampledPoints = el.points?.filter((_, index) => index % 5 === 0) || [];
                         return `${el.id}:${pointsCount}:${sampledPoints.length}:${isDeleted}`;
                     } else {
                         // For other element types (rectangle, circle, etc.), include key properties
                         const isDeleted = el.isDeleted ? "deleted" : "active";
-                        const positionHash = `${Math.round(
-                            el.x || 0
-                        )},${Math.round(el.y || 0)}`;
-                        const sizeHash = `${Math.round(
-                            el.width || 0
-                        )}x${Math.round(el.height || 0)}`;
+                        const positionHash = `${Math.round(el.x || 0)},${Math.round(el.y || 0)}`;
+                        const sizeHash = `${Math.round(el.width || 0)}x${Math.round(el.height || 0)}`;
                         return `${el.id}:${el.type}:${positionHash}:${sizeHash}:${isDeleted}`;
                     }
                 })
@@ -523,8 +379,7 @@ export const useWhiteboardSync = ({
 
             // Check if drawing content has actually changed
             const hasContentChanged = currentHash !== lastPointsHashRef.current;
-            const hasElementCountChanged =
-                validElements.length !== lastElementsCountRef.current;
+            const hasElementCountChanged = validElements.length !== lastElementsCountRef.current;
 
             if (!hasContentChanged && !hasElementCountChanged) {
                 // No meaningful changes detected
@@ -548,10 +403,13 @@ export const useWhiteboardSync = ({
                 if (now - lastUpdateRef.current >= SYNC_THROTTLE_MS) {
                     lastUpdateRef.current = now;
                     sendPendingUpdate();
+                } else {
+                    // Use debounced sync for frequent updates
+                    debouncedSync();
                 }
             }
         },
-        [sendPendingUpdate, canDraw, roomId, username]
+        [sendPendingUpdate, canDraw, debouncedSync]
     );
 
     // Load whiteboard data when opening or when API becomes available
@@ -561,134 +419,101 @@ export const useWhiteboardSync = ({
         }
     }, [isOpen, roomId, socket, excalidrawAPI]);
 
+    // Unified handler for whiteboard data - handles both initial load and subsequent updates
     useEffect(() => {
-        if (!excalidrawAPI || !socket) return;
+        if (!socket) return;
 
         const handleWhiteboardData = (data: any) => {
-            if (!data.elements || !excalidrawAPI) return;
-
-            // If user is currently drawing, don't apply remote updates
-            // to avoid interrupting their drawing experience
-            if (isDrawingRef.current) {
-                console.log(
-                    "🎨 [handleWhiteboardData] Skipping - user is drawing"
-                );
+            if (!excalidrawAPI || !data.elements) {
+                console.warn("[useWhiteboardSync] Missing excalidrawAPI or elements in data response");
                 return;
             }
 
-            console.log(
-                "🎨 [handleWhiteboardData] Loading initial whiteboard data:",
-                {
-                    elementsCount: data.elements?.length,
-                    version: data.version,
+            try {
+                // Parse state properly - handle both string and object
+                let parsedState = {};
+                if (data.state) {
+                    if (typeof data.state === "string") {
+                        parsedState = JSON.parse(data.state);
+                    } else if (typeof data.state === "object") {
+                        parsedState = data.state;
+                    }
                 }
-            );
 
-            if (data.version) {
-                lastVersionRef.current = data.version;
-            }
-
-            if (data.elements && Array.isArray(data.elements)) {
-                try {
-                    // Validate and fix elements before using them
-                    const validatedElements = data.elements
-                        .map((element: any) => {
-                            // Fix freedraw elements missing required properties
-                            if (element.type === "freedraw") {
-                                // If element is deleted, preserve it as-is for proper sync
-                                if (element.isDeleted) {
-                                    return element;
-                                }
-
-                                if (
-                                    !element.points ||
-                                    !Array.isArray(element.points)
-                                ) {
-                                    return {
-                                        ...element,
-                                        points: [], // Empty points array
-                                        pressures: [], // Add pressures array
-                                        simulatePressure: true, // Enable pressure simulation
-                                        // Add other required properties for freedraw
-                                        strokeColor:
-                                            element.strokeColor || "#000000",
-                                        backgroundColor:
-                                            element.backgroundColor ||
-                                            "transparent",
-                                        fillStyle:
-                                            element.fillStyle || "hachure",
-                                        strokeWidth: element.strokeWidth || 1,
-                                        strokeStyle:
-                                            element.strokeStyle || "solid",
-                                        roughness: element.roughness || 1,
-                                        opacity: element.opacity || 100,
-                                        seed:
-                                            element.seed ||
-                                            Math.floor(Math.random() * 2 ** 31),
-                                    };
-                                }
-                                // Ensure pressures array exists for non-deleted elements
-                                if (
-                                    !element.pressures ||
-                                    !Array.isArray(element.pressures)
-                                ) {
-                                    return {
-                                        ...element,
-                                        pressures: element.points.map(
-                                            () => 0.5
-                                        ), // Default pressure
-                                        simulatePressure: true,
-                                    };
-                                }
+                // Validate and fix elements before using them
+                const validatedElements = data.elements
+                    .map((element: any) => {
+                        // Fix freedraw elements missing required properties
+                        if (element.type === "freedraw") {
+                            // If element is deleted, preserve it as-is for proper sync
+                            if (element.isDeleted) {
+                                return element;
                             }
-                            return element;
-                        })
-                        .filter((element) => {
-                            // Don't filter out deleted elements - they're needed for sync
-                            if (element.type === "freedraw") {
-                                // Keep deleted elements for proper synchronization
-                                if (element.isDeleted) {
-                                    return true;
-                                }
-                                // Include freedraw elements that have points array
-                                const hasValidStructure =
-                                    element.points &&
-                                    Array.isArray(element.points);
-                                if (!hasValidStructure) {
-                                    return false;
-                                }
-                                // Accept elements even with 0 points for real-time sync
-                                return true;
+
+                            if (!element.points || !Array.isArray(element.points)) {
+                                return {
+                                    ...element,
+                                    points: [], // Empty points array
+                                    pressures: [], // Add pressures array
+                                    simulatePressure: true, // Enable pressure simulation
+                                    // Add other required properties for freedraw
+                                    strokeColor: element.strokeColor || "#000000",
+                                    backgroundColor: element.backgroundColor || "transparent",
+                                    fillStyle: element.fillStyle || "hachure",
+                                    strokeWidth: element.strokeWidth || 1,
+                                    strokeStyle: element.strokeStyle || "solid",
+                                    roughness: element.roughness || 1,
+                                    opacity: element.opacity || 100,
+                                    seed: element.seed || Math.floor(Math.random() * 2 ** 31),
+                                };
                             }
+                            // Ensure pressures array exists for non-deleted elements
+                            if (!element.pressures || !Array.isArray(element.pressures)) {
+                                return {
+                                    ...element,
+                                    pressures: element.points.map(() => 0.5), // Default pressure
+                                    simulatePressure: true,
+                                };
+                            }
+                        }
+                        return element;
+                    })
+                    .filter((element) => {
+                        // Keep deleted elements for proper synchronization
+                        if (element.isDeleted) {
                             return true;
-                        });
+                        }
 
-                    const appState = {
-                        ...excalidrawAPI.getAppState(),
-                        ...(data.state || {}),
-                        viewModeEnabled: !canDraw,
-                        collaborators: new Map(),
-                    };
+                        // For freedraw elements, ensure they have valid structure
+                        if (element.type === "freedraw") {
+                            const hasValidStructure = element.points && Array.isArray(element.points);
+                            return hasValidStructure;
+                        }
 
-                    excalidrawAPI.updateScene({
-                        elements: validatedElements,
-                        appState,
+                        // Keep all other element types
+                        return true;
                     });
 
-                    // Update local elements ref when receiving valid remote data
-                    if (!isDrawingRef.current) {
-                        localElementsRef.current = [...validatedElements];
-                    }
+                // Load existing whiteboard data with merged state handling
+                excalidrawAPI.updateScene({
+                    elements: validatedElements,
+                    appState: {
+                        ...excalidrawAPI.getAppState(),
+                        ...parsedState,
+                        viewModeEnabled: !canDraw,
+                        collaborators: new Map(),
+                    },
+                });
 
-                    // Clear the applying remote update flag after a delay
-                    setTimeout(() => {
-                        console.log(
-                            "🎨 [handleWhiteboardData] Initial data load complete"
-                        );
-                    }, 200);
-                } catch (err) {
-                    console.error("Error updating initial scene:", err);
+                // Update version tracking
+                if (data.version) {
+                    lastVersionRef.current = data.version;
                 }
+
+                // Update local elements ref when receiving valid remote data
+                localElementsRef.current = [...validatedElements];
+            } catch (error) {
+                console.error("[useWhiteboardSync] Error loading whiteboard data:", error);
             }
         };
 
@@ -697,7 +522,7 @@ export const useWhiteboardSync = ({
         return () => {
             socket.off("whiteboard:data", handleWhiteboardData);
         };
-    }, [socket, excalidrawAPI]);
+    }, [socket, excalidrawAPI, canDraw]);
 
     useEffect(() => {
         if (isOpen && socket) {
@@ -717,16 +542,14 @@ export const useWhiteboardSync = ({
 
         const handlePointerUpdate = (data: any) => {
             // Handle other users' pointer updates to show their cursors
-            if (!excalidrawAPI || !data.peerId || !data.position) return;
+            if (!excalidrawAPI || !data.userId || !data.position) return;
 
             // Update collaborators to show pointer positions from other users
-            const collaborators = new Map(
-                excalidrawAPI.getAppState().collaborators
-            );
+            const collaborators = new Map(excalidrawAPI.getAppState().collaborators);
 
-            const color = getColorFromPeerId(data.peerId);
-            collaborators.set(data.peerId, {
-                username: data.peerId,
+            const color = getColorFromPeerId(data.userId);
+            collaborators.set(data.userId, {
+                username: data.userId,
                 pointer: data.position,
                 selectedElementIds: {},
                 button: "up",
@@ -746,12 +569,10 @@ export const useWhiteboardSync = ({
 
         const handlePointerRemove = (data: any) => {
             // Remove pointer when user leaves or stops interacting
-            if (!excalidrawAPI || !data.peerId) return;
+            if (!excalidrawAPI || !data.userId) return;
 
-            const collaborators = new Map(
-                excalidrawAPI.getAppState().collaborators
-            );
-            collaborators.delete(data.peerId);
+            const collaborators = new Map(excalidrawAPI.getAppState().collaborators);
+            collaborators.delete(data.userId);
 
             excalidrawAPI.updateScene({
                 appState: {
@@ -759,6 +580,50 @@ export const useWhiteboardSync = ({
                     collaborators,
                 },
             });
+        };
+
+        const handleWhiteboardUpdated = (data: any) => {
+            if (!excalidrawAPI || !data.elements) {
+                console.warn("[useWhiteboardSync] Missing excalidrawAPI or elements");
+                return;
+            }
+
+            // Check if this update is from the current user to avoid infinite loops
+            if (data.fromUser === username) {
+                console.log("[useWhiteboardSync] Ignoring self-update");
+                return;
+            }
+
+            try {
+                // Parse state properly - handle both string and object
+                let parsedState = {};
+                if (data.state) {
+                    if (typeof data.state === "string") {
+                        parsedState = JSON.parse(data.state);
+                    } else if (typeof data.state === "object") {
+                        parsedState = data.state;
+                    }
+                }
+
+                // Update the whiteboard with received elements
+                excalidrawAPI.updateScene({
+                    elements: data.elements,
+                    appState: {
+                        ...excalidrawAPI.getAppState(),
+                        ...parsedState,
+                    },
+                });
+
+                // Update version tracking
+                if (data.version) {
+                    lastVersionRef.current = data.version;
+                }
+
+                // Call remote update callback
+                onRemoteUpdate?.(true);
+            } catch (error) {
+                console.error("[useWhiteboardSync] Error applying remote update:", error);
+            }
         };
 
         const handleWhiteboardCleared = () => {
@@ -792,19 +657,18 @@ export const useWhiteboardSync = ({
             return `hsl(${h}, 80%, 60%)`;
         };
 
+        socket.on("whiteboard:updated", handleWhiteboardUpdated);
         socket.on("whiteboard:pointer-update", handlePointerUpdate);
-        socket.on("whiteboard:pointer-remove", handlePointerRemove);
+        socket.on("whiteboard:pointer-leave", handlePointerRemove);
         socket.on("whiteboard:cleared", handleWhiteboardCleared);
         socket.on("whiteboard:permissions-updated", handlePermissionsUpdated);
 
         return () => {
+            socket.off("whiteboard:updated", handleWhiteboardUpdated);
             socket.off("whiteboard:pointer-update", handlePointerUpdate);
-            socket.off("whiteboard:pointer-remove", handlePointerRemove);
+            socket.off("whiteboard:pointer-leave", handlePointerRemove);
             socket.off("whiteboard:cleared", handleWhiteboardCleared);
-            socket.off(
-                "whiteboard:permissions-updated",
-                handlePermissionsUpdated
-            );
+            socket.off("whiteboard:permissions-updated", handlePermissionsUpdated);
         };
     }, [socket, excalidrawAPI]);
 
@@ -823,6 +687,19 @@ export const useWhiteboardSync = ({
             throttledEmitPointer.cancel();
         };
     }, [throttledEmitPointer]);
+
+    // Add method to load existing whiteboard data
+    const loadWhiteboardData = useCallback(() => {
+        if (!socket || !socket.connected) return;
+        socket.emit("whiteboard:get-data", { roomId });
+    }, [socket, roomId]);
+
+    // Load whiteboard data when component opens
+    useEffect(() => {
+        if (isOpen && socket && excalidrawAPI) {
+            loadWhiteboardData();
+        }
+    }, [isOpen, socket, excalidrawAPI, loadWhiteboardData]);
 
     // Add method to clear whiteboard
     const clearWhiteboard = useCallback(() => {
@@ -851,14 +728,17 @@ export const useWhiteboardSync = ({
         socket.emit("whiteboard:get-permissions", { roomId });
     }, [socket, roomId]);
 
-    // Cleanup effect để clear timeout khi component unmount
+    // Cleanup effect để clear timeout và cancel functions khi component unmount
     useEffect(() => {
         return () => {
             if (drawingTimeoutRef.current) {
                 clearTimeout(drawingTimeoutRef.current);
             }
+            // Cancel throttled and debounced functions
+            throttledEmitPointer.cancel();
+            debouncedSync.cancel();
         };
-    }, []);
+    }, [throttledEmitPointer, debouncedSync]);
 
     return {
         handlePointerUpdate,
@@ -867,5 +747,6 @@ export const useWhiteboardSync = ({
         clearWhiteboard,
         updatePermissions,
         getPermissions,
+        loadWhiteboardData,
     };
 };

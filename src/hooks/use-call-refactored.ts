@@ -6,21 +6,7 @@ import { Socket } from "socket.io-client";
 import { useSocket } from "@/contexts/SocketContext";
 
 // Import all modules from our call system
-import {
-    CallSystemContext,
-    CallSystemRefs,
-    CallSystemSetters,
-    CallSystemState,
-    ConsumerManager,
-    MediaManager,
-    ProducerManager,
-    RoomManager,
-    SocketEventHandlerManager,
-    StreamInfo,
-    StreamManager,
-    TransportManager,
-    VADManager,
-} from "./call-system";
+import { CallSystemContext, CallSystemRefs, CallSystemSetters, CallSystemState, ConsumerManager, MediaManager, ProducerManager, RoomManager, SocketEventHandlerManager, StreamInfo, StreamManager, TransportManager, VADManager } from "./call-system";
 
 /**
  * Refactored Call Hook
@@ -45,12 +31,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     const dispatch = useDispatch();
 
     // Use Socket Context instead of creating new socket
-    const {
-        socket: contextSocket,
-        isConnected: socketConnected,
-        connect: connectSocket,
-        disconnect: disconnectSocket,
-    } = useSocket();
+    const { socket: contextSocket, isConnected: socketConnected, connect: connectSocket, disconnect: disconnectSocket } = useSocket();
 
     // Refs - organize all refs into our refs interface
     const refs: CallSystemRefs = {
@@ -121,8 +102,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     const roomManager = new RoomManager(context);
 
     // Check for raw audio mode from URL parameter
-    const useRawAudio =
-        new URLSearchParams(window.location.search).get("rawAudio") === "true";
+    const useRawAudio = new URLSearchParams(window.location.search).get("rawAudio") === "true";
 
     const vadManager = new VADManager(context, useRawAudio);
 
@@ -132,13 +112,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     roomManager.setTransportManager(transportManager);
     mediaManager.setVADManager(vadManager);
 
-    const eventHandlerManager = new SocketEventHandlerManager(
-        context,
-        streamManager,
-        consumerManager,
-        producerManager,
-        transportManager
-    );
+    const eventHandlerManager = new SocketEventHandlerManager(context, streamManager, consumerManager, producerManager, transportManager);
 
     // Set cross-references for auto-publishing
     transportManager.setManagers(producerManager, mediaManager);
@@ -172,34 +146,18 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Monitor transport connection and process pending streams
     useEffect(() => {
-        if (
-            refs.recvTransportRef.current &&
-            refs.socketRef.current &&
-            refs.pendingStreamsRef.current.length > 0
-        ) {
+        if (refs.recvTransportRef.current && refs.socketRef.current && refs.pendingStreamsRef.current.length > 0) {
             streamManager.processPendingStreams();
         }
-    }, [
-        refs.recvTransportRef.current?.id,
-        refs.socketRef.current?.connected,
-        isJoined,
-    ]);
+    }, [refs.recvTransportRef.current?.id, refs.socketRef.current?.connected, isJoined]);
     useEffect(() => {
         const checkPendingStreams = () => {
             const pendingCount = refs.pendingStreamsRef.current.length;
-            if (
-                pendingCount > 0 &&
-                refs.recvTransportRef.current &&
-                refs.socketRef.current
-            ) {
+            if (pendingCount > 0 && refs.recvTransportRef.current && refs.socketRef.current) {
                 const pendingStreams = [...refs.pendingStreamsRef.current];
                 for (const streamData of pendingStreams) {
                     // Validate streamId
-                    if (
-                        !streamData.streamId ||
-                        streamData.streamId === "undefined" ||
-                        typeof streamData.streamId !== "string"
-                    ) {
+                    if (!streamData.streamId || streamData.streamId === "undefined" || typeof streamData.streamId !== "string") {
                         continue;
                     }
 
@@ -208,36 +166,22 @@ export function useCallRefactored(roomId: string, password?: string) {
                         continue;
                     }
 
-                    if (
-                        !streamManager.isStreamBeingConsumed(
-                            streamData.streamId
-                        )
-                    ) {
+                    if (!streamManager.isStreamBeingConsumed(streamData.streamId)) {
                         try {
-                            streamManager.markStreamAsConsuming(
-                                streamData.streamId
-                            );
+                            streamManager.markStreamAsConsuming(streamData.streamId);
                             refs.socketRef.current?.emit("sfu:consume", {
                                 streamId: streamData.streamId,
                                 transportId: refs.recvTransportRef.current!.id,
                             });
 
                             // Remove from pending after attempting
-                            const index =
-                                refs.pendingStreamsRef.current.findIndex(
-                                    (p) => p.streamId === streamData.streamId
-                                );
+                            const index = refs.pendingStreamsRef.current.findIndex((p) => p.streamId === streamData.streamId);
                             if (index >= 0) {
                                 refs.pendingStreamsRef.current.splice(index, 1);
                             }
                         } catch (error) {
-                            console.error(
-                                `Periodic consume failed for ${streamData.streamId}:`,
-                                error
-                            );
-                            streamManager.removeFromConsuming(
-                                streamData.streamId
-                            );
+                            console.error(`Periodic consume failed for ${streamData.streamId}:`, error);
+                            streamManager.removeFromConsuming(streamData.streamId);
                         }
                     }
                 }
@@ -266,10 +210,7 @@ export function useCallRefactored(roomId: string, password?: string) {
                 try {
                     await mediaManager.initializeLocalMedia();
                 } catch (error) {
-                    console.error(
-                        "[useCallRefactored] Auto-initialize media failed:",
-                        error
-                    );
+                    console.error("[useCallRefactored] Auto-initialize media failed:", error);
                 }
             }
         };
@@ -296,21 +237,14 @@ export function useCallRefactored(roomId: string, password?: string) {
                     }
 
                     // Check if audio tracks are enabled
-                    const hasEnabledAudio = audioTracks.some(
-                        (track) => track.enabled
-                    );
+                    const hasEnabledAudio = audioTracks.some((track) => track.enabled);
                     if (!hasEnabledAudio) {
-                        console.warn(
-                            "[useCallRefactored] All audio tracks are disabled, skipping VAD initialization"
-                        );
+                        console.warn("[useCallRefactored] All audio tracks are disabled, skipping VAD initialization");
                         return;
                     }
                     await vadManager.initialize();
                 } catch (error) {
-                    console.error(
-                        "[useCallRefactored] VAD initialization failed:",
-                        error
-                    );
+                    console.error("[useCallRefactored] VAD initialization failed:", error);
                 }
             }
         };
@@ -320,15 +254,10 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Monitor microphone state for VAD
     useEffect(() => {
-        if (
-            vadManager.getState().isInitialized &&
-            refs.localStreamRef.current
-        ) {
+        if (vadManager.getState().isInitialized && refs.localStreamRef.current) {
             const localStream = refs.localStreamRef.current;
             const audioTracks = localStream.getAudioTracks();
-            const microphoneEnabled =
-                audioTracks.length > 0 &&
-                audioTracks.some((track) => track.enabled);
+            const microphoneEnabled = audioTracks.length > 0 && audioTracks.some((track) => track.enabled);
 
             vadManager.updateMicrophoneState(microphoneEnabled);
         }
@@ -362,14 +291,9 @@ export function useCallRefactored(roomId: string, password?: string) {
 
             return () => {
                 if (refs.screenStreamRef.current) {
-                    refs.screenStreamRef.current
-                        .getTracks()
-                        .forEach((track) => {
-                            track.removeEventListener(
-                                "ended",
-                                trackEndedListener
-                            );
-                        });
+                    refs.screenStreamRef.current.getTracks().forEach((track) => {
+                        track.removeEventListener("ended", trackEndedListener);
+                    });
                 }
             };
         }
@@ -392,9 +316,7 @@ export function useCallRefactored(roomId: string, password?: string) {
 
             // Verify socket is connected
             if (!currentSocket?.connected) {
-                throw new Error(
-                    "Socket is not connected after connection attempt"
-                );
+                throw new Error("Socket is not connected after connection attempt");
             }
 
             return await roomManager.joinRoom(password);
@@ -453,9 +375,7 @@ export function useCallRefactored(roomId: string, password?: string) {
             try {
                 // Check if we have necessary transport and socket
                 if (!refs.recvTransportRef.current || !refs.socketRef.current) {
-                    console.error(
-                        "[useCallRefactored] Missing required transport or socket for translation consumption"
-                    );
+                    console.error("[useCallRefactored] Missing required transport or socket for translation consumption");
                     throw new Error("Transport or socket not available");
                 }
 
@@ -474,10 +394,7 @@ export function useCallRefactored(roomId: string, password?: string) {
 
                 return true;
             } catch (error) {
-                console.error(
-                    "[useCallRefactored] Error consuming translation stream:",
-                    error
-                );
+                console.error("[useCallRefactored] Error consuming translation stream:", error);
                 // Clean up on error
                 if (streamId) {
                     streamManager.removeFromConsuming(streamId);
@@ -536,13 +453,15 @@ export function useCallRefactored(roomId: string, password?: string) {
 
         // Global stream from service
         localStream: mediaManager.getLocalStream(),
+
+        // WebRTC Transports for network monitoring
+        recvTransport: refs.recvTransportRef.current,
+        sendTransport: refs.sendTransportRef.current,
     };
 }
 
 // Export socket access for backward compatibility
 export const getSocket = () => {
-    console.warn(
-        "getSocket is deprecated, use useSocket hook from SocketContext instead"
-    );
+    console.warn("getSocket is deprecated, use useSocket hook from SocketContext instead");
     return null;
 };
