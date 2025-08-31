@@ -12,19 +12,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Chatbot } from "./ChatBotUI";
-import {
-    ChatSidebar,
-    LockRoomDialog,
-    NetworkMonitorDialog,
-    ParticipantsList,
-    QRCodeDialog,
-    QuizSidebar,
-    SecretVotingDialog,
-    TranslationCabinSidebar,
-    VideoControls,
-    VideoGrid,
-    Whiteboard,
-} from "./index";
+import { ChatSidebar, LockRoomDialog, NetworkMonitorDialog, ParticipantsList, QRCodeDialog, QuizSidebar, SecretVotingDialog, TranslationCabinSidebar, VideoControls, VideoGrid, Whiteboard } from "./index";
 import { Button } from "./ui/button";
 import { SelectLayoutTemplate } from "./Dialogs/SelectLayoutTemplate";
 
@@ -42,8 +30,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
     const [isNetworkMonitorOpen, setIsNetworkMonitorOpen] = useState(false);
     const [isVotingDialogOpen, setIsVotingDialogOpen] = useState(false);
     const [isTranslationCabinOpen, setIsTranslationCabinOpen] = useState(false);
-    const [isOpenSelectLayoutTemplate, setIsOpenSelectLayoutTemplate] =
-        useState(false);
+    const [isOpenSelectLayoutTemplate, setIsOpenSelectLayoutTemplate] = useState(false);
 
     // Track if we've already attempted to join to prevent multiple join attempts
     const hasAttemptedJoin = useRef(false);
@@ -70,6 +57,8 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         togglePinUser,
         consumeTranslationStream,
         revertTranslationStream,
+        // WebRTC Transports for network monitoring
+        recvTransport,
     } = useCall(roomId ?? "", room.password || null);
     const {
         users: hybridUsers,
@@ -86,12 +75,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
     useEffect(() => {
         const autoJoinRoom = async () => {
             // Only attempt to join once and if we have the required data
-            if (
-                roomId &&
-                room.username &&
-                joinRoom &&
-                !hasAttemptedJoin.current
-            ) {
+            if (roomId && room.username && joinRoom && !hasAttemptedJoin.current) {
                 hasAttemptedJoin.current = true;
                 try {
                     await joinRoom();
@@ -111,8 +95,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         return () => clearTimeout(timeoutId);
     }, [roomId, room.username]); // Only depend on stable values
 
-    const { sendLogsToServer, isMonitorActive, toggleBehaviorMonitoring } =
-        useBehaviorMonitor({ roomId: roomId ?? "" });
+    const { sendLogsToServer, isMonitorActive, toggleBehaviorMonitoring } = useBehaviorMonitor({ roomId: roomId ?? "" });
 
     const users = useMemo((): User[] => {
         // If we have users from the hybrid hook, use them
@@ -207,8 +190,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
             const videoTracks = localStream.stream.getVideoTracks();
             const hasVideoTracks = videoTracks.length > 0;
             const isVideoEnabled = hasVideoTracks && videoTracks[0].enabled;
-            const hasCameraUnavailable =
-                localStream.metadata?.noCameraAvailable === true;
+            const hasCameraUnavailable = localStream.metadata?.noCameraAvailable === true;
 
             // Update video state based on metadata or track state
             if (localStream.metadata?.video === false || !isVideoEnabled) {
@@ -231,8 +213,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
             const audioTracks = localStream.stream.getAudioTracks();
             const hasAudioTracks = audioTracks.length > 0;
             const isAudioEnabled = hasAudioTracks && audioTracks[0].enabled;
-            const hasMicUnavailable =
-                localStream.metadata?.noMicroAvailable === true;
+            const hasMicUnavailable = localStream.metadata?.noMicroAvailable === true;
 
             // Update muted state based on metadata or track state
             if (localStream.metadata?.audio === false || !isAudioEnabled) {
@@ -363,9 +344,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         if (streams.length > 2) {
             toggleBehaviorMonitoring();
         } else {
-            toast.error(
-                "At least 3 participants are required for behavior monitoring."
-            );
+            toast.error("At least 3 participants are required for behavior monitoring.");
         }
     };
 
@@ -404,10 +383,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
 
     return (
         <div className='flex h-screen bg-gray-50 dark:bg-gray-900 relative'>
-            <SelectLayoutTemplate
-                isOpen={isOpenSelectLayoutTemplate}
-                onClose={() => setIsOpenSelectLayoutTemplate(false)}
-            />
+            <SelectLayoutTemplate isOpen={isOpenSelectLayoutTemplate} onClose={() => setIsOpenSelectLayoutTemplate(false)} />
             <LockRoomDialog
                 isOpen={isShowDialogPassword}
                 onClose={() => {
@@ -415,48 +391,15 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                 }}
                 onSetPassword={handleSetPassword}
             />
-            {isNetworkMonitorOpen && (
-                <NetworkMonitorDialog
-                    isOpen={isNetworkMonitorOpen}
-                    onClose={() => setIsNetworkMonitorOpen(false)}
-                />
-            )}
-            {isVotingDialogOpen && (
-                <SecretVotingDialog
-                    isOpen={isVotingDialogOpen}
-                    onClose={() => setIsVotingDialogOpen(false)}
-                    roomId={roomId || ""}
-                />
-            )}
-            <Chatbot
-                isOpen={isChatboxOpen}
-                onClose={() => setIsChatboxOpen(false)}
-                roomId={roomId || ""}
-            />
-            <div
-                className={`relative flex-1 p-2 md:p-4 transition-all duration-300 ${
-                    (isChatOpen || isTranslationCabinOpen) && !isMobile
-                        ? "mr-[320px]"
-                        : ""
-                }`}
-            >
+            {isNetworkMonitorOpen && <NetworkMonitorDialog isOpen={isNetworkMonitorOpen} onClose={() => setIsNetworkMonitorOpen(false)} transport={recvTransport} />}
+            {isVotingDialogOpen && <SecretVotingDialog isOpen={isVotingDialogOpen} onClose={() => setIsVotingDialogOpen(false)} roomId={roomId || ""} />}
+            <Chatbot isOpen={isChatboxOpen} onClose={() => setIsChatboxOpen(false)} roomId={roomId || ""} />
+            <div className={`relative flex-1 p-2 md:p-4 transition-all duration-300 ${(isChatOpen || isTranslationCabinOpen) && !isMobile ? "mr-[320px]" : ""}`}>
                 <div className='mb-2 md:mb-4 flex items-center justify-between relative'>
                     <div className='flex items-center gap-2'>
-                        <h2 className='text-base md:text-lg font-semibold text-gray-900 dark:text-white'>
-                            {room.isOrganizationRoom ? (
-                                <>(Organization Room)</>
-                            ) : (
-                                <>Room ID: {roomId}</>
-                            )}
-                        </h2>
+                        <h2 className='text-base md:text-lg font-semibold text-gray-900 dark:text-white'>{room.isOrganizationRoom ? <>(Organization Room)</> : <>Room ID: {roomId}</>}</h2>
                         {!room.isOrganizationRoom && (
-                            <Button
-                                variant='outline'
-                                size='icon'
-                                title='QR Code'
-                                onClick={() => setIsQRCodeOpen(true)}
-                                className=''
-                            >
+                            <Button variant='outline' size='icon' title='QR Code' onClick={() => setIsQRCodeOpen(true)} className=''>
                                 <QrCode className='h-5 w-5' />
                             </Button>
                         )}
@@ -464,75 +407,21 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                     <div className='flex items-center gap-2'>
                         {isRecording && !isProcessing && (
                             <div className='flex items-center gap-1 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full'>
-                                <Disc2
-                                    className='h-4 w-4 fill-white animate-pulse'
-                                    color='red'
-                                />
-                                <span className='text-xs text-red-600 dark:text-red-400 font-medium'>
-                                    Recording
-                                </span>
+                                <Disc2 className='h-4 w-4 fill-white animate-pulse' color='red' />
+                                <span className='text-xs text-red-600 dark:text-red-400 font-medium'>Recording</span>
                             </div>
                         )}
                         {isProcessing && (
                             <div className='flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full'>
-                                <Loader2
-                                    className='h-4 w-4 animate-spin'
-                                    color='#f59e0b'
-                                />
-                                <span className='text-xs text-yellow-600 dark:text-yellow-400 font-medium'>
-                                    Processing
-                                </span>
+                                <Loader2 className='h-4 w-4 animate-spin' color='#f59e0b' />
+                                <span className='text-xs text-yellow-600 dark:text-yellow-400 font-medium'>Processing</span>
                             </div>
                         )}
-                        <ParticipantsList
-                            roomId={roomId}
-                            togglePinUser={togglePinUser}
-                            handleKickUser={handleKickUser}
-                            users={users}
-                        />
+                        <ParticipantsList roomId={roomId} togglePinUser={togglePinUser} handleKickUser={handleKickUser} users={users} />
                     </div>
                 </div>
-                <VideoGrid
-                    streams={streams}
-                    screenStreams={screenStreams}
-                    isVideoOff={isVideoOff}
-                    users={users || []}
-                    isMuted={isMuted}
-                    speakingPeers={Array.from(speakingPeers)}
-                    isSpeaking={isSpeaking}
-                    togglePinUser={togglePinUser}
-                    consumeTranslationStream={consumeTranslationStream}
-                    revertTranslationStream={revertTranslationStream}
-                />
-                <VideoControls
-                    isMuted={isMuted}
-                    isVideoOff={isVideoOff}
-                    onToggleMute={handleToggleAudio}
-                    onToggleVideo={handleToggleVideo}
-                    onToggleChat={handleToggleChat}
-                    onToggleWhiteboard={handleToggleWhiteboard}
-                    onToggleScreenShare={handleToggleScreenShare}
-                    isScreenSharing={isScreenSharing}
-                    onToggleLockRoom={handleToggleLockRoom}
-                    onToggleNetworkMonitor={() =>
-                        setIsNetworkMonitorOpen(!isNetworkMonitorOpen)
-                    }
-                    onToggleTranslationCabin={handleToggleTranslationCabin}
-                    onToggleVoting={handleToggleVoting}
-                    onToggleQuiz={handleToggleQuiz}
-                    onToggleRecording={handleToggleRecording}
-                    isRecording={isRecording}
-                    isProcessing={isProcessing}
-                    onLeaveRoom={handleLeaveRoom}
-                    onToggleBehaviorMonitoring={handleToggleBehaviorMonitoring}
-                    isCreator={room.isCreator}
-                    isMonitorActive={isMonitorActive}
-                    onToggleLayout={() =>
-                        setIsOpenSelectLayoutTemplate(
-                            !isOpenSelectLayoutTemplate
-                        )
-                    }
-                />
+                <VideoGrid streams={streams} screenStreams={screenStreams} isVideoOff={isVideoOff} users={users || []} isMuted={isMuted} speakingPeers={Array.from(speakingPeers)} isSpeaking={isSpeaking} togglePinUser={togglePinUser} consumeTranslationStream={consumeTranslationStream} revertTranslationStream={revertTranslationStream} />
+                <VideoControls isMuted={isMuted} isVideoOff={isVideoOff} onToggleMute={handleToggleAudio} onToggleVideo={handleToggleVideo} onToggleChat={handleToggleChat} onToggleWhiteboard={handleToggleWhiteboard} onToggleScreenShare={handleToggleScreenShare} isScreenSharing={isScreenSharing} onToggleLockRoom={handleToggleLockRoom} onToggleNetworkMonitor={() => setIsNetworkMonitorOpen(!isNetworkMonitorOpen)} onToggleTranslationCabin={handleToggleTranslationCabin} onToggleVoting={handleToggleVoting} onToggleQuiz={handleToggleQuiz} onToggleRecording={handleToggleRecording} isRecording={isRecording} isProcessing={isProcessing} onLeaveRoom={handleLeaveRoom} onToggleBehaviorMonitoring={handleToggleBehaviorMonitoring} isCreator={room.isCreator} isMonitorActive={isMonitorActive} onToggleLayout={() => setIsOpenSelectLayoutTemplate(!isOpenSelectLayoutTemplate)} />
             </div>{" "}
             {isTranslationCabinOpen && (
                 <TranslationCabinSidebar
@@ -543,31 +432,11 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                         id: user.peerId,
                         username: user.peerId,
                     }))}
-                    onConsumeTranslation={(streamId) =>
-                        consumeTranslationStream(streamId)
-                    }
+                    onConsumeTranslation={(streamId) => consumeTranslationStream(streamId)}
                 />
             )}
-            {isChatOpen && (
-                <ChatSidebar
-                    isOpen={isChatOpen}
-                    setIsOpen={setIsChatOpen}
-                    roomId={roomId}
-                />
-            )}
-            <QRCodeDialog
-                isOpen={isQRCodeOpen}
-                onClose={() => setIsQRCodeOpen(false)}
-                roomId={roomId || ""}
-            />{" "}
-            {isWhiteboardOpen && (
-                <Whiteboard
-                    roomId={roomId}
-                    isOpen={isWhiteboardOpen}
-                    onClose={() => setIsWhiteboardOpen(false)}
-                    users={hybridUsers || []}
-                />
-            )}
+            {isChatOpen && <ChatSidebar isOpen={isChatOpen} setIsOpen={setIsChatOpen} roomId={roomId} />}
+            <QRCodeDialog isOpen={isQRCodeOpen} onClose={() => setIsQRCodeOpen(false)} roomId={roomId || ""} /> {isWhiteboardOpen && <Whiteboard roomId={roomId} isOpen={isWhiteboardOpen} onClose={() => setIsWhiteboardOpen(false)} users={hybridUsers || []} />}
             {isQuizOpen && (
                 <QuizSidebar
                     roomId={roomId || ""}
