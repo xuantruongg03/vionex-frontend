@@ -9,10 +9,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 5173,
-    https: {
-      key: fs.readFileSync("secrets/private-key.pem"),
-      cert: fs.readFileSync("secrets/public-certificate.pem"),
-    },
+    // https: {
+    //   key: fs.readFileSync("secrets/private-key.pem"),
+    //   cert: fs.readFileSync("secrets/public-certificate.pem"),
+    // },
     allowedHosts: [
       "localhost", 
     ],
