@@ -9,12 +9,16 @@
 </p>
 
 <p align="center">
-  [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-  [![Node.js](https://img.shields.io/badge/Node.js-21+-green.svg)](https://nodejs.org/)
-  [![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue.svg)](https://www.typescriptlang.org/)
-  [![WebRTC](https://img.shields.io/badge/WebRTC-Latest-orange.svg)](https://webrtc.org/)
-  [![Vite](https://img.shields.io/badge/Vite-5+-purple.svg)](https://vitejs.dev/)
+  <a href="https://vionex-frontend.vercel.app/" target="_blank">🚀 Live Demo</a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-21+-green.svg" alt="Node.js"></a>
+  <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-18+-blue.svg" alt="React"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5+-blue.svg" alt="TypeScript"></a>
+  <a href="https://webrtc.org/"><img src="https://img.shields.io/badge/WebRTC-Latest-orange.svg" alt="WebRTC"></a>
+  <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-5+-purple.svg" alt="Vite"></a>
 </p>
 
 ---
@@ -40,8 +44,9 @@ Vionex is a professional-grade, real-time video conferencing platform designed f
 
 ### Collaboration Tools
 
--   **Real-time Chat**: Integrated messaging system
--   **File Sharing**: Secure document sharing (coming soon)
+-   **Real-time Chat**: Integrated messaging system with file sharing
+-   **Interactive Whiteboard**: Collaborative drawing with permission controls
+-   **File Sharing**: Support for images, documents, and PDFs
 -   **Recording**: Meeting recording capabilities (coming soon)
 
 ### Professional Controls
@@ -50,6 +55,14 @@ Vionex is a professional-grade, real-time video conferencing platform designed f
 -   **User Management**: Pin speakers, manage participants
 -   **Responsive Design**: Seamless experience across all devices
 -   **Voice Activity Detection**: Intelligent speaker highlighting
+
+### Educational & Enterprise Features
+
+-   **Interactive Quizzes**: Create and conduct real-time quizzes with multiple question types
+-   **Secret Voting**: Anonymous voting system for decision making
+-   **Behavior Monitoring**: Advanced attention tracking for educational settings
+-   **Translation Cabin**: Real-time language translation capabilities
+-   **Network Monitoring**: Connection quality analysis and diagnostics
 
 ## Technology Stack
 
@@ -70,12 +83,30 @@ Vionex is a professional-grade, real-time video conferencing platform designed f
 -   **Socket.IO** - Real-time bidirectional communication
 -   **PeerJS** - Simplified WebRTC abstraction
 
+### Advanced Features
+
+-   **Excalidraw** - Collaborative whiteboard drawing
+-   **Web Audio API** - Advanced audio processing
+-   **WebRTC VAD** - Voice activity detection
+
 ### Development & Deployment
 
 -   **Docker** - Containerized deployment
 -   **Nginx** - High-performance web server
 -   **ESLint** - Code quality enforcement
 -   **Prettier** - Code formatting
+
+## Quick Features Demo
+
+🎯 **Try these features in our live demo**: [https://vionex-frontend.vercel.app/](https://vionex-frontend.vercel.app/)
+
+-   **Video Conferencing**: HD video calls with unlimited participants
+-   **Screen Sharing**: Share your screen with crystal clear quality  
+-   **Interactive Whiteboard**: Collaborate in real-time with drawing tools
+-   **Live Chat**: Send messages and share files instantly
+-   **Quiz System**: Create interactive quizzes for education/training
+-   **Secret Voting**: Make decisions with anonymous voting
+-   **Translation**: Real-time language translation
 
 ## Quick Start
 
@@ -207,11 +238,16 @@ src/
 
 ### Key Components
 
--   **VideoGrid**: Main video conferencing interface
--   **ChatSidebar**: Real-time messaging component
+-   **VideoGrid**: Main video conferencing interface with adaptive layouts
+-   **ChatSidebar**: Real-time messaging component with file sharing
 -   **ParticipantsList**: Meeting participant management
--   **VideoControls**: Media control interface
--   **WhiteBoard**: Collaborative whiteboard (beta)
+-   **VideoControls**: Comprehensive media control interface
+-   **WhiteBoard**: Collaborative whiteboard with permission system
+-   **QuizSidebar**: Interactive quiz creation and management
+-   **SecretVotingDialog**: Anonymous voting system
+-   **TranslationCabinSidebar**: Real-time translation interface
+-   **NetworkMonitorDialog**: Connection quality monitoring
+-   **BehaviorMonitoring**: Attention and engagement tracking
 
 ## Contributing
 
