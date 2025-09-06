@@ -12,7 +12,7 @@ interface TranslationCabinListProps {
 }
 
 export const TranslationCabinList: React.FC<TranslationCabinListProps> = ({ roomId, cabins, availableUsers, sourceUserId, onCabinDestroyed }) => {
-    const { destroyCabin, loading } = useDestroyCabin();
+    const { destroyCabin, loading } = useDestroyCabin(roomId);
     const getLanguageName = (code: string) => {
         return SUPPORTED_LANGUAGES_TRANSLATION.find((lang) => lang.code === code)?.name || code;
     };

@@ -40,12 +40,7 @@ export class ConsumerManager {
         const streamId = data.streamId;
 
         // Validate required fields
-        const requiredFields = [
-            "consumerId",
-            "producerId",
-            "kind",
-            "rtpParameters",
-        ];
+        const requiredFields = ["consumerId", "producerId", "kind", "rtpParameters"];
         const missingFields = requiredFields.filter((field) => !data[field]);
 
         if (missingFields.length > 0) {
@@ -66,13 +61,12 @@ export class ConsumerManager {
         }
 
         try {
-            const consumer =
-                await this.context.refs.recvTransportRef.current.consume({
-                    id: data.consumerId,
-                    producerId: data.producerId,
-                    kind: data.kind,
-                    rtpParameters: data.rtpParameters,
-                });
+            const consumer = await this.context.refs.recvTransportRef.current.consume({
+                id: data.consumerId,
+                producerId: data.producerId,
+                kind: data.kind,
+                rtpParameters: data.rtpParameters,
+            });
 
             // Clean up consuming tracking - consumer created successfully
             this.streamManager.removeFromConsuming(streamId);
@@ -91,14 +85,14 @@ export class ConsumerManager {
 
             // Create remote stream ID (similar to old client logic)
             const parts = streamId.split("_");
-            
+
             // Handle different stream types for publisherId extraction
             let publisherId: string;
             let mediaType: string;
-            
+
             if (streamId.startsWith("translated_")) {
-                // For translation streams: translated_Uuu_vi_en
-                publisherId = parts[1]; // "Uuu"
+                // For translation streams: use metadata instead of parsing streamId
+                publisherId = data.metadata?.targetUserId || "unknown";
                 mediaType = "audio"; // Translation streams are always audio
             } else {
                 // For regular streams: Uuu_audio_timestamp_random
@@ -109,7 +103,7 @@ export class ConsumerManager {
             // Double check stream ownership and determine if we should skip
             const isOwnStream = publisherId === this.context.room.username;
             const isScreenShare = mediaType === "screen" || mediaType === "screen_audio";
-            
+
             if (isOwnStream && !isScreenShare) {
                 // Skip own regular streams (audio/video) but allow own screen shares
                 this.streamManager.removeFromConsuming(streamId);
@@ -120,7 +114,7 @@ export class ConsumerManager {
                 }
                 return;
             }
-            
+
             // Determine if this is a translation stream
             const isTranslationStream = streamId.startsWith("translated_");
 
@@ -144,14 +138,10 @@ export class ConsumerManager {
             }
 
             // Get or create MediaStream
-            let mediaStream =
-                this.context.refs.remoteStreamsMapRef.current.get(uiStreamId);
+            let mediaStream = this.context.refs.remoteStreamsMapRef.current.get(uiStreamId);
             if (!mediaStream) {
                 mediaStream = new MediaStream();
-                this.context.refs.remoteStreamsMapRef.current.set(
-                    uiStreamId,
-                    mediaStream
-                );
+                this.context.refs.remoteStreamsMapRef.current.set(uiStreamId, mediaStream);
             }
 
             // Add track to stream
@@ -164,20 +154,9 @@ export class ConsumerManager {
             if (isTranslationStream) {
                 // Handle translation stream - replace/pause original user's audio
                 const targetUserId = publisherId;
-                this.handleTranslationStream(
-                    consumer,
-                    mediaStream,
-                    targetUserId,
-                    data,
-                    streamId
-                );
+                this.handleTranslationStream(consumer, mediaStream, targetUserId, data, streamId);
             } else if (isScreenShare) {
-                this.streamManager.processScreenShareStream(
-                    mediaStream,
-                    publisherId,
-                    mediaType,
-                    data
-                );
+                this.streamManager.processScreenShareStream(mediaStream, publisherId, mediaType, data);
             } else {
                 // Regular webcam stream handling
                 if (publisherId === this.context.room.username) {
@@ -189,38 +168,24 @@ export class ConsumerManager {
                 }
 
                 // Get or create MediaStream for this remote publisher
-                let currentStream =
-                    this.context.refs.remoteStreamsMapRef.current.get(
-                        uiStreamId
-                    );
+                let currentStream = this.context.refs.remoteStreamsMapRef.current.get(uiStreamId);
 
                 if (currentStream) {
                     try {
                         currentStream.addTrack(consumer.track);
                     } catch (e) {
                         currentStream = new MediaStream([consumer.track]);
-                        this.context.refs.remoteStreamsMapRef.current.set(
-                            uiStreamId,
-                            currentStream
-                        );
+                        this.context.refs.remoteStreamsMapRef.current.set(uiStreamId, currentStream);
                     }
                 } else {
                     currentStream = new MediaStream([consumer.track]);
-                    this.context.refs.remoteStreamsMapRef.current.set(
-                        uiStreamId,
-                        currentStream
-                    );
+                    this.context.refs.remoteStreamsMapRef.current.set(uiStreamId, currentStream);
                 }
 
-                this.streamManager.processRegularStream(
-                    mediaStream,
-                    uiStreamId,
-                    publisherId,
-                    data,
-                    mediaType
-                );
+                this.streamManager.processRegularStream(mediaStream, uiStreamId, publisherId, data, mediaType);
             }
         } catch (error) {
+            console.error("[Error ConsumerManager]: ", error);
             // Clean up on error
             this.streamManager.removeFromConsuming(streamId);
 
@@ -232,21 +197,10 @@ export class ConsumerManager {
     /**
      * Handle translation stream - replace original audio stream
      */
-    private handleTranslationStream = (
-        consumer: any,
-        translationStream: MediaStream,
-        targetUserId: string,
-        data: any,
-        streamId: string
-    ) => {
+    private handleTranslationStream = (consumer: any, translationStream: MediaStream, targetUserId: string, data: any, streamId: string) => {
         // Find and pause existing consumers for this user's audio
-        const existingConsumers = Array.from(
-            this.context.refs.consumersRef.current.entries()
-        ).filter(([consumerId, consumerInfo]) => {
-            return (
-                consumerInfo.streamId.includes(`${targetUserId}_mic`) ||
-                consumerInfo.streamId.includes(`${targetUserId}_audio`)
-            );
+        const existingConsumers = Array.from(this.context.refs.consumersRef.current.entries()).filter(([consumerId, consumerInfo]) => {
+            return consumerInfo.streamId.includes(`${targetUserId}_mic`) || consumerInfo.streamId.includes(`${targetUserId}_audio`);
         });
 
         // Pause original audio consumers to stop consuming original stream
@@ -257,12 +211,9 @@ export class ConsumerManager {
         // Replace stream in UI list - find existing mic stream and replace it
         setTimeout(() => {
             this.context.setters.setStreams((prevStreams) => {
-                return prevStreams.map((streamInfo) => {
+                const updatedStreams = prevStreams.map((streamInfo) => {
                     // Find the original mic stream for this user
-                    if (
-                        (streamInfo.id === `remote-${targetUserId}-mic` ||
-                            streamInfo.id === `remote-${targetUserId}-audio`)
-                    ) {
+                    if (streamInfo.id === `remote-${targetUserId}-mic` || streamInfo.id === `remote-${targetUserId}-audio`) {
                         // Replace with translation stream, keeping same ID for seamless UI
                         return {
                             ...streamInfo,
@@ -276,6 +227,7 @@ export class ConsumerManager {
                     }
                     return streamInfo;
                 });
+                return updatedStreams;
             });
         }, 50);
     };
@@ -292,14 +244,8 @@ export class ConsumerManager {
      */
     revertTranslationStream = (targetUserId: string) => {
         // Find paused original audio consumers and resume them
-        const pausedConsumers = Array.from(
-            this.context.refs.consumersRef.current.entries()
-        ).filter(([consumerId, consumerInfo]) => {
-            return (
-                (consumerInfo.streamId.includes(`${targetUserId}_mic`) ||
-                    consumerInfo.streamId.includes(`${targetUserId}_audio`)) &&
-                consumerInfo.consumer.paused
-            );
+        const pausedConsumers = Array.from(this.context.refs.consumersRef.current.entries()).filter(([consumerId, consumerInfo]) => {
+            return (consumerInfo.streamId.includes(`${targetUserId}_mic`) || consumerInfo.streamId.includes(`${targetUserId}_audio`)) && consumerInfo.consumer.paused;
         });
 
         // Resume original audio consumers
@@ -312,26 +258,13 @@ export class ConsumerManager {
             this.context.setters.setStreams((prevStreams) => {
                 return prevStreams.map((streamInfo) => {
                     // Find translation stream for this user
-                    if (
-                        streamInfo.metadata?.isTranslation &&
-                        streamInfo.metadata?.targetUserId === targetUserId
-                    ) {
+                    if (streamInfo.metadata?.isTranslation && streamInfo.metadata?.targetUserId === targetUserId) {
                         // Find original consumer to get the original stream
-                        const originalConsumer = pausedConsumers.find(
-                            ([_, consumerInfo]) =>
-                                consumerInfo.streamId.includes(
-                                    `${targetUserId}_mic`
-                                ) ||
-                                consumerInfo.streamId.includes(
-                                    `${targetUserId}_audio`
-                                )
-                        );
+                        const originalConsumer = pausedConsumers.find(([_, consumerInfo]) => consumerInfo.streamId.includes(`${targetUserId}_mic`) || consumerInfo.streamId.includes(`${targetUserId}_audio`));
 
                         if (originalConsumer) {
                             const [_, consumerInfo] = originalConsumer;
-                            const originalStream = new MediaStream([
-                                consumerInfo.consumer.track,
-                            ]);
+                            const originalStream = new MediaStream([consumerInfo.consumer.track]);
 
                             // Revert back to original stream
                             return {
@@ -356,9 +289,7 @@ export class ConsumerManager {
      */
     removeConsumer = (data: { consumerId: string; reason: string }) => {
         // Remove from consumers map
-        const consumer = Array.from(
-            this.context.refs.consumersRef.current.values()
-        ).find((c) => c.consumer.id === data.consumerId);
+        const consumer = Array.from(this.context.refs.consumersRef.current.values()).find((c) => c.consumer.id === data.consumerId);
 
         if (consumer) {
             consumer.consumer.close();

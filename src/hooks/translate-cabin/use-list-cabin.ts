@@ -1,22 +1,24 @@
 import { TranslationCabin } from "@/interfaces";
-import translationCabinService from "@/services/translationCabinService";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslationSocket } from "./use-translation-socket";
 
 export const useListCabin = (roomId: string, userId: string) => {
+    const { listTranslationCabins } = useTranslationSocket(roomId);
+
     const {
         data: cabins = [],
         isLoading: loading,
         isError: error,
         refetch,
-    } = useQuery({
+    } = useQuery<TranslationCabin[]>({
         queryKey: ["translation-cabins", roomId, userId],
-        queryFn: () =>
-            translationCabinService.getListTranslationCabin({ roomId, userId }),
+        queryFn: () => listTranslationCabins({ roomId, userId }),
         enabled: !!(roomId && userId),
+        refetchInterval: 10000, // Refetch every 10 seconds
     });
 
     return {
-        cabins: cabins as TranslationCabin[],
+        cabins,
         loading,
         error,
         refetch,

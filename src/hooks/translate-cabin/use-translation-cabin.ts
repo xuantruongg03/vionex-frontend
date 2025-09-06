@@ -1,26 +1,21 @@
 import { useMutation } from "@tanstack/react-query";
-import translationCabinService from "../../services/translationCabinService";
 import { CreateTranslationCabinRequest } from "@/interfaces";
+import { useTranslationSocket } from "./use-translation-socket";
 
-const createTranslationCabinReq = async (
-    request: CreateTranslationCabinRequest
-) => {
-    const res = await translationCabinService.createTranslationCabin(request);
-    return res;
-};
+export const useTranslationCabin = (roomId: string) => {
+    const { createTranslationCabin } = useTranslationSocket(roomId);
 
-export const useTranslationCabin = () => {
     const {
-        mutateAsync: createTranslate,
+        mutateAsync: createCabin,
         isPending,
         isError,
     } = useMutation({
-        mutationFn: createTranslationCabinReq,
+        mutationFn: (request: CreateTranslationCabinRequest) => createTranslationCabin(request),
     });
 
     return {
         loading: isPending,
         error: isError,
-        createCabin: createTranslate,
+        createCabin,
     };
 };
