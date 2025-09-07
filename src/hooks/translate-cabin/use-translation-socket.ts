@@ -185,11 +185,32 @@ export const useTranslationSocket = (roomId: string) => {
         [socket]
     );
 
+    // Setup listener specifically for cabin destroyed events
+    const setupCabinDestroyListener = useCallback(
+        (onCabinDestroyed: (data: { targetUserId: string }) => void) => {
+            if (!socket?.connected) return;
+
+            const handleCabinUpdate = (update: TranslationCabinUpdate) => {
+                if (update.action === "destroyed") {
+                    onCabinDestroyed({ targetUserId: update.targetUserId });
+                }
+            };
+
+            socket.on("translation:cabin-update", handleCabinUpdate);
+
+            return () => {
+                socket.off("translation:cabin-update", handleCabinUpdate);
+            };
+        },
+        [socket]
+    );
+
     return {
         createTranslationCabin,
         destroyTranslationCabin,
         listTranslationCabins,
         setupCabinUpdateListener,
+        setupCabinDestroyListener,
         isLoading,
     };
 };

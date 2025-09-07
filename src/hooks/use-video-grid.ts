@@ -3,27 +3,55 @@ import { useSelector } from "react-redux";
 import { User } from "@/interfaces";
 import { RootState } from "@/redux/store";
 
-export const useVideoGrid = (
-    streams: any[],
-    screenStreams: any[],
-    users: User[],
-    speakingPeers: string[],
-    myPeerId: string,
-    room: any
-) => {
+export const useVideoGrid = (streams: any[], screenStreams: any[], users: User[], speakingPeers: string[], myPeerId: string, room: any) => {
     const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
     const streamMapRef = useRef<Map<string, MediaStream>>(new Map());
 
     // Get layout state from Redux instead of local state
-    const selectedLayoutTemplate = useSelector(
-        (state: RootState) => state.layout.selectedLayoutTemplate
-    );
+    const selectedLayoutTemplate = useSelector((state: RootState) => state.layout.selectedLayoutTemplate);
 
     const [layouts, setLayouts] = useState<{ [index: string]: any[] }>({});
     const [currentBreakpoint, setCurrentBreakpoint] = useState("lg");
     const [mounted, setMounted] = useState(false);
     const [usersToShow, setUsersToShow] = useState<User[]>([]);
     const [remainingUsers, setRemainingUsers] = useState<User[]>([]);
+
+    const streamMaps = useMemo(() => {
+        const byPeerId = new Map<string, any[]>();
+        const translated = new Map<string, any>();
+        const screenShares = new Map<string, any>();
+
+        streams.forEach((stream) => {
+            const { id, metadata } = stream;
+
+            // Group by peerId
+            if (id.startsWith("remote-")) {
+                const parts = id.split("-");
+                if (parts.length >= 3) {
+                    const peerId = parts[1];
+                    if (!byPeerId.has(peerId)) {
+                        byPeerId.set(peerId, []);
+                    }
+                    byPeerId.get(peerId)!.push(stream);
+                }
+            }
+
+            // Track translated streams
+            if (metadata?.isTranslation && metadata?.targetUserId) {
+                translated.set(metadata.targetUserId, stream);
+            }
+
+            // Track screen shares
+            if (id.startsWith("screen-") || metadata?.isScreenShare || metadata?.type === "screen") {
+                const owner = id.startsWith("screen-") ? id.replace("screen-", "") : metadata?.publisherId || metadata?.peerId;
+                if (owner) {
+                    screenShares.set(owner, stream);
+                }
+            }
+        });
+
+        return { byPeerId, translated, screenShares };
+    }, [streams]);
 
     const attachMediaStream = useCallback((id: string, stream: MediaStream) => {
         const videoElement = videoRefs.current[id];
@@ -43,124 +71,70 @@ export const useVideoGrid = (
         });
     }, [streams, attachMediaStream]);
 
-    // Helper: tìm stream của user
     const getUserStream = useCallback(
         (peerId: string) => {
             if (peerId === myPeerId || peerId === "local") {
-                const localStream = streams.find((s) => s.id === "local");
+                const localStream = streamMaps.byPeerId.get("local")?.[0] || streams.find((s) => s.id === "local");
                 if (localStream) return localStream;
                 return null;
             }
 
-            // Screen share streams first
-            const screenStream = streams.find(
-                (s) =>
-                    s.id === `screen-${peerId}` ||
-                    (s.id.startsWith(`remote-${peerId}-`) &&
-                        (s.metadata?.isScreenShare ||
-                            s.metadata?.type === "screen"))
-            );
+            const userStreams = streamMaps.byPeerId.get(peerId) || [];
+
+            // Screen share streams first từ cached map
+            const screenStream = streamMaps.screenShares.get(peerId);
             if (screenStream) return screenStream;
 
-            // Video streams
-            const videoStream = streams.find(
-                (s) =>
-                    s.id.startsWith(`remote-${peerId}-`) &&
-                    (s.metadata?.type === "webcam" ||
-                        s.metadata?.video === true)
-            );
+            // Video streams - tối ưu với userStreams cache
+            const videoStream = userStreams.find((s) => s.metadata?.type === "webcam" || s.metadata?.video === true);
             if (videoStream) return videoStream;
 
             // Audio streams
-            const audioStream = streams.find(
-                (s) =>
-                    s.id.startsWith(`remote-${peerId}-`) &&
-                    (s.metadata?.type === "mic" ||
-                        (s.metadata?.audio === true &&
-                            s.metadata?.video === false))
-            );
+            const audioStream = userStreams.find((s) => s.metadata?.type === "mic" || (s.metadata?.audio === true && s.metadata?.video === false));
             if (audioStream) return audioStream;
 
             // Presence streams
-            const presenceStream = streams.find(
-                (s) =>
-                    s.id.startsWith(`remote-${peerId}-`) &&
-                    s.metadata?.type === "presence"
-            );
+            const presenceStream = userStreams.find((s) => s.metadata?.type === "presence");
             return presenceStream || null;
         },
-        [streams, myPeerId]
+        [streams, myPeerId, streamMaps]
     );
 
-    // Helper: tìm audio stream riêng biệt cho user
     const getUserAudioStream = useCallback(
         (peerId: string) => {
             if (peerId === myPeerId || peerId === "local") {
-                const localScreenStream = streams.find(
-                    (s) => s.id === "screen-local"
-                );
-                if (
-                    localScreenStream &&
-                    localScreenStream.stream.getAudioTracks().length > 0
-                ) {
+                const localScreenStream = streamMaps.screenShares.get("local") || streamMaps.screenShares.get(myPeerId) || streams.find((s) => s.id === "screen-local");
+                if (localScreenStream && localScreenStream.stream.getAudioTracks().length > 0) {
                     return localScreenStream.stream;
-                }
-
-                const ownScreenStream = streams.find(
-                    (s) => s.id === `screen-${myPeerId}`
-                );
-                if (
-                    ownScreenStream &&
-                    ownScreenStream.stream.getAudioTracks().length > 0
-                ) {
-                    return ownScreenStream.stream;
                 }
                 return null;
             }
 
-            // For remote users, prioritize translated audio
-            const translatedStream = streams.find(
-                (s) => s.metadata?.isTranslation
-            );
-            if (translatedStream) return translatedStream.stream;
+            const translatedStream = streamMaps.translated.get(peerId);
+            if (translatedStream && translatedStream.stream.getAudioTracks().length > 0) {
+                return translatedStream.stream;
+            }
 
-            // Screen share audio
-            const screenStream = streams.find(
-                (s) => s.id === `screen-${peerId}`
-            );
-            if (
-                screenStream &&
-                screenStream.stream.getAudioTracks().length > 0
-            ) {
+            const screenStream = streamMaps.screenShares.get(peerId);
+            if (screenStream && screenStream.stream.getAudioTracks().length > 0) {
                 return screenStream.stream;
             }
 
-            // Original audio streams
-            const audioStreams = streams.filter(
-                (s) =>
-                    s.id.startsWith(`remote-${peerId}-`) &&
-                    s.stream.getAudioTracks().length > 0 &&
-                    !s.id.includes("-translated")
-            );
-            return audioStreams.length > 0 ? audioStreams[0].stream : null;
+            const userStreams = streamMaps.byPeerId.get(peerId) || [];
+            const audioStream = userStreams.find((s) => s.stream.getAudioTracks().length > 0 && !s.id.includes("-translated") && s.metadata?.isTranslation !== true);
+            return audioStream ? audioStream.stream : null;
         },
-        [streams, myPeerId]
+        [streams, myPeerId, streamMaps]
     );
 
-    // Helper functions
     const isUserScreenSharing = useCallback(
         (peerId: string) => {
-            return streams.some(
-                (s) =>
-                    s.id === `screen-${peerId}` ||
-                    (s.id.startsWith(`remote-${peerId}-`) &&
-                        (s.metadata?.isScreenShare ||
-                            s.metadata?.type === "screen")) ||
-                    (s.id === "screen-local" &&
-                        (peerId === myPeerId || peerId === "local"))
-            );
+            if (peerId === myPeerId || peerId === "local") {
+                return streams.some((s) => s.id === "screen-local");
+            }
+            return streamMaps.screenShares.has(peerId);
         },
-        [streams, myPeerId]
+        [streams, myPeerId, streamMaps.screenShares]
     );
 
     const isUserPinned = useCallback(
@@ -186,22 +160,17 @@ export const useVideoGrid = (
 
     const hasUserTranslation = useCallback(
         (peerId: string) => {
-            return streams.some((s) => s.id === `remote-${peerId}-translated`);
+            return streamMaps.translated.has(peerId);
         },
-        [streams]
+        [streamMaps.translated]
     );
 
     const isUserUsingTranslation = useCallback(
         (peerId: string) => {
-            const translatedStream = streams.find(
-                (s) => s.id === `remote-${peerId}-translated`
-            );
-            return (
-                !!translatedStream &&
-                translatedStream.stream.getAudioTracks().length > 0
-            );
+            const translatedStream = streamMaps.translated.get(peerId);
+            return !!translatedStream && translatedStream.stream.getAudioTracks().length > 0;
         },
-        [streams]
+        [streamMaps.translated]
     );
 
     // Screen share users logic - use dedicated screenStreams instead of filtering
@@ -229,17 +198,11 @@ export const useVideoGrid = (
 
             if (!screenOwner) continue;
 
-            const hasVideoTracks =
-                stream.stream && stream.stream.getVideoTracks().length > 0;
+            const hasVideoTracks = stream.stream && stream.stream.getVideoTracks().length > 0;
             const existingStream = streamsByOwner.get(screenOwner);
 
             // Only replace if new stream has video and existing doesn't, or if no existing stream
-            if (
-                !existingStream ||
-                (hasVideoTracks &&
-                    (!existingStream.stream ||
-                        existingStream.stream.getVideoTracks().length === 0))
-            ) {
+            if (!existingStream || (hasVideoTracks && (!existingStream.stream || existingStream.stream.getVideoTracks().length === 0))) {
                 streamsByOwner.set(screenOwner, stream);
             }
         }
@@ -247,8 +210,7 @@ export const useVideoGrid = (
         // Create screen users from best streams
         const screenUsers = [];
         for (const [screenOwner, stream] of streamsByOwner) {
-            const hasVideoTracks =
-                stream.stream && stream.stream.getVideoTracks().length > 0;
+            const hasVideoTracks = stream.stream && stream.stream.getVideoTracks().length > 0;
 
             if (hasVideoTracks) {
                 const screenUser = {
@@ -265,12 +227,8 @@ export const useVideoGrid = (
 
     // Sorted users logic
     const sortedUsers = useMemo(() => {
-        const localUser = users.find(
-            (u) => u.peerId === myPeerId || u.peerId === "local"
-        );
-        const otherUsers = users.filter(
-            (u) => u.peerId !== myPeerId && u.peerId !== "local"
-        );
+        const localUser = users.find((u) => u.peerId === myPeerId || u.peerId === "local");
+        const otherUsers = users.filter((u) => u.peerId !== myPeerId && u.peerId !== "local");
 
         return [...otherUsers].sort((a, b) => {
             const aScreen = isUserScreenSharing(a.peerId);
@@ -295,14 +253,7 @@ export const useVideoGrid = (
 
             return 0;
         });
-    }, [
-        users,
-        myPeerId,
-        isUserScreenSharing,
-        isUserPinned,
-        isUserSpeaking,
-        hasUserStream,
-    ]);
+    }, [users, myPeerId, isUserScreenSharing, isUserPinned, isUserSpeaking, hasUserStream]);
 
     return {
         videoRefs,

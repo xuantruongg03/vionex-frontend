@@ -195,39 +195,32 @@ export class ConsumerManager {
     };
 
     /**
-     * Handle translation stream - replace original audio stream
+     * Handle translation stream - add as separate stream (don't replace original)
      */
     private handleTranslationStream = (consumer: any, translationStream: MediaStream, targetUserId: string, data: any, streamId: string) => {
-        // Find and pause existing consumers for this user's audio
-        const existingConsumers = Array.from(this.context.refs.consumersRef.current.entries()).filter(([consumerId, consumerInfo]) => {
-            return consumerInfo.streamId.includes(`${targetUserId}_mic`) || consumerInfo.streamId.includes(`${targetUserId}_audio`);
-        });
-
-        // Pause original audio consumers to stop consuming original stream
-        existingConsumers.forEach(([consumerId, consumerInfo]) => {
-            consumerInfo.consumer.pause();
-        });
-
-        // Replace stream in UI list - find existing mic stream and replace it
+        // Simply add translation stream as new stream alongside original
+        // No need to pause or replace anything - let UI choose which one to use
         setTimeout(() => {
             this.context.setters.setStreams((prevStreams) => {
-                const updatedStreams = prevStreams.map((streamInfo) => {
-                    // Find the original mic stream for this user
-                    if (streamInfo.id === `remote-${targetUserId}-mic` || streamInfo.id === `remote-${targetUserId}-audio`) {
-                        // Replace with translation stream, keeping same ID for seamless UI
-                        return {
-                            ...streamInfo,
-                            stream: translationStream, // Replace the MediaStream
-                            metadata: {
-                                ...streamInfo.metadata,
-                                isTranslation: true,
-                                targetUserId: targetUserId,
-                            },
-                        };
-                    }
-                    return streamInfo;
-                });
-                return updatedStreams;
+                // Check if translation stream already exists
+                const translationExists = prevStreams.some((stream) => stream.id === `remote-${targetUserId}-translated`);
+
+                if (translationExists) {
+                    return prevStreams; // Already exists, don't add duplicate
+                }
+
+                // Add new translation stream
+                const newTranslatedStream = {
+                    id: `remote-${targetUserId}-translated`,
+                    stream: translationStream,
+                    metadata: {
+                        ...data.metadata,
+                        isTranslation: true,
+                        targetUserId: targetUserId,
+                    },
+                };
+
+                return [...prevStreams, newTranslatedStream];
             });
         }, 50);
     };
