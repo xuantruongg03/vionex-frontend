@@ -21,32 +21,6 @@ export const TranslationCabinList: React.FC<TranslationCabinListProps> = ({ room
         return availableUsers.find((user) => user.id === userId)?.username || userId;
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "active":
-                return "#059669";
-            case "stopped":
-                return "#dc2626";
-            case "error":
-                return "#ea580c";
-            default:
-                return "#6b7280";
-        }
-    };
-
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case "active":
-                return "●";
-            case "stopped":
-                return "■";
-            case "error":
-                return "⚠";
-            default:
-                return "○";
-        }
-    };
-
     const handleDestroy = async (index: number) => {
         const cabin = cabins[index];
         const data = {

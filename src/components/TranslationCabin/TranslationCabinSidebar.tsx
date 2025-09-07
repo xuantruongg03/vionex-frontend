@@ -24,9 +24,10 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
     const isMobile = useIsMobile();
 
     // Redux
-    const user = useSelector((state: any) => state.room);
+    const room = useSelector((state: any) => state.room);
+    const user = useSelector((state: any) => state.auth.user);
 
-    const { cabins, loading: listLoading, refetch: refetchCabins } = useListCabin(roomId, user?.username || "");
+    const { cabins, loading: listLoading, refetch: refetchCabins } = useListCabin(roomId, user?.name || room.username);
 
     // Tab state
     const [activeTab, setActiveTab] = useState<"create" | "list">("list");
@@ -62,7 +63,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
         try {
             await createCabin({
                 roomId,
-                sourceUserId: user.username,
+                sourceUserId: user?.name || room.username,
                 targetUserId: selectedUserId,
                 sourceLanguage,
                 targetLanguage,
@@ -149,7 +150,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                     <span className='ml-2 text-sm text-gray-600 dark:text-gray-400'>Loading cabins...</span>
                                 </div>
                             ) : (
-                                <TranslationCabinList roomId={roomId} cabins={cabins} availableUsers={availableUsers} sourceUserId={user?.username || ""} onCabinDestroyed={refetchCabins} />
+                                <TranslationCabinList roomId={roomId} cabins={cabins} availableUsers={availableUsers} sourceUserId={user?.name || room.username} onCabinDestroyed={refetchCabins} />
                             )}
                         </div>
                     )}
@@ -168,9 +169,9 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Select User to Translate</label>
                                         <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} required disabled={loading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
                                             <option value=''>Choose a user...</option>
-                                            {availableUsers.map((user) => (
-                                                <option key={user.id} value={user.id}>
-                                                    {user.username}
+                                            {availableUsers.map((availableUser) => (
+                                                <option key={availableUser.id} value={availableUser.id}>
+                                                    {availableUser.username}
                                                 </option>
                                             ))}
                                         </select>

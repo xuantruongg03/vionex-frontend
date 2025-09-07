@@ -14,7 +14,7 @@ export const useListCabin = (roomId: string, userId: string) => {
         queryKey: ["translation-cabins", roomId, userId],
         queryFn: () => listTranslationCabins({ roomId, userId }),
         enabled: !!(roomId && userId),
-        refetchInterval: 10000, // Refetch every 10 seconds
+        // refetchInterval: 10000, // Refetch every 10 seconds
     });
 
     return {

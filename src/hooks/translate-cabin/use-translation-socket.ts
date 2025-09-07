@@ -1,6 +1,6 @@
 import { useSocket } from "@/contexts/SocketContext";
 import { CreateTranslationCabinRequest, DestroyTranslationCabinRequest, TranslationCabin } from "@/interfaces";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 interface TranslationSocketResponse {
     success: boolean;
@@ -65,7 +65,7 @@ export const useTranslationSocket = (roomId: string) => {
                     socket.off("translation:created", onSuccess);
                     socket.off("translation:error", onError);
                     reject(new Error("Request timeout"));
-                }, 30000);
+                }, 15000);
             });
         },
         [socket]
@@ -109,13 +109,13 @@ export const useTranslationSocket = (roomId: string) => {
                 // Emit the request
                 socket.emit("translation:destroy", request);
 
-                // Timeout after 30 seconds
+                // Timeout after 15 seconds
                 setTimeout(() => {
                     setIsLoading(false);
                     socket.off("translation:destroyed", onSuccess);
                     socket.off("translation:error", onError);
                     reject(new Error("Request timeout"));
-                }, 30000);
+                }, 15000);
             });
         },
         [socket]
@@ -165,7 +165,7 @@ export const useTranslationSocket = (roomId: string) => {
                     socket.off("translation:list", onSuccess);
                     socket.off("translation:error", onError);
                     reject(new Error("Request timeout"));
-                }, 30000);
+                }, 15000);
             });
         },
         [socket]
