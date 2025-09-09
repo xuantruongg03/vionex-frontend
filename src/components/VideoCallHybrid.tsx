@@ -78,6 +78,7 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
         toggleLockRoom,
         togglePinUser,
         consumeTranslationStream,
+        revertTranslationStream,
         removeTranslatedStream,
         // WebRTC Transports for network monitoring
         recvTransport,
@@ -485,6 +486,7 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                         username: user.peerId,
                     }))}
                     onConsumeTranslation={(streamId) => consumeTranslationStream(streamId)}
+                    onRevertTranslation={(targetUserId) => revertTranslationStream(targetUserId)}
                 />
             )}
             {uiState.isChatOpen && <ChatSidebar isOpen={uiState.isChatOpen} setIsOpen={(isOpen) => updateUIState({ isChatOpen: isOpen })} roomId={roomId} />}

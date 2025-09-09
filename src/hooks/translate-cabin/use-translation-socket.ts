@@ -1,5 +1,6 @@
 import { useSocket } from "@/contexts/SocketContext";
 import { CreateTranslationCabinRequest, DestroyTranslationCabinRequest, TranslationCabin } from "@/interfaces";
+import { useMutation } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
 interface TranslationSocketResponse {
@@ -8,22 +9,15 @@ interface TranslationSocketResponse {
     data?: any;
 }
 
-interface TranslationCabinUpdate {
-    action: "created" | "destroyed";
-    roomId: string;
-    sourceUserId: string;
-    targetUserId: string;
-    sourceLanguage: string;
-    targetLanguage: string;
-}
+const SOCKET_TIMEOUT = 15000; // 15 seconds
 
 export const useTranslationSocket = (roomId: string) => {
     const { socket } = useSocket();
     const [isLoading, setIsLoading] = useState(false);
 
-    // Create translation cabin via socket
-    const createTranslationCabin = useCallback(
-        async (request: CreateTranslationCabinRequest): Promise<{ streamId?: string }> => {
+    // Generic socket request helper
+    const makeSocketRequest = useCallback(
+        <T = any>(eventToEmit: string, successEvent: string, data: any, errorMessage: string, onSuccess?: (data: T) => void): Promise<T> => {
             if (!socket?.connected) {
                 throw new Error("Socket not connected");
             }
@@ -31,186 +25,96 @@ export const useTranslationSocket = (roomId: string) => {
             return new Promise((resolve, reject) => {
                 setIsLoading(true);
 
-                // Set up one-time listeners for the response
-                const onSuccess = (response: TranslationSocketResponse) => {
+                const cleanup = () => {
+                    socket.off(successEvent, onSuccessHandler);
+                    socket.off("translation:error", onErrorHandler);
                     setIsLoading(false);
-                    if (response.success) {
-                        resolve({ streamId: response.data?.streamId });
-                    } else {
-                        reject(new Error(response.message || "Failed to create translation cabin"));
-                    }
-                    // Clean up listeners
-                    socket.off("translation:created", onSuccess);
-                    socket.off("translation:error", onError);
                 };
 
-                const onError = (error: { message: string }) => {
-                    setIsLoading(false);
-                    reject(new Error(error.message || "Failed to create translation cabin"));
-                    // Clean up listeners
-                    socket.off("translation:created", onSuccess);
-                    socket.off("translation:error", onError);
+                const onSuccessHandler = (response: TranslationSocketResponse) => {
+                    cleanup();
+                    if (response.success) {
+                        onSuccess?.(response.data);
+                        resolve(response.data);
+                    } else {
+                        reject(new Error(response.message || errorMessage));
+                    }
+                };
+
+                const onErrorHandler = (error: { message: string }) => {
+                    cleanup();
+                    reject(new Error(error.message || errorMessage));
                 };
 
                 // Set up listeners
-                socket.on("translation:created", onSuccess);
-                socket.on("translation:error", onError);
+                socket.on(successEvent, onSuccessHandler);
+                socket.on("translation:error", onErrorHandler);
 
                 // Emit the request
-                socket.emit("translation:create", request);
+                socket.emit(eventToEmit, data);
 
-                // Timeout after 30 seconds
+                // Timeout
                 setTimeout(() => {
-                    setIsLoading(false);
-                    socket.off("translation:created", onSuccess);
-                    socket.off("translation:error", onError);
+                    cleanup();
                     reject(new Error("Request timeout"));
-                }, 15000);
+                }, SOCKET_TIMEOUT);
             });
         },
         [socket]
     );
 
+    // Create translation cabin via socket
+    const createTranslationCabin = useCallback(
+        async (request: CreateTranslationCabinRequest): Promise<{ streamId?: string }> => {
+            const data = await makeSocketRequest<{ streamId?: string }>("translation:create", "translation:created", request, "Failed to create translation cabin");
+            return { streamId: data?.streamId };
+        },
+        [makeSocketRequest]
+    );
+
     // Destroy translation cabin via socket
     const destroyTranslationCabin = useCallback(
-        async (request: DestroyTranslationCabinRequest): Promise<void> => {
-            if (!socket?.connected) {
-                throw new Error("Socket not connected");
-            }
-
-            return new Promise((resolve, reject) => {
-                setIsLoading(true);
-
-                // Set up one-time listeners for the response
-                const onSuccess = (response: TranslationSocketResponse) => {
-                    setIsLoading(false);
-                    if (response.success) {
-                        resolve();
-                    } else {
-                        reject(new Error(response.message || "Failed to destroy translation cabin"));
-                    }
-                    // Clean up listeners
-                    socket.off("translation:destroyed", onSuccess);
-                    socket.off("translation:error", onError);
-                };
-
-                const onError = (error: { message: string }) => {
-                    setIsLoading(false);
-                    reject(new Error(error.message || "Failed to destroy translation cabin"));
-                    // Clean up listeners
-                    socket.off("translation:destroyed", onSuccess);
-                    socket.off("translation:error", onError);
-                };
-
-                // Set up listeners
-                socket.on("translation:destroyed", onSuccess);
-                socket.on("translation:error", onError);
-
-                // Emit the request
-                socket.emit("translation:destroy", request);
-
-                // Timeout after 15 seconds
-                setTimeout(() => {
-                    setIsLoading(false);
-                    socket.off("translation:destroyed", onSuccess);
-                    socket.off("translation:error", onError);
-                    reject(new Error("Request timeout"));
-                }, 15000);
+        async (request: DestroyTranslationCabinRequest, onDestroyed?: (targetUserId: string) => void): Promise<void> => {
+            await makeSocketRequest("translation:destroy", "translation:destroyed", request, "Failed to destroy translation cabin", () => {
+                console.log(`[useTranslationSocket] Cabin destroyed successfully for targetUserId: ${request.targetUserId}`);
+                onDestroyed?.(request.targetUserId);
             });
         },
-        [socket]
+        [makeSocketRequest]
     );
 
     // List translation cabins via socket
     const listTranslationCabins = useCallback(
         async (params: { roomId: string; userId: string }): Promise<TranslationCabin[]> => {
-            if (!socket?.connected) {
-                throw new Error("Socket not connected");
-            }
-
-            return new Promise((resolve, reject) => {
-                setIsLoading(true);
-
-                // Set up one-time listeners for the response
-                const onSuccess = (response: TranslationSocketResponse) => {
-                    setIsLoading(false);
-                    if (response.success) {
-                        resolve(response.data || []);
-                    } else {
-                        reject(new Error(response.message || "Failed to list translation cabins"));
-                    }
-                    // Clean up listeners
-                    socket.off("translation:list", onSuccess);
-                    socket.off("translation:error", onError);
-                };
-
-                const onError = (error: { message: string }) => {
-                    setIsLoading(false);
-                    reject(new Error(error.message || "Failed to list translation cabins"));
-                    // Clean up listeners
-                    socket.off("translation:list", onSuccess);
-                    socket.off("translation:error", onError);
-                };
-
-                // Set up listeners
-                socket.on("translation:list", onSuccess);
-                socket.on("translation:error", onError);
-
-                // Emit the request
-                socket.emit("translation:list", params);
-
-                // Timeout after 30 seconds
-                setTimeout(() => {
-                    setIsLoading(false);
-                    socket.off("translation:list", onSuccess);
-                    socket.off("translation:error", onError);
-                    reject(new Error("Request timeout"));
-                }, 15000);
-            });
+            const data = await makeSocketRequest<TranslationCabin[]>("translation:list", "translation:list", params, "Failed to list translation cabins");
+            return data || [];
         },
-        [socket]
-    );
-
-    // Listen for cabin updates (other users creating/destroying cabins)
-    const setupCabinUpdateListener = useCallback(
-        (onUpdate: (update: TranslationCabinUpdate) => void) => {
-            if (!socket?.connected) return;
-
-            socket.on("translation:cabin-update", onUpdate);
-
-            return () => {
-                socket.off("translation:cabin-update", onUpdate);
-            };
-        },
-        [socket]
-    );
-
-    // Setup listener specifically for cabin destroyed events
-    const setupCabinDestroyListener = useCallback(
-        (onCabinDestroyed: (data: { targetUserId: string }) => void) => {
-            if (!socket?.connected) return;
-
-            const handleCabinUpdate = (update: TranslationCabinUpdate) => {
-                if (update.action === "destroyed") {
-                    onCabinDestroyed({ targetUserId: update.targetUserId });
-                }
-            };
-
-            socket.on("translation:cabin-update", handleCabinUpdate);
-
-            return () => {
-                socket.off("translation:cabin-update", handleCabinUpdate);
-            };
-        },
-        [socket]
+        [makeSocketRequest]
     );
 
     return {
         createTranslationCabin,
         destroyTranslationCabin,
         listTranslationCabins,
-        setupCabinUpdateListener,
-        setupCabinDestroyListener,
         isLoading,
+    };
+};
+
+// Mutation hook for destroying cabin (previously in separate file)
+export const useDestroyCabin = (roomId: string, onDestroyed?: (targetUserId: string) => void) => {
+    const { destroyTranslationCabin } = useTranslationSocket(roomId);
+
+    const {
+        mutateAsync: destroyCabin,
+        isPending,
+        isError,
+    } = useMutation({
+        mutationFn: (params: DestroyTranslationCabinRequest) => destroyTranslationCabin(params, onDestroyed),
+    });
+
+    return {
+        loading: isPending,
+        error: isError,
+        destroyCabin,
     };
 };

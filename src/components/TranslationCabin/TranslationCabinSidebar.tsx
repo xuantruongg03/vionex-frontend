@@ -6,7 +6,6 @@ import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { Button } from "../ui/button";
 import { TranslationCabinList } from "./TranslationCabinList";
-import { useListCabin, useTranslationCabin } from "@/hooks";
 import { useTranslationSocket } from "@/hooks/translate-cabin/use-translation-socket";
 
 interface TranslationCabinSidebarProps {
@@ -15,11 +14,11 @@ interface TranslationCabinSidebarProps {
     roomId: string;
     availableUsers: Array<{ id: string; username: string }>;
     onConsumeTranslation?: (streamId: string) => void;
+    onRevertTranslation?: (targetUserId: string) => void;
 }
 
-export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = ({ isOpen, setIsOpen, roomId, availableUsers, onConsumeTranslation }) => {
-    const { loading, error, createCabin } = useTranslationCabin(roomId);
-    const { setupCabinUpdateListener } = useTranslationSocket(roomId);
+export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = ({ isOpen, setIsOpen, roomId, availableUsers, onConsumeTranslation, onRevertTranslation }) => {
+    const { createTranslationCabin, listTranslationCabins, destroyTranslationCabin, isLoading } = useTranslationSocket(roomId);
 
     const isMobile = useIsMobile();
 
@@ -27,7 +26,9 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
     const room = useSelector((state: any) => state.room);
     const user = useSelector((state: any) => state.auth.user);
 
-    const { cabins, loading: listLoading, refetch: refetchCabins } = useListCabin(roomId, user?.name || room.username);
+    // Local state for cabins list
+    const [cabins, setCabins] = useState([]);
+    const [listLoading, setListLoading] = useState(false);
 
     // Tab state
     const [activeTab, setActiveTab] = useState<"create" | "list">("list");
@@ -37,16 +38,38 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
     const [sourceLanguage, setSourceLanguage] = useState("vi");
     const [targetLanguage, setTargetLanguage] = useState("en");
 
-    // Setup real-time cabin updates listener
-    useEffect(() => {
-        const cleanup = setupCabinUpdateListener((update) => {
-            console.log("Translation cabin update:", update);
-            // Refresh the cabin list when there are updates
-            refetchCabins();
-        });
+    // Function to fetch cabins list
+    const refetchCabins = async () => {
+        try {
+            setListLoading(true);
+            const cabinsList = await listTranslationCabins({ roomId, userId: user?.name || room.username });
+            setCabins(cabinsList);
+        } catch (error) {
+            console.error("Failed to fetch cabins:", error);
+        } finally {
+            setListLoading(false);
+        }
+    };
 
-        return cleanup;
-    }, [setupCabinUpdateListener, refetchCabins]);
+    // Initial load and setup
+    useEffect(() => {
+        if (isOpen) {
+            refetchCabins();
+        }
+    }, [isOpen]);
+
+    // Listen for cabin updates (this is handled by SocketEventHandlerManager automatically)
+    // We just need to refresh the list when we detect changes
+    useEffect(() => {
+        // Auto-refresh cabin list periodically when sidebar is open
+        if (!isOpen) return;
+
+        const interval = setInterval(() => {
+            refetchCabins();
+        }, 5000); // Refresh every 5 seconds
+
+        return () => clearInterval(interval);
+    }, [isOpen]);
 
     const handleCreateTranslation = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -61,16 +84,18 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
         }
 
         try {
-            await createCabin({
+            const result = await createTranslationCabin({
                 roomId,
                 sourceUserId: user?.name || room.username,
                 targetUserId: selectedUserId,
                 sourceLanguage,
                 targetLanguage,
-            }).then((response) => {
-                // Handle data stream ID
-                onConsumeTranslation(response.streamId);
             });
+
+            // Handle data stream ID
+            if (result.streamId && onConsumeTranslation) {
+                await onConsumeTranslation(result.streamId);
+            }
 
             // Reset form
             setSelectedUserId("");
@@ -82,6 +107,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
             setActiveTab("list");
         } catch (err) {
             console.error("Failed to create translation cabin:", err);
+            alert(err.message || "Failed to create translation cabin");
         }
     };
 
@@ -138,7 +164,8 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                 </div>
 
                 {/* Error Message */}
-                {error && <div className='mx-4 mt-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm'>{error}</div>}
+                {/* Show error or loading state */}
+                {isLoading && <div className='mx-4 mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm'>Loading...</div>}
 
                 {/* Content */}
                 <div className='flex-1 overflow-y-auto'>
@@ -150,7 +177,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                     <span className='ml-2 text-sm text-gray-600 dark:text-gray-400'>Loading cabins...</span>
                                 </div>
                             ) : (
-                                <TranslationCabinList roomId={roomId} cabins={cabins} availableUsers={availableUsers} sourceUserId={user?.name || room.username} onCabinDestroyed={refetchCabins} />
+                                <TranslationCabinList roomId={roomId} cabins={cabins} availableUsers={availableUsers} sourceUserId={user?.name || room.username} onCabinDestroyed={refetchCabins} onRevertTranslation={onRevertTranslation} />
                             )}
                         </div>
                     )}
@@ -167,7 +194,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                 <form onSubmit={handleCreateTranslation} className='space-y-4'>
                                     <div>
                                         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Select User to Translate</label>
-                                        <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} required disabled={loading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
+                                        <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} required disabled={isLoading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
                                             <option value=''>Choose a user...</option>
                                             {availableUsers.map((availableUser) => (
                                                 <option key={availableUser.id} value={availableUser.id}>
@@ -180,7 +207,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                     <div className='grid grid-cols-2 gap-3'>
                                         <div>
                                             <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>From</label>
-                                            <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} disabled={loading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
+                                            <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} disabled={isLoading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
                                                 {SUPPORTED_LANGUAGES_TRANSLATION.map((lang) => (
                                                     <option key={lang.code} value={lang.code}>
                                                         {lang.name}
@@ -190,7 +217,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                         </div>
                                         <div>
                                             <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>To</label>
-                                            <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={loading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
+                                            <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={isLoading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
                                                 {SUPPORTED_LANGUAGES_TRANSLATION.map((lang) => (
                                                     <option key={lang.code} value={lang.code}>
                                                         {lang.name}
@@ -200,8 +227,8 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                         </div>
                                     </div>
 
-                                    <Button type='submit' disabled={loading || !selectedUserId || sourceLanguage === targetLanguage} className='w-full' size='lg'>
-                                        {loading ? "Creating Translation..." : "Start Translation"}
+                                    <Button type='submit' disabled={isLoading || !selectedUserId || sourceLanguage === targetLanguage} className='w-full' size='lg'>
+                                        {isLoading ? "Creating Translation..." : "Start Translation"}
                                     </Button>
                                 </form>
                             </div>
@@ -210,7 +237,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                 </div>
 
                 {/* Loading Overlay */}
-                {loading && (
+                {isLoading && (
                     <div className='absolute inset-0 bg-black/20 flex items-center justify-center'>
                         <div className='bg-white dark:bg-gray-800 rounded-lg p-4 shadow-lg'>
                             <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto'></div>

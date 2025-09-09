@@ -1,15 +1,3 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
-
 import { CallSystemContext } from "../types";
 import { StreamManager } from "../streams/StreamManager";
 
@@ -236,42 +224,53 @@ export class ConsumerManager {
      * Revert translation stream back to original audio
      */
     revertTranslationStream = (targetUserId: string) => {
-        // Find paused original audio consumers and resume them
-        const pausedConsumers = Array.from(this.context.refs.consumersRef.current.entries()).filter(([consumerId, consumerInfo]) => {
-            return (consumerInfo.streamId.includes(`${targetUserId}_mic`) || consumerInfo.streamId.includes(`${targetUserId}_audio`)) && consumerInfo.consumer.paused;
+        console.log(`[ConsumerManager] Reverting translation stream for user: ${targetUserId}`);
+
+        // Find and resume paused original audio consumers
+        const originalConsumers = Array.from(this.context.refs.consumersRef.current.entries()).filter(([consumerId, consumerInfo]) => {
+            return (consumerInfo.streamId.includes(`${targetUserId}_mic`) || consumerInfo.streamId.includes(`${targetUserId}_audio`) || consumerInfo.streamId.includes(`${targetUserId}_`)) && consumerInfo.consumer.paused;
         });
 
         // Resume original audio consumers
-        pausedConsumers.forEach(([consumerId, consumerInfo]) => {
-            consumerInfo.consumer.resume();
+        originalConsumers.forEach(([consumerId, consumerInfo]) => {
+            try {
+                consumerInfo.consumer.resume();
+                console.log(`[ConsumerManager] Resumed original consumer: ${consumerId}`);
+            } catch (error) {
+                console.error(`[ConsumerManager] Error resuming consumer ${consumerId}:`, error);
+            }
         });
 
-        // Revert stream in UI list - find translation stream and revert it back
+        // Remove translation stream from UI and close its consumer
         setTimeout(() => {
             this.context.setters.setStreams((prevStreams) => {
-                return prevStreams.map((streamInfo) => {
+                return prevStreams.filter((streamInfo) => {
                     // Find translation stream for this user
                     if (streamInfo.metadata?.isTranslation && streamInfo.metadata?.targetUserId === targetUserId) {
-                        // Find original consumer to get the original stream
-                        const originalConsumer = pausedConsumers.find(([_, consumerInfo]) => consumerInfo.streamId.includes(`${targetUserId}_mic`) || consumerInfo.streamId.includes(`${targetUserId}_audio`));
+                        // Find and close the translation consumer
+                        const translationConsumer = Array.from(this.context.refs.consumersRef.current.entries()).find(([_, consumerInfo]) => {
+                            return consumerInfo.streamId.startsWith("translated_") && (consumerInfo.streamId.includes(targetUserId) || streamInfo.metadata?.targetUserId === targetUserId);
+                        });
 
-                        if (originalConsumer) {
-                            const [_, consumerInfo] = originalConsumer;
-                            const originalStream = new MediaStream([consumerInfo.consumer.track]);
-
-                            // Revert back to original stream
-                            return {
-                                ...streamInfo,
-                                stream: originalStream, // Replace with original MediaStream
-                                metadata: {
-                                    ...streamInfo.metadata,
-                                    isTranslation: false,
-                                    targetUserId: undefined,
-                                },
-                            };
+                        if (translationConsumer) {
+                            const [consumerId, consumerInfo] = translationConsumer;
+                            try {
+                                consumerInfo.consumer.close();
+                                this.context.refs.consumersRef.current.delete(consumerId);
+                                console.log(`[ConsumerManager] Closed translation consumer: ${consumerId}`);
+                            } catch (error) {
+                                console.error(`[ConsumerManager] Error closing translation consumer:`, error);
+                            }
                         }
+
+                        // Remove translation stream from remoteStreamsMap
+                        const translationStreamId = `remote-${targetUserId}-translated`;
+                        this.context.refs.remoteStreamsMapRef.current.delete(translationStreamId);
+
+                        console.log(`[ConsumerManager] Removed translation stream from UI for user: ${targetUserId}`);
+                        return false; // Remove this stream from UI
                     }
-                    return streamInfo;
+                    return true; // Keep other streams
                 });
             });
         }, 50);

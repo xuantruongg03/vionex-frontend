@@ -7,7 +7,6 @@ import { useSelector } from "react-redux";
 import "react-resizable/css/styles.css";
 import { StreamTile } from "./StreamTile";
 import { useVideoGrid } from "@/hooks/use-video-grid";
-import { useTranslationSocket } from "@/hooks/translate-cabin/use-translation-socket";
 import { calculateGridDimensions, createDefaultLayout } from "@/utils/gridLayout";
 import LAYOUT_TEMPLATES from "./Templates/LayoutTemplate";
 
@@ -24,20 +23,6 @@ const SharedAvatar = ({ userName, isSpeaking = false, size = "w-16 h-16", textSi
 export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, users, speakingPeers, isSpeaking, togglePinUser, removeTranslatedStream }: { streams: { id: string; stream: MediaStream; metadata?: any }[]; screenStreams: { id: string; stream: MediaStream; metadata?: any }[]; isVideoOff: boolean; isMuted: boolean; users: User[]; speakingPeers: string[]; isSpeaking: boolean; togglePinUser: (peerId: string) => void; removeTranslatedStream?: (targetUserId: string) => void }) => {
     const room = useSelector((state: any) => state.room);
     const myPeerId = room.username || "local";
-
-    // Setup cabin destroy listener to remove translated stream
-    const { setupCabinDestroyListener } = useTranslationSocket(room.id);
-
-    useEffect(() => {
-        if (!removeTranslatedStream) return;
-
-        const cleanup = setupCabinDestroyListener(({ targetUserId }) => {
-            console.log(`[VideoGrid] Cabin destroyed for user ${targetUserId}, removing translated stream`);
-            removeTranslatedStream(targetUserId);
-        });
-
-        return cleanup;
-    }, [setupCabinDestroyListener, removeTranslatedStream]);
 
     const {
         layouts,
