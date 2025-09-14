@@ -19,6 +19,8 @@ import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "sonner";
 
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
 const Auth = () => {
     const [isLogin, setIsLogin] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
@@ -81,7 +83,7 @@ const Auth = () => {
 
     return (
         <GoogleOAuthProvider
-            clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}
+            clientId={clientId}
         >
             <div className='h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100 dark:from-slate-900 dark:via-blue-900/30 dark:to-purple-900/30 flex items-center justify-center p-4'>
                 {/* Background decoration */}
