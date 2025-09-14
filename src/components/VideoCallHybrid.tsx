@@ -7,7 +7,7 @@ import { User } from "@/interfaces";
 import { ActionLogType } from "@/interfaces/action";
 import { TypeUserEvent } from "@/interfaces/behavior";
 import { Disc2, Loader2, QrCode } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -16,21 +16,43 @@ import { ChatSidebar, LockRoomDialog, NetworkMonitorDialog, ParticipantsList, QR
 import { Button } from "./ui/button";
 import { SelectLayoutTemplate } from "./Dialogs/SelectLayoutTemplate";
 
-export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
-    const [isChatOpen, setIsChatOpen] = useState(false);
-    const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
-    const [isQuizOpen, setIsQuizOpen] = useState(false);
-    const [isQRCodeOpen, setIsQRCodeOpen] = useState(false);
-    const [isChatboxOpen, setIsChatboxOpen] = useState(false);
+interface UIState {
+    isChatOpen: boolean;
+    isWhiteboardOpen: boolean;
+    isQuizOpen: boolean;
+    isQRCodeOpen: boolean;
+    isChatboxOpen: boolean;
+    isShowDialogPassword: boolean;
+    isNetworkMonitorOpen: boolean;
+    isVotingDialogOpen: boolean;
+    isTranslationCabinOpen: boolean;
+    isOpenSelectLayoutTemplate: boolean;
+}
+
+const initialUIState: UIState = {
+    isChatOpen: false,
+    isWhiteboardOpen: false,
+    isQuizOpen: false,
+    isQRCodeOpen: false,
+    isChatboxOpen: false,
+    isShowDialogPassword: false,
+    isNetworkMonitorOpen: false,
+    isVotingDialogOpen: false,
+    isTranslationCabinOpen: false,
+    isOpenSelectLayoutTemplate: false,
+};
+
+export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
+    const [uiState, setUIState] = useState<UIState>(initialUIState);
+
+    const updateUIState = useCallback((updates: Partial<UIState>) => {
+        setUIState((prev) => ({ ...prev, ...updates }));
+    }, []);
+
     const [isMuted, setIsMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [canToggleVideo, setCanToggleVideo] = useState(true);
     const [canToggleAudio, setCanToggleAudio] = useState(true);
-    const [isShowDialogPassword, setIsShowDialogPassword] = useState(false);
-    const [isNetworkMonitorOpen, setIsNetworkMonitorOpen] = useState(false);
-    const [isVotingDialogOpen, setIsVotingDialogOpen] = useState(false);
-    const [isTranslationCabinOpen, setIsTranslationCabinOpen] = useState(false);
-    const [isOpenSelectLayoutTemplate, setIsOpenSelectLayoutTemplate] = useState(false);
 
     // Track if we've already attempted to join to prevent multiple join attempts
     const hasAttemptedJoin = useRef(false);
@@ -57,6 +79,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         togglePinUser,
         consumeTranslationStream,
         revertTranslationStream,
+        removeTranslatedStream,
         // WebRTC Transports for network monitoring
         recvTransport,
     } = useCall(roomId ?? "", room.password || null);
@@ -98,8 +121,8 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
     const { sendLogsToServer, isMonitorActive, toggleBehaviorMonitoring } = useBehaviorMonitor({ roomId: roomId ?? "" });
 
     const users = useMemo((): User[] => {
-        // If we have users from the hybrid hook, use them
-        if (hybridUsers && hybridUsers.length > 0) {
+        // If we have users from the hybrid hook, use them (preferred path)
+        if (hybridUsers?.length > 0) {
             return hybridUsers;
         }
 
@@ -107,10 +130,9 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         const userMap = new Map<string, User>();
 
         // Add current user
-        const currentUser = room.username;
-        if (currentUser) {
-            userMap.set(currentUser, {
-                peerId: currentUser,
+        if (room.username) {
+            userMap.set(room.username, {
+                peerId: room.username,
                 isCreator: room.isCreator || false,
                 timeArrive: new Date(),
             });
@@ -235,7 +257,7 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         }
     }, [streams, isVideoOff, isMuted]);
 
-    const handleToggleVideo = async () => {
+    const handleToggleVideo = useCallback(async () => {
         if (canToggleVideo) {
             try {
                 const videoEnabled = await toggleVideo();
@@ -256,9 +278,9 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         } else {
             toast.error("Can't toggle camera");
         }
-    };
+    }, [canToggleVideo, toggleVideo, dispatch]);
 
-    const handleToggleAudio = async () => {
+    const handleToggleAudio = useCallback(async () => {
         if (canToggleAudio) {
             try {
                 const audioEnabled = await toggleAudio();
@@ -279,82 +301,134 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
         } else {
             toast.error("Can't toggle microphone");
         }
-    };
+    }, [canToggleAudio, toggleAudio, dispatch]);
 
-    const handleSetPassword = async (password: string) => {
-        setIsShowDialogPassword(false);
-        toggleLockRoom(password);
-    };
+    const handleSetPassword = useCallback(
+        async (password: string) => {
+            updateUIState({ isShowDialogPassword: false });
+            toggleLockRoom(password);
+        },
+        [updateUIState, toggleLockRoom]
+    );
 
-    const handleToggleLockRoom = () => {
+    const handleToggleLockRoom = useCallback(() => {
         if (!room.isLocked) {
-            setIsShowDialogPassword(true);
+            updateUIState({ isShowDialogPassword: true });
         } else {
             handleSetPassword("");
         }
-    };
+    }, [room.isLocked, updateUIState, handleSetPassword]);
 
-    const handleToggleVoting = () => {
+    const handleToggleVoting = useCallback(() => {
         if (isMobile) {
-            if (isChatOpen) setIsChatOpen(false);
-            if (isWhiteboardOpen) setIsWhiteboardOpen(false);
-            if (isQuizOpen) setIsQuizOpen(false);
+            updateUIState({
+                isChatOpen: false,
+                isWhiteboardOpen: false,
+                isQuizOpen: false,
+                isVotingDialogOpen: !uiState.isVotingDialogOpen,
+            });
+        } else {
+            updateUIState({ isVotingDialogOpen: !uiState.isVotingDialogOpen });
         }
-        setIsVotingDialogOpen(!isVotingDialogOpen);
-    };
+    }, [isMobile, uiState.isVotingDialogOpen, updateUIState]);
 
-    const handleToggleQuiz = () => {
+    const handleToggleQuiz = useCallback(() => {
         if (isMobile) {
-            if (isChatOpen) setIsChatOpen(false);
-            if (isWhiteboardOpen) setIsWhiteboardOpen(false);
+            updateUIState({
+                isChatOpen: false,
+                isWhiteboardOpen: false,
+                isQuizOpen: !uiState.isQuizOpen,
+            });
+        } else {
+            updateUIState({ isQuizOpen: !uiState.isQuizOpen });
         }
-        setIsQuizOpen(!isQuizOpen);
-    };
+    }, [isMobile, uiState.isQuizOpen, updateUIState]);
 
-    const handleToggleChat = () => {
-        if (isMobile && isQuizOpen && !isChatOpen) {
-            setIsQuizOpen(false);
+    const handleToggleChat = useCallback(() => {
+        if (isMobile && uiState.isQuizOpen && !uiState.isChatOpen) {
+            updateUIState({ isQuizOpen: false });
         }
         // Desktop: Auto-close other sidebars when opening chat
-        if (!isChatOpen) {
-            setIsTranslationCabinOpen(false);
-            setIsWhiteboardOpen(false);
-        }
-        setIsChatOpen(!isChatOpen);
-    };
-
-    const handleToggleWhiteboard = () => {
-        if (isMobile) {
-            if (isChatOpen) setIsChatOpen(false);
-            if (isQuizOpen) setIsQuizOpen(false);
+        if (!uiState.isChatOpen) {
+            updateUIState({
+                isChatOpen: true,
+                isTranslationCabinOpen: false,
+                isWhiteboardOpen: false,
+            });
         } else {
-            if (!isWhiteboardOpen) {
-                setIsChatOpen(false);
-                setIsTranslationCabinOpen(false);
+            updateUIState({ isChatOpen: false });
+        }
+    }, [isMobile, uiState.isQuizOpen, uiState.isChatOpen, updateUIState]);
+
+    const handleToggleWhiteboard = useCallback(() => {
+        if (isMobile) {
+            updateUIState({
+                isChatOpen: false,
+                isQuizOpen: false,
+                isWhiteboardOpen: !uiState.isWhiteboardOpen,
+            });
+        } else {
+            if (!uiState.isWhiteboardOpen) {
+                updateUIState({
+                    isChatOpen: false,
+                    isTranslationCabinOpen: false,
+                    isWhiteboardOpen: true,
+                });
+            } else {
+                updateUIState({ isWhiteboardOpen: false });
             }
         }
-        setIsWhiteboardOpen(!isWhiteboardOpen);
-    };
+    }, [isMobile, uiState.isWhiteboardOpen, uiState.isChatOpen, updateUIState]);
 
-    const handleToggleRecording = () => {
+    const handleToggleTranslationCabin = useCallback(() => {
+        if (isMobile) {
+            updateUIState({
+                isChatOpen: false,
+                isWhiteboardOpen: false,
+                isQuizOpen: false,
+                isTranslationCabinOpen: !uiState.isTranslationCabinOpen,
+            });
+        } else {
+            // Desktop: Auto-close other sidebars when opening translation cabin
+            if (!uiState.isTranslationCabinOpen) {
+                updateUIState({
+                    isChatOpen: false,
+                    isWhiteboardOpen: false,
+                    isTranslationCabinOpen: true,
+                });
+            } else {
+                updateUIState({ isTranslationCabinOpen: false });
+            }
+        }
+    }, [isMobile, uiState.isTranslationCabinOpen, updateUIState]);
+
+    const handleToggleNetworkMonitor = useCallback(() => {
+        updateUIState({ isNetworkMonitorOpen: !uiState.isNetworkMonitorOpen });
+    }, [updateUIState, uiState.isNetworkMonitorOpen]);
+
+    const handleToggleLayoutTemplate = useCallback(() => {
+        updateUIState({ isOpenSelectLayoutTemplate: !uiState.isOpenSelectLayoutTemplate });
+    }, [updateUIState, uiState.isOpenSelectLayoutTemplate]);
+
+    const handleToggleRecording = useCallback(() => {
         toggleRecording();
-    };
+    }, [toggleRecording]);
 
-    const handleToggleBehaviorMonitoring = () => {
+    const handleToggleBehaviorMonitoring = useCallback(() => {
         if (streams.length > 2) {
             toggleBehaviorMonitoring();
         } else {
             toast.error("At least 3 participants are required for behavior monitoring.");
         }
-    };
+    }, [streams.length, toggleBehaviorMonitoring]);
 
-    const handleLeaveRoom = () => {
+    const handleLeaveRoom = useCallback(() => {
         sendLogsToServer();
         leaveRoom();
         navigate("/room");
-    };
+    }, [sendLogsToServer, leaveRoom, navigate]);
 
-    const handleToggleScreenShare = async () => {
+    const handleToggleScreenShare = useCallback(async () => {
         try {
             const success = await toggleScreenShare();
             if (!success) {
@@ -364,42 +438,21 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
             console.error("Error toggling screen share:", error);
             toast.error("Can't toggle screen share");
         }
-    };
-
-    const handleToggleTranslationCabin = () => {
-        if (isMobile) {
-            if (isChatOpen) setIsChatOpen(false);
-            if (isWhiteboardOpen) setIsWhiteboardOpen(false);
-            if (isQuizOpen) setIsQuizOpen(false);
-        } else {
-            // Desktop: Auto-close other sidebars when opening translation cabin
-            if (!isTranslationCabinOpen) {
-                setIsChatOpen(false);
-                setIsWhiteboardOpen(false);
-            }
-        }
-        setIsTranslationCabinOpen(!isTranslationCabinOpen);
-    };
+    }, [toggleScreenShare]);
 
     return (
         <div className='flex h-screen bg-gray-50 dark:bg-gray-900 relative'>
-            <SelectLayoutTemplate isOpen={isOpenSelectLayoutTemplate} onClose={() => setIsOpenSelectLayoutTemplate(false)} />
-            <LockRoomDialog
-                isOpen={isShowDialogPassword}
-                onClose={() => {
-                    setIsShowDialogPassword(false);
-                }}
-                onSetPassword={handleSetPassword}
-            />
-            {isNetworkMonitorOpen && <NetworkMonitorDialog isOpen={isNetworkMonitorOpen} onClose={() => setIsNetworkMonitorOpen(false)} transport={recvTransport} />}
-            {isVotingDialogOpen && <SecretVotingDialog isOpen={isVotingDialogOpen} onClose={() => setIsVotingDialogOpen(false)} roomId={roomId || ""} />}
-            <Chatbot isOpen={isChatboxOpen} onClose={() => setIsChatboxOpen(false)} roomId={roomId || ""} />
-            <div className={`relative flex-1 p-2 md:p-4 transition-all duration-300 ${(isChatOpen || isTranslationCabinOpen) && !isMobile ? "mr-[320px]" : ""}`}>
+            <SelectLayoutTemplate isOpen={uiState.isOpenSelectLayoutTemplate} onClose={() => updateUIState({ isOpenSelectLayoutTemplate: false })} />
+            <LockRoomDialog isOpen={uiState.isShowDialogPassword} onClose={() => updateUIState({ isShowDialogPassword: false })} onSetPassword={handleSetPassword} />
+            {uiState.isNetworkMonitorOpen && <NetworkMonitorDialog isOpen={uiState.isNetworkMonitorOpen} onClose={() => updateUIState({ isNetworkMonitorOpen: false })} transport={recvTransport} />}
+            {uiState.isVotingDialogOpen && <SecretVotingDialog isOpen={uiState.isVotingDialogOpen} onClose={() => updateUIState({ isVotingDialogOpen: false })} roomId={roomId || ""} />}
+            <Chatbot isOpen={uiState.isChatboxOpen} onClose={() => updateUIState({ isChatboxOpen: false })} roomId={roomId || ""} />
+            <div className={`relative flex-1 p-2 md:p-4 transition-all duration-300 ${(uiState.isChatOpen || uiState.isTranslationCabinOpen) && !isMobile ? "mr-[320px]" : ""}`}>
                 <div className='mb-2 md:mb-4 flex items-center justify-between relative'>
                     <div className='flex items-center gap-2'>
                         <h2 className='text-base md:text-lg font-semibold text-gray-900 dark:text-white'>{room.isOrganizationRoom ? <>(Organization Room)</> : <>Room ID: {roomId}</>}</h2>
                         {!room.isOrganizationRoom && (
-                            <Button variant='outline' size='icon' title='QR Code' onClick={() => setIsQRCodeOpen(true)} className=''>
+                            <Button variant='outline' size='icon' title='QR Code' onClick={() => updateUIState({ isQRCodeOpen: true })} className=''>
                                 <QrCode className='h-5 w-5' />
                             </Button>
                         )}
@@ -420,32 +473,28 @@ export const VideoCallHybrid = ({ roomId }: { roomId: string }) => {
                         <ParticipantsList roomId={roomId} togglePinUser={togglePinUser} handleKickUser={handleKickUser} users={users} />
                     </div>
                 </div>
-                <VideoGrid streams={streams} screenStreams={screenStreams} isVideoOff={isVideoOff} users={users || []} isMuted={isMuted} speakingPeers={Array.from(speakingPeers)} isSpeaking={isSpeaking} togglePinUser={togglePinUser} consumeTranslationStream={consumeTranslationStream} revertTranslationStream={revertTranslationStream} />
-                <VideoControls isMuted={isMuted} isVideoOff={isVideoOff} onToggleMute={handleToggleAudio} onToggleVideo={handleToggleVideo} onToggleChat={handleToggleChat} onToggleWhiteboard={handleToggleWhiteboard} onToggleScreenShare={handleToggleScreenShare} isScreenSharing={isScreenSharing} onToggleLockRoom={handleToggleLockRoom} onToggleNetworkMonitor={() => setIsNetworkMonitorOpen(!isNetworkMonitorOpen)} onToggleTranslationCabin={handleToggleTranslationCabin} onToggleVoting={handleToggleVoting} onToggleQuiz={handleToggleQuiz} onToggleRecording={handleToggleRecording} isRecording={isRecording} isProcessing={isProcessing} onLeaveRoom={handleLeaveRoom} onToggleBehaviorMonitoring={handleToggleBehaviorMonitoring} isCreator={room.isCreator} isMonitorActive={isMonitorActive} onToggleLayout={() => setIsOpenSelectLayoutTemplate(!isOpenSelectLayoutTemplate)} />
+                <VideoGrid streams={streams} screenStreams={screenStreams} isVideoOff={isVideoOff} users={users || []} isMuted={isMuted} speakingPeers={Array.from(speakingPeers)} isSpeaking={isSpeaking} togglePinUser={togglePinUser} removeTranslatedStream={removeTranslatedStream} />
+                <VideoControls isMuted={isMuted} isVideoOff={isVideoOff} onToggleMute={handleToggleAudio} onToggleVideo={handleToggleVideo} onToggleChat={handleToggleChat} onToggleWhiteboard={handleToggleWhiteboard} onToggleScreenShare={handleToggleScreenShare} isScreenSharing={isScreenSharing} onToggleLockRoom={handleToggleLockRoom} onToggleNetworkMonitor={handleToggleNetworkMonitor} onToggleTranslationCabin={handleToggleTranslationCabin} onToggleVoting={handleToggleVoting} onToggleQuiz={handleToggleQuiz} onToggleRecording={handleToggleRecording} isRecording={isRecording} isProcessing={isProcessing} onLeaveRoom={handleLeaveRoom} onToggleBehaviorMonitoring={handleToggleBehaviorMonitoring} isCreator={room.isCreator} isMonitorActive={isMonitorActive} onToggleLayout={handleToggleLayoutTemplate} />
             </div>{" "}
-            {isTranslationCabinOpen && (
+            {uiState.isTranslationCabinOpen && (
                 <TranslationCabinSidebar
-                    isOpen={isTranslationCabinOpen}
-                    setIsOpen={setIsTranslationCabinOpen}
+                    isOpen={uiState.isTranslationCabinOpen}
+                    setIsOpen={(isOpen) => updateUIState({ isTranslationCabinOpen: isOpen })}
                     roomId={roomId || ""}
                     availableUsers={users.map((user) => ({
                         id: user.peerId,
                         username: user.peerId,
                     }))}
                     onConsumeTranslation={(streamId) => consumeTranslationStream(streamId)}
+                    onRevertTranslation={(targetUserId) => revertTranslationStream(targetUserId)}
                 />
             )}
-            {isChatOpen && <ChatSidebar isOpen={isChatOpen} setIsOpen={setIsChatOpen} roomId={roomId} />}
-            <QRCodeDialog isOpen={isQRCodeOpen} onClose={() => setIsQRCodeOpen(false)} roomId={roomId || ""} /> {isWhiteboardOpen && <Whiteboard roomId={roomId} isOpen={isWhiteboardOpen} onClose={() => setIsWhiteboardOpen(false)} users={hybridUsers || []} />}
-            {isQuizOpen && (
-                <QuizSidebar
-                    roomId={roomId || ""}
-                    isOpen={isQuizOpen}
-                    onClose={() => {
-                        setIsQuizOpen(false);
-                    }}
-                />
-            )}
+            {uiState.isChatOpen && <ChatSidebar isOpen={uiState.isChatOpen} setIsOpen={(isOpen) => updateUIState({ isChatOpen: isOpen })} roomId={roomId} />}
+            <QRCodeDialog isOpen={uiState.isQRCodeOpen} onClose={() => updateUIState({ isQRCodeOpen: false })} roomId={roomId || ""} />
+            {uiState.isWhiteboardOpen && <Whiteboard roomId={roomId} isOpen={uiState.isWhiteboardOpen} onClose={() => updateUIState({ isWhiteboardOpen: false })} users={hybridUsers || []} />}
+            {uiState.isQuizOpen && <QuizSidebar roomId={roomId || ""} isOpen={uiState.isQuizOpen} onClose={() => updateUIState({ isQuizOpen: false })} />}
         </div>
     );
-};
+});
+
+VideoCallHybrid.displayName = "VideoCallHybrid";

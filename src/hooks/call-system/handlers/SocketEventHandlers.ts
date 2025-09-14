@@ -18,13 +18,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     private producerManager: ProducerManager;
     private transportManager: TransportManager;
 
-    constructor(
-        context: CallSystemContext,
-        streamManager: StreamManager,
-        consumerManager: ConsumerManager,
-        producerManager: ProducerManager,
-        transportManager: TransportManager
-    ) {
+    constructor(context: CallSystemContext, streamManager: StreamManager, consumerManager: ConsumerManager, producerManager: ProducerManager, transportManager: TransportManager) {
         this.context = context;
         this.streamManager = streamManager;
         this.consumerManager = consumerManager;
@@ -65,12 +59,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             const metadata = stream.metadata || {};
 
             // Check if this is a screen share stream
-            const isScreenShare =
-                metadata.isScreenShare ||
-                metadata.type === "screen" ||
-                metadata.type === "screen_audio" ||
-                streamId.includes("_screen_") ||
-                streamId.includes("_screen_audio_");
+            const isScreenShare = metadata.isScreenShare || metadata.type === "screen" || metadata.type === "screen_audio" || streamId.includes("_screen_") || streamId.includes("_screen_audio_");
 
             // Skip our own non-screen streams
             if (publisherId === this.context.room.username && !isScreenShare) {
@@ -78,11 +67,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             }
 
             // Validate streamId
-            if (
-                !streamId ||
-                streamId === "undefined" ||
-                typeof streamId !== "string"
-            ) {
+            if (!streamId || streamId === "undefined" || typeof streamId !== "string") {
                 continue;
             }
 
@@ -92,18 +77,14 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             }
 
             // Use WebSocket consume instead of HTTP for consistency
-            if (
-                this.context.refs.recvTransportRef.current &&
-                this.context.refs.socketRef.current
-            ) {
+            if (this.context.refs.recvTransportRef.current && this.context.refs.socketRef.current) {
                 try {
                     // Mark as consuming
                     this.streamManager.markStreamAsConsuming(streamId);
 
                     this.context.refs.socketRef.current.emit("sfu:consume", {
                         streamId: streamId,
-                        transportId:
-                            this.context.refs.recvTransportRef.current.id,
+                        transportId: this.context.refs.recvTransportRef.current.id,
                     });
                 } catch (error) {
                     // Remove from consuming list on error
@@ -116,18 +97,12 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     handleStreamAdded = async (data: any) => {
         // Normalize stream properties - handle both streamId and stream_id
         const streamId = data.streamId || data.stream_id || data.id;
-        const publisherId =
-            data.publisherId || data.publisher_id || data.peerId;
+        const publisherId = data.publisherId || data.publisher_id || data.peerId;
         const metadata = data.metadata || {};
 
         // Skip own streams - but allow own screen share streams to be added
         const isOwnStream = publisherId === this.context.room.username;
-        const isScreenShare =
-            metadata.isScreenShare ||
-            metadata.type === "screen" ||
-            metadata.type === "screen_audio" ||
-            (streamId && streamId.includes("_screen_")) ||
-            (streamId && streamId.includes("_screen_audio_"));
+        const isScreenShare = metadata.isScreenShare || metadata.type === "screen" || metadata.type === "screen_audio" || (streamId && streamId.includes("_screen_")) || (streamId && streamId.includes("_screen_audio_"));
 
         if (isOwnStream && !isScreenShare) {
             return;
@@ -141,11 +116,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         }
 
         // Validate streamId
-        if (
-            !streamId ||
-            streamId === "undefined" ||
-            typeof streamId !== "string"
-        ) {
+        if (!streamId || streamId === "undefined" || typeof streamId !== "string") {
             return;
         }
 
@@ -154,10 +125,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             return;
         }
 
-        if (
-            !this.context.refs.recvTransportRef.current ||
-            !this.context.refs.socketRef.current
-        ) {
+        if (!this.context.refs.recvTransportRef.current || !this.context.refs.socketRef.current) {
             // Add to pending streams queue
             this.streamManager.addToPendingStreams({
                 streamId: streamId,
@@ -167,28 +135,15 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             });
 
             // Try to consume immediately if we have receive transport but it's just not connected yet
-            if (
-                this.context.refs.recvTransportRef.current &&
-                this.context.refs.socketRef.current
-            ) {
+            if (this.context.refs.recvTransportRef.current && this.context.refs.socketRef.current) {
                 setTimeout(() => {
-                    if (
-                        !this.streamManager.isStreamBeingConsumed(streamId) &&
-                        streamId &&
-                        streamId !== "undefined" &&
-                        typeof streamId === "string"
-                    ) {
+                    if (!this.streamManager.isStreamBeingConsumed(streamId) && streamId && streamId !== "undefined" && typeof streamId === "string") {
                         try {
                             this.streamManager.markStreamAsConsuming(streamId);
-                            this.context.refs.socketRef.current?.emit(
-                                "sfu:consume",
-                                {
-                                    streamId: streamId,
-                                    transportId:
-                                        this.context.refs.recvTransportRef
-                                            .current!.id,
-                                }
-                            );
+                            this.context.refs.socketRef.current?.emit("sfu:consume", {
+                                streamId: streamId,
+                                transportId: this.context.refs.recvTransportRef.current!.id,
+                            });
                         } catch (error) {
                             this.streamManager.removeFromConsuming(streamId);
                         }
@@ -215,11 +170,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     };
 
     handleStreamMetadataUpdated = (data: any) => {
-        this.streamManager.updateStreamMetadata(
-            data.streamId,
-            data.metadata,
-            data.publisherId
-        );
+        this.streamManager.updateStreamMetadata(data.streamId, data.metadata, data.publisherId);
     };
 
     // Consumer handlers
@@ -242,9 +193,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             return;
         }
 
-        const deviceInitialized = await this.transportManager.initializeDevice(
-            data.routerRtpCapabilities
-        );
+        const deviceInitialized = await this.transportManager.initializeDevice(data.routerRtpCapabilities);
 
         if (deviceInitialized) {
             this.transportManager.createTransports();
@@ -254,10 +203,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Add timeout fallback in case sfu:rtp-capabilities-set is not received
         setTimeout(() => {
-            if (
-                !this.context.refs.sendTransportRef.current &&
-                !this.context.refs.recvTransportRef.current
-            ) {
+            if (!this.context.refs.sendTransportRef.current && !this.context.refs.recvTransportRef.current) {
                 this.handleRtpCapabilitiesSet();
             }
         }, 3000);
@@ -275,21 +221,12 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         this.transportManager.handleTransportConnected(data);
 
         // Process pending streams when receive transport is connected
-        if (
-            this.context.refs.recvTransportRef.current &&
-            this.context.refs.recvTransportRef.current.id === data.transportId
-        ) {
+        if (this.context.refs.recvTransportRef.current && this.context.refs.recvTransportRef.current.id === data.transportId) {
             this.streamManager.processPendingStreams();
         }
 
         // Also trigger auto-publish if we have media ready
-        if (
-            this.context.refs.sendTransportRef.current &&
-            this.context.refs.sendTransportRef.current.id ===
-                data.transportId &&
-            this.context.refs.localStreamRef.current &&
-            this.context.refs.producersRef.current.size === 0
-        ) {
+        if (this.context.refs.sendTransportRef.current && this.context.refs.sendTransportRef.current.id === data.transportId && this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0) {
             setTimeout(async () => {
                 await this.producerManager.publishTracks();
             }, 500);
@@ -302,13 +239,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     };
 
     // Pin/Unpin response handlers
-    handlePinResponse = (data: {
-        success: boolean;
-        message: string;
-        consumersCreated?: any[];
-        alreadyPriority?: boolean;
-        existingConsumer?: boolean;
-    }) => {
+    handlePinResponse = (data: { success: boolean; message: string; consumersCreated?: any[]; alreadyPriority?: boolean; existingConsumer?: boolean }) => {
         if (data.success) {
             if (data.alreadyPriority) {
                 toast.info(`User is already in priority view`);
@@ -321,12 +252,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         }
     };
 
-    handleUnpinResponse = (data: {
-        success: boolean;
-        message: string;
-        consumersRemoved?: string[];
-        stillInPriority?: boolean;
-    }) => {
+    handleUnpinResponse = (data: { success: boolean; message: string; consumersRemoved?: string[]; stillInPriority?: boolean }) => {
         if (data.success) {
             if (data.stillInPriority) {
                 toast.info(`User unpinned but still in priority view`);
@@ -339,30 +265,18 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     };
 
     // Broadcast event handlers (when other users pin/unpin)
-    handleUserPinned = (data: {
-        pinnerPeerId: string;
-        pinnedPeerId: string;
-        roomId: string;
-    }) => {
+    handleUserPinned = (data: { pinnerPeerId: string; pinnedPeerId: string; roomId: string }) => {
         // Optional: Show notification when someone else pins a user
         console.log(`${data.pinnerPeerId} pinned ${data.pinnedPeerId}`);
     };
 
-    handleUserUnpinned = (data: {
-        unpinnerPeerId: string;
-        unpinnedPeerId: string;
-        roomId: string;
-    }) => {
+    handleUserUnpinned = (data: { unpinnerPeerId: string; unpinnedPeerId: string; roomId: string }) => {
         // Optional: Show notification when someone else unpins a user
         console.log(`${data.unpinnerPeerId} unpinned ${data.unpinnedPeerId}`);
     };
 
     // Legacy handlers (keeping for compatibility)
-    handlePinSuccess = (data: {
-        pinnedPeerId: string;
-        consumersCreated: any[];
-        alreadyPriority: boolean;
-    }) => {
+    handlePinSuccess = (data: { pinnedPeerId: string; consumersCreated: any[]; alreadyPriority: boolean }) => {
         if (data.alreadyPriority) {
             toast.info(`${data.pinnedPeerId} is already in priority view`);
         } else {
@@ -380,11 +294,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         toast.error(`Failed to pin user: ${data.message}`);
     };
 
-    handleUnpinSuccess = (data: {
-        unpinnedPeerId: string;
-        consumersRemoved: string[];
-        stillInPriority: boolean;
-    }) => {
+    handleUnpinSuccess = (data: { unpinnedPeerId: string; consumersRemoved: string[]; stillInPriority: boolean }) => {
         if (data.stillInPriority) {
             toast.info(`${data.unpinnedPeerId} is still in priority view`);
         } else {
@@ -392,11 +302,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
             // Remove streams if consumers were removed
             if (data.consumersRemoved && data.consumersRemoved.length > 0) {
-                this.context.setters.setStreams((prev) =>
-                    prev.filter(
-                        (stream) => !stream.id.includes(data.unpinnedPeerId)
-                    )
-                );
+                this.context.setters.setStreams((prev) => prev.filter((stream) => !stream.id.includes(data.unpinnedPeerId)));
             }
         }
 
@@ -440,27 +346,17 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         toast.error(`Failed to unlock room: ${data.message}`);
     };
 
-    handleRoomLocked = (data: {
-        roomId: string;
-        lockedBy: string;
-        message: string;
-    }) => {
+    handleRoomLocked = (data: { roomId: string; lockedBy: string; message: string }) => {
         toast.info(`Room locked by ${data.lockedBy}`);
     };
 
-    handleRoomUnlocked = (data: {
-        roomId: string;
-        unlockedBy: string;
-        message: string;
-    }) => {
+    handleRoomUnlocked = (data: { roomId: string; unlockedBy: string; message: string }) => {
         toast.info(`Room unlocked by ${data.unlockedBy}`);
     };
 
     // ENHANCED: Speaking activity handlers for visual indicators
     handleUserSpeaking = (data: { peerId: string }) => {
-        console.log(
-            `[SocketEventHandlers] User ${data.peerId} started speaking`
-        );
+        console.log(`[SocketEventHandlers] User ${data.peerId} started speaking`);
 
         // Add user to speaking peers set for visual indicators
         this.context.setters.setSpeakingPeers((prev) => {
@@ -477,16 +373,12 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
                 newSet.delete(data.peerId);
                 return newSet;
             });
-            console.log(
-                `[SocketEventHandlers] Auto-removed speaking indicator for ${data.peerId}`
-            );
+            console.log(`[SocketEventHandlers] Auto-removed speaking indicator for ${data.peerId}`);
         }, 3000);
     };
 
     handleUserStoppedSpeaking = (data: { peerId: string }) => {
-        console.log(
-            `[SocketEventHandlers] User ${data.peerId} stopped speaking`
-        );
+        console.log(`[SocketEventHandlers] User ${data.peerId} stopped speaking`);
 
         // Remove user from speaking peers set
         this.context.setters.setSpeakingPeers((prev) => {
@@ -505,6 +397,28 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         this.streamManager.removeScreenShareStreams(data.peerId);
     };
 
+    // Translation cabin handlers
+    handleTranslationCabinUpdate = (data: { action: "created" | "destroyed"; roomId: string; sourceUserId: string; targetUserId: string; sourceLanguage: string; targetLanguage: string }) => {
+        if (data.action === "destroyed") {
+            // Revert translation stream back to original audio
+            this.consumerManager.revertTranslationStream(data.targetUserId);
+
+            // Show notification
+            if (data.targetUserId === this.context.room.username) {
+                toast.info(`Translation from ${data.sourceUserId} has ended`);
+            } else {
+                toast.info(`Translation for ${data.targetUserId} has ended`);
+            }
+        } else if (data.action === "created") {
+            // Show notification for new translation
+            if (data.targetUserId === this.context.room.username) {
+                toast.info(`Translation from ${data.sourceUserId} started`);
+            } else {
+                toast.info(`Translation for ${data.targetUserId} started`);
+            }
+        }
+    };
+
     /**
      * Register all event handlers with socket
      */
@@ -520,10 +434,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // Stream handlers
         socket.on("sfu:streams", this.handleStreams);
         socket.on("sfu:stream-added", this.handleStreamAdded);
-        socket.on(
-            "sfu:stream-metadata-updated",
-            this.handleStreamMetadataUpdated
-        );
+        socket.on("sfu:stream-metadata-updated", this.handleStreamMetadataUpdated);
         socket.on("sfu:stream-removed", (data: any) => {
             const streamId = data.streamId || data.stream_id;
             if (streamId) {
@@ -584,6 +495,9 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // Screen share handlers
         socket.on("sfu:screen-share-started", this.handleScreenShareStarted);
         socket.on("sfu:screen-share-stopped", this.handleScreenShareStopped);
+
+        // Translation cabin handlers
+        socket.on("translation:cabin-update", this.handleTranslationCabinUpdate);
     };
 
     /**
@@ -601,10 +515,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // Stream handlers
         socket.off("sfu:streams", this.handleStreams);
         socket.off("sfu:stream-added", this.handleStreamAdded);
-        socket.off(
-            "sfu:stream-metadata-updated",
-            this.handleStreamMetadataUpdated
-        );
+        socket.off("sfu:stream-metadata-updated", this.handleStreamMetadataUpdated);
         socket.off("sfu:stream-removed");
 
         // Consumer handlers
@@ -651,5 +562,8 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // Screen share handlers
         socket.off("sfu:screen-share-started", this.handleScreenShareStarted);
         socket.off("sfu:screen-share-stopped", this.handleScreenShareStopped);
+
+        // Translation cabin handlers
+        socket.off("translation:cabin-update", this.handleTranslationCabinUpdate);
     };
 }

@@ -412,6 +412,14 @@ export function useCallRefactored(roomId: string, password?: string) {
         [consumerManager]
     );
 
+    // Simple function to remove translated stream from list
+    const removeTranslatedStream = useCallback(
+        (targetUserId: string) => {
+            setStreams((prevStreams) => prevStreams.filter((stream) => !(stream.id === `remote-${targetUserId}-translated` || (stream.metadata?.isTranslation && stream.metadata?.targetUserId === targetUserId))));
+        },
+        [setStreams]
+    );
+
     return {
         // State
         streams,
@@ -444,6 +452,7 @@ export function useCallRefactored(roomId: string, password?: string) {
         // Translation Actions
         consumeTranslationStream,
         revertTranslationStream,
+        removeTranslatedStream,
 
         // VAD Actions
         startVADListening: () => vadManager.startListening(),

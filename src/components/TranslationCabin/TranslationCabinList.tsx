@@ -1,4 +1,4 @@
-import { useDestroyCabin } from "@/hooks/translate-cabin/use-destroy-cabin";
+import { useDestroyCabin } from "@/hooks/translate-cabin/use-translation-socket";
 import { TranslationCabin } from "@/interfaces";
 import { SUPPORTED_LANGUAGES_TRANSLATION } from "@/lib/lang";
 import React from "react";
@@ -9,42 +9,17 @@ interface TranslationCabinListProps {
     availableUsers: Array<{ id: string; username: string }>;
     sourceUserId: string;
     onCabinDestroyed?: () => void;
+    onRevertTranslation?: (targetUserId: string) => void;
 }
 
-export const TranslationCabinList: React.FC<TranslationCabinListProps> = ({ roomId, cabins, availableUsers, sourceUserId, onCabinDestroyed }) => {
-    const { destroyCabin, loading } = useDestroyCabin();
+export const TranslationCabinList: React.FC<TranslationCabinListProps> = ({ roomId, cabins, availableUsers, sourceUserId, onCabinDestroyed, onRevertTranslation }) => {
+    const { destroyCabin, loading } = useDestroyCabin(roomId, onRevertTranslation);
     const getLanguageName = (code: string) => {
         return SUPPORTED_LANGUAGES_TRANSLATION.find((lang) => lang.code === code)?.name || code;
     };
 
     const getUserName = (userId: string) => {
         return availableUsers.find((user) => user.id === userId)?.username || userId;
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "active":
-                return "#059669";
-            case "stopped":
-                return "#dc2626";
-            case "error":
-                return "#ea580c";
-            default:
-                return "#6b7280";
-        }
-    };
-
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case "active":
-                return "●";
-            case "stopped":
-                return "■";
-            case "error":
-                return "⚠";
-            default:
-                return "○";
-        }
     };
 
     const handleDestroy = async (index: number) => {
