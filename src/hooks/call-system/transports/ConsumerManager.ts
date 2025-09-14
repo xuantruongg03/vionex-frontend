@@ -49,40 +49,6 @@ export class ConsumerManager {
         }
 
         try {
-            // Enhanced validation of RTP parameters before consumer creation
-            if (!data.rtpParameters || !data.rtpParameters.codecs) {
-                console.error("[ConsumerManager] Invalid RTP parameters:", data);
-                throw new Error("Invalid RTP parameters: missing codecs");
-            }
-
-            // Validate codec compatibility
-            const primaryCodec = data.rtpParameters.codecs[0];
-            if (!primaryCodec || !primaryCodec.mimeType) {
-                console.error("[ConsumerManager] Invalid primary codec:", primaryCodec);
-                throw new Error("Invalid primary codec in RTP parameters");
-            }
-
-            // Log codec information for debugging
-            console.log(`[ConsumerManager] Creating consumer for ${streamId}`, {
-                kind: data.kind,
-                codec: primaryCodec.mimeType,
-                payloadType: primaryCodec.payloadType,
-                clockRate: primaryCodec.clockRate,
-                parameters: primaryCodec.parameters,
-            });
-
-            // Check for known problematic H.264 profiles
-            if (primaryCodec.mimeType.toLowerCase() === 'video/h264' && 
-                primaryCodec.parameters?.['profile-level-id']) {
-                const profileLevel = primaryCodec.parameters['profile-level-id'];
-                console.log(`[ConsumerManager] H.264 profile-level-id: ${profileLevel}`);
-                
-                // Warn about high profiles that might cause issues
-                if (profileLevel.startsWith('4d') || profileLevel.startsWith('64')) {
-                    console.warn(`[ConsumerManager] High H.264 profile detected (${profileLevel}), may cause compatibility issues`);
-                }
-            }
-
             const consumer = await this.context.refs.recvTransportRef.current.consume({
                 id: data.consumerId,
                 producerId: data.producerId,
@@ -208,52 +174,6 @@ export class ConsumerManager {
             }
         } catch (error) {
             console.error("[Error ConsumerManager]: ", error);
-            
-            // Enhanced error handling with specific error types
-            if (error.message?.includes('setRemoteDescription') || 
-                error.message?.includes('Failed to set recv parameters')) {
-                console.error("[ConsumerManager] WebRTC setRemoteDescription error - codec mismatch or RTP parameter issue", {
-                    streamId,
-                    error: error.message,
-                    rtpParameters: data.rtpParameters,
-                    codec: data.rtpParameters?.codecs?.[0]?.mimeType,
-                    profileLevelId: data.rtpParameters?.codecs?.[0]?.parameters?.['profile-level-id'],
-                });
-                
-                // Emit specific error to notify UI
-                this.context.refs.socketRef.current?.emit('sfu:consumer-error', {
-                    streamId,
-                    error: 'Video codec not supported by your device',
-                    errorType: 'RTP_PARAMETERS_MISMATCH',
-                    details: {
-                        codec: data.rtpParameters?.codecs?.[0]?.mimeType,
-                        profileLevelId: data.rtpParameters?.codecs?.[0]?.parameters?.['profile-level-id']
-                    }
-                });
-            } else if (error.message?.includes('InvalidAccessError')) {
-                console.error("[ConsumerManager] WebRTC InvalidAccessError - transport or connection issue", {
-                    streamId,
-                    error: error.message,
-                });
-                
-                // Try to request stream refresh
-                this.context.refs.socketRef.current?.emit('sfu:request-stream-refresh', {
-                    streamId,
-                    reason: 'InvalidAccessError'
-                });
-            } else if (error.message?.includes('OperationError')) {
-                console.error("[ConsumerManager] WebRTC OperationError - likely codec negotiation failure", {
-                    streamId,
-                    error: error.message,
-                });
-                
-                this.context.refs.socketRef.current?.emit('sfu:consumer-error', {
-                    streamId,
-                    error: 'Unable to decode video stream',
-                    errorType: 'CODEC_NEGOTIATION_FAILED'
-                });
-            }
-
             // Clean up on error
             this.streamManager.removeFromConsuming(streamId);
 
