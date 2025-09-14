@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
 
 const WEBSOCKET_URL = "http://localhost:3005";
-const HTTP_API_URL = "http://localhost:3005/api";
+const HTTP_API_URL = "http://localhost:3005";
 
 class WebSocketService {
     private socket: Socket | null = null;
