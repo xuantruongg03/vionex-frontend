@@ -271,7 +271,10 @@ export class TransportManager {
 
         // Initialize local media when send transport is ready
         transport.on("connectionstatechange", (state) => {
+            console.log(`[TransportManager] Send transport connection state: ${state}`);
+            
             if (state === "connected") {
+                console.log("[TransportManager] Send transport successfully connected");
                 if (!this.context.refs.localStreamRef.current) {
                     setTimeout(async () => {
                         if (this.mediaManager) {
@@ -285,6 +288,13 @@ export class TransportManager {
                         }
                     }, 500);
                 }
+            } else if (state === "failed") {
+                console.error(`[TransportManager] Send transport failed`);
+                this.context.setters.setError(`Connection failed: ${state}`);
+            } else if (state === "disconnected") {
+                console.warn(`[TransportManager] Send transport disconnected`);
+            } else if (state === "connecting") {
+                console.log(`[TransportManager] Send transport connecting...`);
             }
         });
     };

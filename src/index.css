@@ -165,12 +165,16 @@
   }
 }
 
-/* Google Login iframe width fix */
-.google-login-wrapper iframe {
-  width: 100% !important;
-  min-width: 100% !important;
+/* Google Login button width fix using transform scale */
+.google-login-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  overflow: hidden;
 }
 
-.google-login-wrapper div {
-  width: 100% !important;
+.google-login-wrapper > div {
+  transform: scaleX(1.69);
+  transform-origin: center;
+  width: 236px;
 }
