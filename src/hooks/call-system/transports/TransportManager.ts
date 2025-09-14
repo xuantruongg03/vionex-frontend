@@ -35,8 +35,27 @@ export class TransportManager {
 
         if (!this.context.refs.deviceRef.current.loaded) {
             try {
+                // Prioritize H.264 over VP8 by reordering codecs
+                const modifiedCapabilities = { ...routerRtpCapabilities };
+                if (modifiedCapabilities.codecs) {
+                    // Separate H.264 and other video codecs
+                    const h264Codecs = modifiedCapabilities.codecs.filter(codec => 
+                        codec.kind === 'video' && codec.mimeType.toLowerCase().includes('h264')
+                    );
+                    const otherCodecs = modifiedCapabilities.codecs.filter(codec => 
+                        !(codec.kind === 'video' && codec.mimeType.toLowerCase().includes('h264'))
+                    );
+                    
+                    // Put H.264 codecs first
+                    modifiedCapabilities.codecs = [...h264Codecs, ...otherCodecs];
+                    
+                    console.log('[TransportManager] Prioritizing H.264 codecs. Video codecs order:', 
+                        modifiedCapabilities.codecs.filter(c => c.kind === 'video').map(c => c.mimeType)
+                    );
+                }
+
                 await this.context.refs.deviceRef.current.load({
-                    routerRtpCapabilities,
+                    routerRtpCapabilities: modifiedCapabilities,
                 });
 
                 // Now send device RTP capabilities to SFU
