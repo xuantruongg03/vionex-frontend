@@ -35,27 +35,8 @@ export class TransportManager {
 
         if (!this.context.refs.deviceRef.current.loaded) {
             try {
-                // Prioritize H.264 over VP8 by reordering codecs
-                const modifiedCapabilities = { ...routerRtpCapabilities };
-                if (modifiedCapabilities.codecs) {
-                    // Separate H.264 and other video codecs
-                    const h264Codecs = modifiedCapabilities.codecs.filter(codec => 
-                        codec.kind === 'video' && codec.mimeType.toLowerCase().includes('h264')
-                    );
-                    const otherCodecs = modifiedCapabilities.codecs.filter(codec => 
-                        !(codec.kind === 'video' && codec.mimeType.toLowerCase().includes('h264'))
-                    );
-                    
-                    // Put H.264 codecs first
-                    modifiedCapabilities.codecs = [...h264Codecs, ...otherCodecs];
-                    
-                    console.log('[TransportManager] Prioritizing H.264 codecs. Video codecs order:', 
-                        modifiedCapabilities.codecs.filter(c => c.kind === 'video').map(c => c.mimeType)
-                    );
-                }
-
                 await this.context.refs.deviceRef.current.load({
-                    routerRtpCapabilities: modifiedCapabilities,
+                    routerRtpCapabilities,
                 });
 
                 // Now send device RTP capabilities to SFU
@@ -290,10 +271,7 @@ export class TransportManager {
 
         // Initialize local media when send transport is ready
         transport.on("connectionstatechange", (state) => {
-            console.log(`[TransportManager] Send transport connection state: ${state}`);
-            
             if (state === "connected") {
-                console.log("[TransportManager] Send transport successfully connected");
                 if (!this.context.refs.localStreamRef.current) {
                     setTimeout(async () => {
                         if (this.mediaManager) {
@@ -307,13 +285,6 @@ export class TransportManager {
                         }
                     }, 500);
                 }
-            } else if (state === "failed") {
-                console.error(`[TransportManager] Send transport failed`);
-                this.context.setters.setError(`Connection failed: ${state}`);
-            } else if (state === "disconnected") {
-                console.warn(`[TransportManager] Send transport disconnected`);
-            } else if (state === "connecting") {
-                console.log(`[TransportManager] Send transport connecting...`);
             }
         });
     };
