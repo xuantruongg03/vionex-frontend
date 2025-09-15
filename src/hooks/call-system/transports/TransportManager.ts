@@ -29,6 +29,9 @@ export class TransportManager {
     initializeDevice = async (
         routerRtpCapabilities: mediasoupTypes.RtpCapabilities
     ) => {
+        console.log("[TransportManager] Initializing device with router capabilities containing", 
+            routerRtpCapabilities?.codecs?.length || 0, "codecs");
+            
         if (!this.context.refs.deviceRef.current) {
             this.context.refs.deviceRef.current = new Device();
         }
@@ -38,6 +41,9 @@ export class TransportManager {
                 await this.context.refs.deviceRef.current.load({
                     routerRtpCapabilities,
                 });
+
+                console.log("[TransportManager] Device loaded successfully. Device RTP capabilities:", 
+                    this.context.refs.deviceRef.current.rtpCapabilities?.codecs?.map((c: any) => c.mimeType));
 
                 // Now send device RTP capabilities to SFU
                 this.context.refs.socketRef.current?.emit(
@@ -50,10 +56,11 @@ export class TransportManager {
 
                 return true;
             } catch (error) {
-                console.error("Error loading device:", error);
+                console.error("Error loading device with router capabilities:", error);
                 return false;
             }
         } else {
+            console.log("[TransportManager] Device already loaded, sending capabilities to SFU");
             // Now send device RTP capabilities to SFU
             this.context.refs.socketRef.current?.emit(
                 "sfu:set-rtp-capabilities",
@@ -70,6 +77,14 @@ export class TransportManager {
      * Create transports after RTP capabilities are set
      */
     createTransports = () => {
+        // Guard: Ensure device is loaded before creating transports
+        if (!this.context.refs.deviceRef.current?.loaded) {
+            console.error("[TransportManager] Cannot create transports - device not loaded with capabilities");
+            return;
+        }
+
+        console.log("[TransportManager] Creating transports - device is ready");
+        
         // Now create transports
         this.context.refs.socketRef.current?.emit("sfu:create-transport", {
             roomId: this.context.roomId,
@@ -87,6 +102,12 @@ export class TransportManager {
      */
     createTransport = async (transportInfo: any) => {
         try {
+            // Guard: Ensure device is loaded before creating any transport
+            if (!this.context.refs.deviceRef.current?.loaded) {
+                console.error("[TransportManager] Cannot create transport - device not loaded with capabilities");
+                throw new Error("Device not loaded with router capabilities");
+            }
+
             if (!this.context.refs.deviceRef.current) {
                 throw new Error("Device not initialized");
             }
@@ -97,6 +118,8 @@ export class TransportManager {
             if (!actualTransportInfo.id) {
                 throw new Error("Transport info missing required 'id' field");
             }
+
+            console.log("[TransportManager] Creating", isProducer ? "send" : "receive", "transport with device loaded");
 
             const transport = isProducer
                 ? this.context.refs.deviceRef.current.createSendTransport(

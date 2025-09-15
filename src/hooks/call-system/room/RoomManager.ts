@@ -73,18 +73,35 @@ export class RoomManager {
                 userInfo: this.context.room.userInfo, // Add user info
             });
 
-            // Wait for join success and router capabilities
+            // Wait for both join success AND router capabilities
             const joinSuccess = await new Promise<boolean>(
                 (resolve, reject) => {
+                    let joinReceived = false;
+                    let capabilitiesReceived = false;
+                    
                     const timeout = setTimeout(() => {
-                        reject(new Error("Join timeout"));
-                    }, 10000);
+                        reject(new Error("Join timeout - missing join-success or router-capabilities"));
+                    }, 15000);
+
+                    const checkCompletion = () => {
+                        if (joinReceived && capabilitiesReceived) {
+                            clearTimeout(timeout);
+                            this.context.setters.setIsConnected(true);
+                            this.context.setters.setIsJoined(true);
+                            resolve(true);
+                        }
+                    };
 
                     const handleJoinSuccess = () => {
-                        clearTimeout(timeout);
-                        this.context.setters.setIsConnected(true);
-                        this.context.setters.setIsJoined(true);
-                        resolve(true);
+                        console.log("[RoomManager] Received sfu:join-success");
+                        joinReceived = true;
+                        checkCompletion();
+                    };
+
+                    const handleRouterCapabilities = (data: any) => {
+                        console.log("[RoomManager] Received sfu:router-capabilities");
+                        capabilitiesReceived = true;
+                        checkCompletion();
                     };
 
                     const handleJoinError = (error: any) => {
@@ -95,6 +112,10 @@ export class RoomManager {
                     this.context.refs.socketRef.current?.once(
                         "sfu:join-success",
                         handleJoinSuccess
+                    );
+                    this.context.refs.socketRef.current?.once(
+                        "sfu:router-capabilities", 
+                        handleRouterCapabilities
                     );
                     this.context.refs.socketRef.current?.once(
                         "sfu:error",

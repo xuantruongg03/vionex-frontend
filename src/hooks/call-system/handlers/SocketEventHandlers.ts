@@ -51,6 +51,25 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             return;
         }
 
+        // Guard: Only process streams if device is ready
+        if (!this.context.refs.deviceRef.current?.loaded) {
+            console.log("[SocketEventHandlers] Device not ready - adding streams to pending queue");
+            streams.forEach(stream => {
+                const streamId = stream.streamId || stream.stream_id;
+                const publisherId = stream.publisherId || stream.publisher_id;
+                
+                if (streamId && publisherId !== this.context.room.username) {
+                    this.streamManager.addToPendingStreams({
+                        streamId,
+                        publisherId,
+                        metadata: stream.metadata || {},
+                        rtpParameters: stream.rtpParameters,
+                    });
+                }
+            });
+            return;
+        }
+
         // Process each stream that's not from the current user
         for (const stream of streams) {
             // Normalize stream properties - handle both streamId and stream_id
@@ -90,6 +109,15 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
                     // Remove from consuming list on error
                     this.streamManager.removeFromConsuming(streamId);
                 }
+            } else {
+                // Add to pending if no transport yet
+                console.log("[SocketEventHandlers] No receive transport - adding stream to pending:", streamId);
+                this.streamManager.addToPendingStreams({
+                    streamId,
+                    publisherId,
+                    metadata,
+                    rtpParameters: stream.rtpParameters,
+                });
             }
         }
     };
@@ -125,8 +153,21 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             return;
         }
 
+        // Guard: Check if device is ready for consuming
+        if (!this.context.refs.deviceRef.current?.loaded) {
+            console.log("[SocketEventHandlers] Device not ready for stream consumption - adding to pending:", streamId);
+            this.streamManager.addToPendingStreams({
+                streamId: streamId,
+                publisherId: publisherId,
+                metadata: data.metadata,
+                rtpParameters: data.rtpParameters,
+            });
+            return;
+        }
+
         if (!this.context.refs.recvTransportRef.current || !this.context.refs.socketRef.current) {
             // Add to pending streams queue
+            console.log("[SocketEventHandlers] No receive transport - adding stream to pending:", streamId);
             this.streamManager.addToPendingStreams({
                 streamId: streamId,
                 publisherId: publisherId,
@@ -188,28 +229,50 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
     // Transport handlers
     handleRouterCapabilities = async (data: { routerRtpCapabilities: any }) => {
+        console.log("[SocketEventHandlers] Processing router capabilities with codecs:", 
+            data.routerRtpCapabilities?.codecs?.map((c: any) => c.mimeType));
+            
         if (!data.routerRtpCapabilities) {
-            console.warn("No router RTP capabilities in data");
+            console.warn("[SocketEventHandlers] No router RTP capabilities in data");
             return;
         }
+
+        // Validate that capabilities contain codec information
+        if (!data.routerRtpCapabilities.codecs || data.routerRtpCapabilities.codecs.length === 0) {
+            console.error("[SocketEventHandlers] Router capabilities missing codec information!");
+            return;
+        }
+
+        // Log codec compatibility for debugging
+        const audioCodecs = data.routerRtpCapabilities.codecs.filter((c: any) => c.kind === 'audio').map((c: any) => c.mimeType);
+        const videoCodecs = data.routerRtpCapabilities.codecs.filter((c: any) => c.kind === 'video').map((c: any) => c.mimeType);
+        console.log("[SocketEventHandlers] Available codecs - Audio:", audioCodecs, "Video:", videoCodecs);
 
         const deviceInitialized = await this.transportManager.initializeDevice(data.routerRtpCapabilities);
 
         if (deviceInitialized) {
+            console.log("[SocketEventHandlers] Device initialized successfully, creating transports");
             this.transportManager.createTransports();
         } else {
-            console.error("Device initialization failed");
+            console.error("[SocketEventHandlers] Device initialization failed - codec compatibility issue?");
         }
 
         // Add timeout fallback in case sfu:rtp-capabilities-set is not received
         setTimeout(() => {
             if (!this.context.refs.sendTransportRef.current && !this.context.refs.recvTransportRef.current) {
+                console.log("[SocketEventHandlers] Fallback: Creating transports after 3s timeout");
                 this.handleRtpCapabilitiesSet();
             }
         }, 3000);
     };
 
     handleRtpCapabilitiesSet = () => {
+        console.log("[SocketEventHandlers] RTP capabilities set, attempting to create transports");
+        // Guard: Only create transports if device is ready
+        if (!this.context.refs.deviceRef.current?.loaded) {
+            console.error("[SocketEventHandlers] Cannot create transports - device not loaded with capabilities");
+            return;
+        }
         this.transportManager.createTransports();
     };
 
