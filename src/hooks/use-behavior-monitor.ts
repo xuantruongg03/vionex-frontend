@@ -56,17 +56,17 @@ export default function useBehaviorMonitor({
     }, [eventLog, username, roomId, dispatch]);
 
     const throttledSendLogs = useCallback(() => {
-        // const now = Date.now();
-        // if (now - lastRequestTimeRef.current > 5000) {
-        //     lastRequestTimeRef.current = now;
-        //     sendLogsToServer();
-        // } else if (!requestLogThrottleRef.current) {
-        //     requestLogThrottleRef.current = setTimeout(() => {
-        //         lastRequestTimeRef.current = Date.now();
-        //         sendLogsToServer();
-        //         requestLogThrottleRef.current = null;
-        //     }, 5000 - (now - lastRequestTimeRef.current));
-        // }
+        const now = Date.now();
+        if (now - lastRequestTimeRef.current > 5000) {
+            lastRequestTimeRef.current = now;
+            sendLogsToServer();
+        } else if (!requestLogThrottleRef.current) {
+            requestLogThrottleRef.current = setTimeout(() => {
+                lastRequestTimeRef.current = Date.now();
+                sendLogsToServer();
+                requestLogThrottleRef.current = null;
+            }, 5000 - (now - lastRequestTimeRef.current));
+        }
     }, [sendLogsToServer]);
 
     useEffect(() => {

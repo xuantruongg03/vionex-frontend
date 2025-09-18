@@ -83,15 +83,29 @@ export const useVideoGrid = (streams: any[], screenStreams: any[], users: User[]
 
             // Screen share streams first từ cached map
             const screenStream = streamMaps.screenShares.get(peerId);
-            if (screenStream) return screenStream;
+            if (screenStream) {
+                return screenStream;
+            }
 
-            // Video streams - tối ưu với userStreams cache
-            const videoStream = userStreams.find((s) => s.metadata?.type === "webcam" || s.metadata?.video === true);
-            if (videoStream) return videoStream;
+            // Video streams - ưu tiên stream có video tracks thực sự
+            const videoStream = userStreams.find((s) => {
+                const hasVideoTracks = s.stream.getVideoTracks().length > 0;
+                const isVideoType = s.metadata?.type === "webcam" || s.metadata?.video === true;
+                return hasVideoTracks && isVideoType;
+            });
+            if (videoStream) {
+                return videoStream;
+            }
 
-            // Audio streams
-            const audioStream = userStreams.find((s) => s.metadata?.type === "mic" || (s.metadata?.audio === true && s.metadata?.video === false));
-            if (audioStream) return audioStream;
+            const audioStream = userStreams.find((s) => {
+                const hasAudioTracks = s.stream.getAudioTracks().length > 0;
+                const hasNoVideoTracks = s.stream.getVideoTracks().length === 0;
+                const isAudioType = s.metadata?.type === "mic" || (s.metadata?.audio === true && s.metadata?.video === false);
+                return hasAudioTracks && hasNoVideoTracks && isAudioType;
+            });
+            if (audioStream) {
+                return audioStream;
+            }
 
             // Presence streams
             const presenceStream = userStreams.find((s) => s.metadata?.type === "presence");

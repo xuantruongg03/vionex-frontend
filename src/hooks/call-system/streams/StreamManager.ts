@@ -9,6 +9,7 @@ import { CallSystemContext, PendingStreamData } from "../types";
 
 export class StreamManager {
     private context: CallSystemContext;
+    private streamProcessingTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
     constructor(context: CallSystemContext) {
         this.context = context;
@@ -26,9 +27,7 @@ export class StreamManager {
         const fallbackStreamId = `remote-${publisherId}-fallback`;
 
         this.context.setters.setStreams((prev) => {
-            const existingIndex = prev.findIndex((s) =>
-                s.id.includes(publisherId)
-            );
+            const existingIndex = prev.findIndex((s) => s.id.includes(publisherId));
 
             if (existingIndex === -1) {
                 return [
@@ -53,19 +52,12 @@ export class StreamManager {
     /**
      * Process screen share stream updates
      */
-    processScreenShareStream = (
-        mediaStream: MediaStream,
-        publisherId: string,
-        mediaType: string,
-        data: any
-    ) => {
+    processScreenShareStream = (mediaStream: MediaStream, publisherId: string, mediaType: string, data: any) => {
         if (mediaType === "screen") {
             // Screen video stream - use separate screen streams state
             this.context.setters.setScreenStreams((prev) => {
                 // Remove any duplicate screen streams for this publisher first
-                const filteredStreams = prev.filter(
-                    (s) => s.id !== `screen-${publisherId}`
-                );
+                const filteredStreams = prev.filter((s) => s.id !== `screen-${publisherId}`);
 
                 // Always create/recreate the stream to avoid duplicates
                 const newStream = {
@@ -88,14 +80,10 @@ export class StreamManager {
             // Screen audio stream - update existing screen stream in screen streams state
             this.context.setters.setScreenStreams((prev) => {
                 // Remove any duplicate screen streams for this publisher first
-                const filteredStreams = prev.filter(
-                    (s) => s.id !== `screen-${publisherId}`
-                );
+                const filteredStreams = prev.filter((s) => s.id !== `screen-${publisherId}`);
 
                 // Find if we have existing screen stream to preserve video
-                const existingStream = prev.find(
-                    (s) => s.id === `screen-${publisherId}`
-                );
+                const existingStream = prev.find((s) => s.id === `screen-${publisherId}`);
 
                 const newStream = {
                     id: `screen-${publisherId}`,
@@ -119,15 +107,15 @@ export class StreamManager {
     /**
      * Process regular webcam stream
      */
-    processRegularStream = (
-        mediaStream: MediaStream,
-        uiStreamId: string,
-        publisherId: string,
-        data: any,
-        mediaType: string
-    ) => {
-        // Add stream to UI state
-        setTimeout(() => {
+    processRegularStream = (mediaStream: MediaStream, uiStreamId: string, publisherId: string, data: any, mediaType: string) => {
+        // Clear any existing timeout for this stream
+        const existingTimeout = this.streamProcessingTimeouts.get(uiStreamId);
+        if (existingTimeout) {
+            clearTimeout(existingTimeout);
+        }
+
+        // Debounce stream updates to prevent spam
+        const timeout = setTimeout(() => {
             this.context.setters.setStreams((prev) => {
                 // Remove any existing streams for this specific remote stream ID to avoid duplicates
                 const filteredStreams = prev.filter((s) => s.id !== uiStreamId);
@@ -140,10 +128,8 @@ export class StreamManager {
                     return true;
                 });
 
-                const isAudioStream =
-                    data.kind === "audio" || mediaType.includes("mic");
-                const isVideoStream =
-                    data.kind === "video" || mediaType.includes("webcam");
+                const isAudioStream = data.kind === "audio" || mediaType.includes("mic");
+                const isVideoStream = data.kind === "video" || mediaType.includes("webcam");
 
                 const metadata: StreamMetadata = {
                     video: isVideoStream,
@@ -153,6 +139,14 @@ export class StreamManager {
                     peerId: publisherId,
                     ...data.metadata,
                 };
+
+                // Check if stream has tracks before adding to UI
+                const tracks = mediaStream.getTracks();
+                const hasValidTracks = tracks.length > 0;
+
+                if (!hasValidTracks) {
+                    return finalFilteredStreams;
+                }
 
                 // Add the new media stream
                 const newStreams = [
@@ -165,17 +159,18 @@ export class StreamManager {
                 ];
                 return newStreams;
             });
-        }, 100);
+
+            // Clean up the timeout
+            this.streamProcessingTimeouts.delete(uiStreamId);
+        }, 50); // 50ms debounce
+
+        this.streamProcessingTimeouts.set(uiStreamId, timeout);
     };
 
     /**
      * Update stream metadata
      */
-    updateStreamMetadata = (
-        streamId: string,
-        metadata: any,
-        publisherId: string
-    ) => {
+    updateStreamMetadata = (streamId: string, metadata: any, publisherId: string) => {
         // Skip own streams
         if (publisherId === this.context.room.username) {
             return;
@@ -207,28 +202,27 @@ export class StreamManager {
     /**
      * Remove stream by ID
      */
-    removeStream = (streamId: string) => {
+    removeStream = (streamId: string, isScreenShare?: boolean, publisherId?: string) => {
         if (!streamId) {
             return;
         }
 
-        // Parse stream ID to determine type and peer
+        // Parse stream ID to determine type and peer if publisherId not provided
         const parts = streamId.split("_");
-        const publisherId = parts[0];
+        const parsedPublisherId = parts[0];
         const mediaType = parts[1]; // video, audio, screen, screen_audio
 
-        // Check if this is a screen share stream
-        const isScreenShare =
-            mediaType === "screen" || mediaType === "screen_audio";
+        // Use provided publisherId or fallback to parsed one
+        const actualPublisherId = publisherId || parsedPublisherId;
 
-        if (isScreenShare) {
+        // Check if this is a screen share stream - use parameter if provided, otherwise fallback to parsing
+        const isScreenShareStream = isScreenShare !== undefined ? isScreenShare : mediaType === "screen" || mediaType === "screen_audio";
+
+        if (isScreenShareStream) {
             // Remove screen share stream from regular streams
             this.context.setters.setStreams((prev) =>
                 prev.filter((stream) => {
-                    const isScreenFromThisPeer =
-                        stream.id === `screen-${publisherId}` ||
-                        (stream.metadata?.peerId === publisherId &&
-                            stream.metadata?.isScreenShare);
+                    const isScreenFromThisPeer = stream.id === `screen-${actualPublisherId}` || (stream.metadata?.peerId === actualPublisherId && stream.metadata?.isScreenShare);
                     return !isScreenFromThisPeer;
                 })
             );
@@ -236,31 +230,20 @@ export class StreamManager {
             // Remove screen share stream from dedicated screen streams state
             this.context.setters.setScreenStreams((prev) =>
                 prev.filter((stream) => {
-                    const isScreenFromThisPeer =
-                        stream.id === `screen-${publisherId}` ||
-                        (stream.metadata?.peerId === publisherId &&
-                            stream.metadata?.isScreenShare);
+                    const isScreenFromThisPeer = stream.id === `screen-${actualPublisherId}` || (stream.metadata?.peerId === actualPublisherId && stream.metadata?.isScreenShare);
                     return !isScreenFromThisPeer;
                 })
             );
 
             // Clean up remote streams map
-            this.context.refs.remoteStreamsMapRef.current.delete(
-                `screen-${publisherId}`
-            );
-            this.context.refs.remoteStreamsMapRef.current.delete(
-                `screen-audio-${publisherId}`
-            );
+            this.context.refs.remoteStreamsMapRef.current.delete(`screen-${actualPublisherId}`);
+            this.context.refs.remoteStreamsMapRef.current.delete(`screen-audio-${actualPublisherId}`);
         } else {
             // Handle regular stream removal
-            const remoteStreamId = `remote-${publisherId}-${mediaType}`;
-            this.context.refs.remoteStreamsMapRef.current.delete(
-                remoteStreamId
-            );
+            const remoteStreamId = `remote-${actualPublisherId}-${mediaType}`;
+            this.context.refs.remoteStreamsMapRef.current.delete(remoteStreamId);
 
-            this.context.setters.setStreams((prev) =>
-                prev.filter((stream) => stream.id !== remoteStreamId)
-            );
+            this.context.setters.setStreams((prev) => prev.filter((stream) => stream.id !== remoteStreamId));
         }
     };
 
@@ -317,10 +300,7 @@ export class StreamManager {
         this.context.setters.setStreams((prev) =>
             prev.filter((stream) => {
                 // Remove streams that match this peer's screen share
-                const isScreenFromThisPeer =
-                    stream.id === `screen-${peerId}` ||
-                    (stream.metadata?.peerId === peerId &&
-                        stream.metadata?.isScreenShare);
+                const isScreenFromThisPeer = stream.id === `screen-${peerId}` || (stream.metadata?.peerId === peerId && stream.metadata?.isScreenShare);
                 return !isScreenFromThisPeer;
             })
         );
@@ -329,21 +309,14 @@ export class StreamManager {
         this.context.setters.setScreenStreams((prev) =>
             prev.filter((stream) => {
                 // Remove streams that match this peer's screen share
-                const isScreenFromThisPeer =
-                    stream.id === `screen-${peerId}` ||
-                    (stream.metadata?.peerId === peerId &&
-                        stream.metadata?.isScreenShare);
+                const isScreenFromThisPeer = stream.id === `screen-${peerId}` || (stream.metadata?.peerId === peerId && stream.metadata?.isScreenShare);
                 return !isScreenFromThisPeer;
             })
         );
 
         // Clean up remote streams map
-        this.context.refs.remoteStreamsMapRef.current.delete(
-            `screen-${peerId}`
-        );
-        this.context.refs.remoteStreamsMapRef.current.delete(
-            `screen-audio-${peerId}`
-        );
+        this.context.refs.remoteStreamsMapRef.current.delete(`screen-${peerId}`);
+        this.context.refs.remoteStreamsMapRef.current.delete(`screen-audio-${peerId}`);
     };
 
     /**
@@ -355,11 +328,7 @@ export class StreamManager {
         if (pendingStreams.length > 0) {
             for (const streamData of pendingStreams) {
                 // Validate streamId
-                if (
-                    !streamData.streamId ||
-                    streamData.streamId === "undefined" ||
-                    typeof streamData.streamId !== "string"
-                ) {
+                if (!streamData.streamId || streamData.streamId === "undefined" || typeof streamData.streamId !== "string") {
                     continue;
                 }
 
@@ -369,32 +338,16 @@ export class StreamManager {
                 }
 
                 // Check if already consuming
-                if (
-                    !this.context.refs.consumingStreamsRef.current.has(
-                        streamData.streamId
-                    )
-                ) {
+                if (!this.context.refs.consumingStreamsRef.current.has(streamData.streamId)) {
                     try {
-                        this.context.refs.consumingStreamsRef.current.add(
-                            streamData.streamId
-                        );
-                        this.context.refs.socketRef.current?.emit(
-                            "sfu:consume",
-                            {
-                                streamId: streamData.streamId,
-                                transportId:
-                                    this.context.refs.recvTransportRef.current!
-                                        .id,
-                            }
-                        );
+                        this.context.refs.consumingStreamsRef.current.add(streamData.streamId);
+                        this.context.refs.socketRef.current?.emit("sfu:consume", {
+                            streamId: streamData.streamId,
+                            transportId: this.context.refs.recvTransportRef.current!.id,
+                        });
                     } catch (error) {
-                        console.error(
-                            `Failed to consume pending stream ${streamData.streamId}:`,
-                            error
-                        );
-                        this.context.refs.consumingStreamsRef.current.delete(
-                            streamData.streamId
-                        );
+                        console.error(`Failed to consume pending stream ${streamData.streamId}:`, error);
+                        this.context.refs.consumingStreamsRef.current.delete(streamData.streamId);
                     }
                 }
             }
@@ -430,5 +383,16 @@ export class StreamManager {
      */
     removeFromConsuming = (streamId: string) => {
         this.context.refs.consumingStreamsRef.current.delete(streamId);
+    };
+
+    /**
+     * Cleanup timeouts and resources
+     */
+    cleanup = () => {
+        // Clear all pending timeouts
+        this.streamProcessingTimeouts.forEach((timeout) => {
+            clearTimeout(timeout);
+        });
+        this.streamProcessingTimeouts.clear();
     };
 }
