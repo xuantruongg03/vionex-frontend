@@ -70,16 +70,24 @@ export class TransportManager {
      * Create transports after RTP capabilities are set
      */
     createTransports = () => {
-        // Now create transports
+        // Prevent creating duplicate transports
+        if (this.context.refs.sendTransportRef.current || this.context.refs.recvTransportRef.current) {
+            return;
+        }
+        
+        // Create transports sequentially to avoid race conditions
         this.context.refs.socketRef.current?.emit("sfu:create-transport", {
             roomId: this.context.roomId,
             isProducer: true,
         });
 
-        this.context.refs.socketRef.current?.emit("sfu:create-transport", {
-            roomId: this.context.roomId,
-            isProducer: false,
-        });
+        // Small delay to ensure server processes first transport before second
+        setTimeout(() => {
+            this.context.refs.socketRef.current?.emit("sfu:create-transport", {
+                roomId: this.context.roomId,
+                isProducer: false,
+            });
+        }, 100);
     };
 
     /**
@@ -96,6 +104,15 @@ export class TransportManager {
 
             if (!actualTransportInfo.id) {
                 throw new Error("Transport info missing required 'id' field");
+            }
+
+            // Check if transport already exists to prevent duplicates
+            if (isProducer && this.context.refs.sendTransportRef.current) {
+                return;
+            }
+            
+            if (!isProducer && this.context.refs.recvTransportRef.current) {
+                return;
             }
 
             const transport = isProducer
