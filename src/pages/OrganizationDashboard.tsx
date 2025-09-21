@@ -4,23 +4,15 @@ import { MembersTab } from "@/components/Organization/MembersTab";
 import { RoomList } from "@/components/Organization/RoomList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import useCreateOrg from "@/hooks/org/use-create-org";
 import { useUserPermissions } from "@/hooks/org/use-user-permissions";
-import {
-    default as orgService
-} from "@/services/orgService";
-import { useQueries } from "@tanstack/react-query";
+import { default as orgService } from "@/services/orgService";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Edit } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,11 +33,7 @@ const getOrgRoomsReq = async () => {
 
 const OrganizationDashboard = () => {
     // Use useQueries to combine all 3 queries
-    const [
-        { data: organization, isLoading: isLoadingOrg, error: orgError },
-        { data: members, isLoading: isLoadingMembers, error: membersError },
-        { data: orgRoomsData, isLoading: isLoadingRooms, error: roomsError }
-    ] = useQueries({
+    const [{ data: organization, isLoading: isLoadingOrg, error: orgError }, { data: members, isLoading: isLoadingMembers, error: membersError }, { data: orgRoomsData, isLoading: isLoadingRooms, error: roomsError }] = useQueries({
         queries: [
             {
                 queryKey: ["organization"],
@@ -66,13 +54,14 @@ const OrganizationDashboard = () => {
                 // enabled: !!organization, // Only fetch when organization exists
                 retry: 2,
                 staleTime: 5 * 60 * 1000, // 5 minutes
-            }
-        ]
+            },
+        ],
     });
 
     // Hook
     const { createOrg, isPending: isCreatingOrganization } = useCreateOrg();
-    
+    const queryClient = useQueryClient();
+
     // Get user permissions
     const permissions = useUserPermissions(members?.members || []);
 
@@ -96,11 +85,12 @@ const OrganizationDashboard = () => {
                         const response: any = await createOrg(formData);
                         if (response.success) {
                             toast.success("Organization created successfully!");
+                            // Invalidate and refetch organization data
+                            await queryClient.invalidateQueries({ queryKey: ["organization"] });
+                            await queryClient.invalidateQueries({ queryKey: ["members"] });
+                            await queryClient.invalidateQueries({ queryKey: ["orgRooms"] });
                         } else {
-                            toast.error(
-                                response.message ||
-                                    "Failed to create organization"
-                            );
+                            toast.error(response.message || "Failed to create organization");
                         }
                     } catch (error) {
                         toast.error("Failed to create organization");
@@ -118,29 +108,21 @@ const OrganizationDashboard = () => {
             <div className='flex justify-between items-center mb-8'>
                 <div>
                     <h1 className='text-3xl font-bold'>{organization.name}</h1>
-                    <p className='text-muted-foreground'>
-                        {organization.description}
-                    </p>
+                    <p className='text-muted-foreground'>{organization.description}</p>
                 </div>
                 <Badge variant='secondary'>{organization.domain}.vionex</Badge>
             </div>
 
             <Tabs defaultValue='overview' className='space-y-6'>
-                <TabsList className={`grid w-full ${permissions.canManageOrganization ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                <TabsList className={`grid w-full ${permissions.canManageOrganization ? "grid-cols-4" : "grid-cols-3"}`}>
                     <TabsTrigger value='overview'>Overview</TabsTrigger>
                     <TabsTrigger value='members'>Members</TabsTrigger>
                     <TabsTrigger value='rooms'>Rooms</TabsTrigger>
-                    {permissions.canManageOrganization && (
-                        <TabsTrigger value='settings'>Settings</TabsTrigger>
-                    )}
+                    {permissions.canManageOrganization && <TabsTrigger value='settings'>Settings</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value='overview' className='space-y-6'>
-                    <DashboardOverview
-                        organization={organization}
-                        membersCount={members?.members.length}
-                        roomsCount={orgRoomsData.length}
-                    />
+                    <DashboardOverview organization={organization} membersCount={members?.members.length} roomsCount={orgRoomsData.length} />
                 </TabsContent>
 
                 <TabsContent value='members' className='space-y-6'>
@@ -148,11 +130,7 @@ const OrganizationDashboard = () => {
                 </TabsContent>
 
                 <TabsContent value='rooms' className='space-y-6'>
-                    <RoomList
-                        sessions={orgRoomsData}
-                        organizationId={organization.id}
-                        members={members?.members || []}
-                    />
+                    <RoomList sessions={orgRoomsData} organizationId={organization.id} members={members?.members || []} />
                 </TabsContent>
 
                 {permissions.canManageOrganization && (
@@ -160,29 +138,20 @@ const OrganizationDashboard = () => {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Organization Settings</CardTitle>
-                                <CardDescription>
-                                    Manage your organization details and
-                                    preferences.
-                                </CardDescription>
+                                <CardDescription>Manage your organization details and preferences.</CardDescription>
                             </CardHeader>
-                            <CardContent className='space-y-4'>
-                                <div>
+                            <CardContent className='space-y-6'>
+                                <div className='space-y-2'>
                                     <Label>Organization Name</Label>
                                     <Input value={organization.name} readOnly />
                                 </div>
-                                <div>
+                                <div className='space-y-2'>
                                     <Label>Domain</Label>
-                                    <Input
-                                        value={`${organization.domain}.vionex`}
-                                        readOnly
-                                    />
+                                    <Input value={`${organization.domain}.vionex`} readOnly />
                                 </div>
-                                <div>
+                                <div className='space-y-2'>
                                     <Label>Description</Label>
-                                    <Textarea
-                                        value={organization.description || ""}
-                                        readOnly
-                                    />
+                                    <Textarea value={organization.description || ""} readOnly />
                                 </div>
                                 <Button variant='outline'>
                                     <Edit className='w-4 h-4 mr-2' />

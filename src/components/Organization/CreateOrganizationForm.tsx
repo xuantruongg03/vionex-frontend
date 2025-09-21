@@ -16,27 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CreateOrganizationFormProps {
-    onSubmit: (data: {
-        name: string;
-        domain: string;
-        description: string;
-    }) => Promise<void>;
+    onSubmit: (data: { name: string; domain: string; description: string }) => Promise<void>;
     isLoading: boolean;
 }
 
-export const CreateOrganizationForm = ({
-    onSubmit,
-    isLoading,
-}: CreateOrganizationFormProps) => {
+export const CreateOrganizationForm = ({ onSubmit, isLoading }: CreateOrganizationFormProps) => {
     const [formData, setFormData] = useState({
         name: "",
         domain: "",
@@ -53,16 +40,11 @@ export const CreateOrganizationForm = ({
             <Card>
                 <CardHeader className='text-center'>
                     <Building className='w-12 h-12 mx-auto mb-4 text-primary' />
-                    <CardTitle className='text-2xl'>
-                        Create Your Organization
-                    </CardTitle>
-                    <CardDescription>
-                        Set up your organization to start managing private video
-                        calls and team meetings.
-                    </CardDescription>
+                    <CardTitle className='text-2xl'>Create Your Organization</CardTitle>
+                    <CardDescription>Set up your organization to start managing private video calls and team meetings.</CardDescription>
                 </CardHeader>
-                <CardContent className='space-y-4'>
-                    <div>
+                <CardContent className='space-y-6'>
+                    <div className='space-y-2'>
                         <Label htmlFor='org-name'>Organization Name</Label>
                         <Input
                             id='org-name'
@@ -76,7 +58,7 @@ export const CreateOrganizationForm = ({
                             }
                         />
                     </div>
-                    <div>
+                    <div className='space-y-2'>
                         <Label htmlFor='org-domain'>Domain</Label>
                         <Input
                             id='org-domain'
@@ -89,15 +71,13 @@ export const CreateOrganizationForm = ({
                                 }))
                             }
                         />
-                        <p className='text-sm text-muted-foreground mt-1'>
+                        <p className='text-sm text-muted-foreground mt-2'>
                             Member emails will be: name@
                             {formData.domain || "domain"}.vionex
                         </p>
                     </div>
-                    <div>
-                        <Label htmlFor='org-description'>
-                            Description (Optional)
-                        </Label>
+                    <div className='space-y-2'>
+                        <Label htmlFor='org-description'>Description (Optional)</Label>
                         <Textarea
                             id='org-description'
                             placeholder='Brief description of your organization'
@@ -110,13 +90,7 @@ export const CreateOrganizationForm = ({
                             }
                         />
                     </div>
-                    <Button
-                        onClick={handleSubmit}
-                        className='w-full'
-                        disabled={
-                            !formData.name || !formData.domain || isLoading
-                        }
-                    >
+                    <Button onClick={handleSubmit} className='w-full' disabled={!formData.name || !formData.domain || isLoading}>
                         {isLoading ? (
                             <>Loading...</>
                         ) : (
