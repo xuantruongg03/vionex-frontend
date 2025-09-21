@@ -1,23 +1,6 @@
 import { types as mediasoupTypes } from "mediasoup-client";
 import axiosClient from "@/apis/api-client";
-
-interface StreamMetadata {
-    video: boolean;
-    audio: boolean;
-    type: "webcam" | "mic" | "screen";
-    isScreenShare?: boolean;
-    noCameraAvailable?: boolean;
-    noMicroAvailable?: boolean;
-}
-
-interface Stream {
-    streamId: string;
-    publisherId: string;
-    producerId: string;
-    metadata: StreamMetadata;
-    rtpParameters: mediasoupTypes.RtpParameters;
-    roomId: string;
-}
+import { StreamMetadata, Stream } from "@/interfaces/signal";
 
 class ApiService {
     private peerId: string | null = null;
@@ -49,9 +32,7 @@ class ApiService {
             if (accessToken) {
                 headers["Authorization"] = `Bearer ${accessToken}`;
             } else {
-                throw new Error(
-                    "Authentication required but no access token found"
-                );
+                throw new Error("Authentication required but no access token found");
             }
         }
 
@@ -71,27 +52,9 @@ class ApiService {
 
             return response as T;
         } catch (error: any) {
-            const message =
-                error.response?.data?.message ||
-                error.message ||
-                "Request failed";
+            const message = error.response?.data?.message || error.message || "Request failed";
             throw new Error(message);
         }
-    }
-
-    // These methods are no longer used - WebSocket handles all communication
-    async joinRoom(roomId: string, peerId: string, password?: string) {
-        throw new Error("Use WebSocket join instead - sfu:join event");
-    }
-
-    async joinOrgRoom(roomId: string, peerId: string) {
-        throw new Error("Use WebSocket join instead - sfu:join event");
-    }
-
-    async getRouterRtpCapabilities(roomId: string) {
-        throw new Error(
-            "Router capabilities are provided via WebSocket - sfu:router-capabilities event"
-        );
     }
 
     async verifyOrgRoomAccess(roomId: string) {
@@ -108,13 +71,10 @@ class ApiService {
 
     // Updated endpoints to match new gateway.controller.ts
     async setRtpCapabilities(rtpCapabilities: any) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/rtp-capabilities`,
-            {
-                method: "PUT",
-                data: { rtpCapabilities },
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/rtp-capabilities`, {
+            method: "PUT",
+            data: { rtpCapabilities },
+        });
     }
 
     async createTransport(roomId: string, isProducer: boolean) {
@@ -125,83 +85,45 @@ class ApiService {
     }
 
     async getUsers(roomId: string) {
-        return this.request<{ success: boolean; users: any[] }>(
-            `/sfu/rooms/${roomId}/users`
-        );
+        return this.request<{ success: boolean; users: any[] }>(`/sfu/rooms/${roomId}/users`);
     }
 
     async getStreams(roomId: string) {
-        return this.request<{ success: boolean; streams: Stream[] }>(
-            `/sfu/rooms/${roomId}/streams`
-        );
+        return this.request<{ success: boolean; streams: Stream[] }>(`/sfu/rooms/${roomId}/streams`);
     }
 
     async unpublishStream(streamId: string) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/streams/${streamId}`,
-            {
-                method: "DELETE",
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/streams/${streamId}`, {
+            method: "DELETE",
+        });
     }
 
     async removeUser(roomId: string, participantId: string) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/rooms/${roomId}/users/${participantId}`,
-            {
-                method: "DELETE",
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/rooms/${roomId}/users/${participantId}`, {
+            method: "DELETE",
+        });
     }
 
-    async connectTransport(
-        roomId: string,
-        transportId: string,
-        peerId: string,
-        dtlsParameters: any
-    ) {
-        return this.request<{ success: boolean; message: string }>(
-            `/api/room/${roomId}/transports/${transportId}/connect`,
-            {
-                method: "POST",
-                data: { peerId, dtlsParameters },
-            }
-        );
+    async connectTransport(roomId: string, transportId: string, peerId: string, dtlsParameters: any) {
+        return this.request<{ success: boolean; message: string }>(`/api/room/${roomId}/transports/${transportId}/connect`, {
+            method: "POST",
+            data: { peerId, dtlsParameters },
+        });
     }
-    async produce(
-        roomId: string,
-        peerId: string,
-        transportId: string,
-        kind: string,
-        rtpParameters: any,
-        appData: any
-    ) {
-        return this.request<{ success: boolean; producerId: string }>(
-            `/api/room/${roomId}/produce`,
-            {
-                method: "POST",
-                data: {
-                    peerId,
-                    transportId,
-                    kind,
-                    rtpParameters,
-                    metadata: appData,
-                },
-            }
-        );
+    async produce(roomId: string, peerId: string, transportId: string, kind: string, rtpParameters: any, appData: any) {
+        return this.request<{ success: boolean; producerId: string }>(`/api/room/${roomId}/produce`, {
+            method: "POST",
+            data: {
+                peerId,
+                transportId,
+                kind,
+                rtpParameters,
+                metadata: appData,
+            },
+        });
     }
 
-    async consume({
-        streamId,
-        roomId,
-        transportId,
-        peerId,
-    }: {
-        streamId: string;
-        roomId: string;
-        transportId: string;
-        peerId: string;
-    }) {
+    async consume({ streamId, roomId, transportId, peerId }: { streamId: string; roomId: string; transportId: string; peerId: string }) {
         return this.request<{
             success: boolean;
             consumerId: string;
@@ -220,28 +142,14 @@ class ApiService {
         });
     }
 
-    async connectTransportHttp(
-        transportId: string,
-        dtlsParameters: any,
-        roomId: string
-    ) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/transport/${transportId}/connect`,
-            {
-                method: "POST",
-                data: { dtlsParameters, roomId },
-            }
-        );
+    async connectTransportHttp(transportId: string, dtlsParameters: any, roomId: string) {
+        return this.request<{ success: boolean; message: string }>(`/sfu/transport/${transportId}/connect`, {
+            method: "POST",
+            data: { dtlsParameters, roomId },
+        });
     }
 
-    async produceHttp(
-        transportId: string,
-        kind: "audio" | "video",
-        rtpParameters: any,
-        roomId: string,
-        participantId?: string,
-        appData?: any
-    ) {
+    async produceHttp(transportId: string, kind: "audio" | "video", rtpParameters: any, roomId: string, participantId?: string, appData?: any) {
         return this.request<{
             success: boolean;
             data: { id: string; producerId: string };
@@ -257,89 +165,58 @@ class ApiService {
         });
     }
 
-    async consumeHttp(
-        transportId: string,
-        streamId: string,
-        rtpCapabilities: any,
-        roomId: string,
-        participantId?: string
-    ) {
-        return this.request<{ success: boolean; data: any }>(
-            `/sfu/transport/${transportId}/consume`,
-            {
-                method: "POST",
-                data: {
-                    streamId,
-                    rtpCapabilities,
-                    roomId,
-                    participantId,
-                },
-            }
-        );
+    async consumeHttp(transportId: string, streamId: string, rtpCapabilities: any, roomId: string, participantId?: string) {
+        return this.request<{ success: boolean; data: any }>(`/sfu/transport/${transportId}/consume`, {
+            method: "POST",
+            data: {
+                streamId,
+                rtpCapabilities,
+                roomId,
+                participantId,
+            },
+        });
     }
 
-    async resumeConsumer(
-        consumerId: string,
-        roomId: string,
-        participantId?: string
-    ) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/consumer/${consumerId}/resume`,
-            {
-                method: "POST",
-                data: { roomId, participantId },
-            }
-        );
+    async resumeConsumer(consumerId: string, roomId: string, participantId?: string) {
+        return this.request<{ success: boolean; message: string }>(`/sfu/consumer/${consumerId}/resume`, {
+            method: "POST",
+            data: { roomId, participantId },
+        });
     }
 
     async pauseConsumer(consumerId: string, roomId: string) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/consumer/${consumerId}/pause`,
-            {
-                method: "POST",
-                data: { roomId },
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/consumer/${consumerId}/pause`, {
+            method: "POST",
+            data: { roomId },
+        });
     }
 
     async closeConsumer(consumerId: string, roomId: string) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/consumer/${consumerId}`,
-            {
-                method: "DELETE",
-                data: { roomId },
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/consumer/${consumerId}`, {
+            method: "DELETE",
+            data: { roomId },
+        });
     }
 
     async pauseProducer(producerId: string, roomId: string) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/producer/${producerId}/pause`,
-            {
-                method: "POST",
-                data: { roomId },
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/producer/${producerId}/pause`, {
+            method: "POST",
+            data: { roomId },
+        });
     }
 
     async resumeProducer(producerId: string, roomId: string) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/producer/${producerId}/resume`,
-            {
-                method: "POST",
-                data: { roomId },
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/producer/${producerId}/resume`, {
+            method: "POST",
+            data: { roomId },
+        });
     }
 
     async closeProducer(producerId: string, roomId: string) {
-        return this.request<{ success: boolean; message: string }>(
-            `/sfu/producer/${producerId}`,
-            {
-                method: "DELETE",
-                data: { roomId },
-            }
-        );
+        return this.request<{ success: boolean; message: string }>(`/sfu/producer/${producerId}`, {
+            method: "DELETE",
+            data: { roomId },
+        });
     }
 }
 

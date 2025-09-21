@@ -3,15 +3,7 @@ import { UserPlus, Trash2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Member } from "@/services/orgService";
@@ -98,9 +90,7 @@ export const MembersTab = ({ members }: any) => {
     return (
         <div className='space-y-6'>
             <div className='flex justify-between items-center'>
-                <h2 className='text-2xl font-bold dark:text-white'>
-                    Team Members
-                </h2>
+                <h2 className='text-2xl font-bold dark:text-white'>Team Members</h2>
                 {permissions.canInviteMembers && (
                     <Dialog open={showDialog} onOpenChange={setShowDialog}>
                         <DialogTrigger asChild>
@@ -111,16 +101,8 @@ export const MembersTab = ({ members }: any) => {
                         </DialogTrigger>
                         <DialogContent className='dark:bg-slate-800 dark:border-slate-700'>
                             <DialogHeader>
-                                <DialogTitle className='dark:text-white'>
-                                    {data
-                                        ? "Member Invited Successfully!"
-                                        : "Invite Team Member"}
-                                </DialogTitle>
-                                <DialogDescription className='dark:text-slate-300'>
-                                    {data
-                                        ? "Member has been successfully added to your organization."
-                                        : "Send an invitation to join your organization."}
-                                </DialogDescription>
+                                <DialogTitle className='dark:text-white'>{data ? "Member Invited Successfully!" : "Invite Team Member"}</DialogTitle>
+                                <DialogDescription className='dark:text-slate-300'>{data ? "Member has been successfully added to your organization." : "Send an invitation to join your organization."}</DialogDescription>
                             </DialogHeader>
 
                             {data ? (
@@ -128,81 +110,37 @@ export const MembersTab = ({ members }: any) => {
                                 <div className='space-y-4'>
                                     <Card className='border-slate-200 bg-slate-50 dark:bg-slate-800 dark:border-slate-600'>
                                         <CardContent className='p-4'>
-                                            <h3 className='font-medium text-slate-800 dark:text-slate-200 mb-3'>
-                                                Member Details
-                                            </h3>
+                                            <h3 className='font-medium text-slate-800 dark:text-slate-200 mb-3'>Member Details</h3>
                                             <div className='space-y-2'>
                                                 <div className='grid grid-cols-2 gap-2'>
-                                                    <span className='font-medium text-sm dark:text-slate-300'>
-                                                        Name:
-                                                    </span>
-                                                    <span className='text-sm dark:text-slate-200'>
-                                                        {data.name}
-                                                    </span>
+                                                    <span className='font-medium text-sm dark:text-slate-300'>Name:</span>
+                                                    <span className='text-sm dark:text-slate-200'>{data.name}</span>
                                                 </div>
                                                 <div className='flex items-center justify-between gap-2'>
-                                                    <span className='font-medium text-sm dark:text-slate-300'>
-                                                        Email:
-                                                    </span>
+                                                    <span className='font-medium text-sm dark:text-slate-300'>Email:</span>
                                                     <div className='flex items-center gap-2'>
-                                                        <span className='text-sm dark:text-slate-200'>
-                                                            {data.email}
-                                                        </span>
-                                                        <Button
-                                                            variant='ghost'
-                                                            size='sm'
-                                                            className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                                            onClick={() =>
-                                                                copyToClipboard(
-                                                                    data.email,
-                                                                    "Email"
-                                                                )
-                                                            }
-                                                        >
+                                                        <span className='text-sm dark:text-slate-200'>{data.email}</span>
+                                                        <Button variant='ghost' size='sm' className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700' onClick={() => copyToClipboard(data.email, "Email")}>
                                                             <Copy className='w-3 h-3' />
                                                         </Button>
                                                     </div>
                                                 </div>
                                                 <div className='grid grid-cols-2 gap-2'>
-                                                    <span className='font-medium text-sm dark:text-slate-300'>
-                                                        Role:
-                                                    </span>
-                                                    <span className='text-sm dark:text-slate-200'>
-                                                        {data.role}
-                                                    </span>
+                                                    <span className='font-medium text-sm dark:text-slate-300'>Role:</span>
+                                                    <span className='text-sm dark:text-slate-200'>{data.role}</span>
                                                 </div>
                                                 <div className='flex items-center justify-between gap-2'>
-                                                    <span className='font-medium text-sm dark:text-slate-300'>
-                                                        Temp Password:
-                                                    </span>
+                                                    <span className='font-medium text-sm dark:text-slate-300'>Temp Password:</span>
                                                     <div className='flex items-center gap-2'>
-                                                        <span className='text-sm dark:text-slate-200'>
-                                                            {data?.password}
-                                                        </span>
-                                                        <Button
-                                                            variant='ghost'
-                                                            size='sm'
-                                                            className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-600'
-                                                            onClick={() =>
-                                                                copyToClipboard(
-                                                                    data.password!,
-                                                                    "Password"
-                                                                )
-                                                            }
-                                                        >
+                                                        <span className='text-sm dark:text-slate-200'>{data?.password}</span>
+                                                        <Button variant='ghost' size='sm' className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-600' onClick={() => copyToClipboard(data.password!, "Password")}>
                                                             <Copy className='w-3 h-3' />
                                                         </Button>
                                                     </div>
                                                 </div>
                                                 <div className='grid grid-cols-2 gap-2'>
-                                                    <span className='font-medium text-sm dark:text-slate-300'>
-                                                        Joined:
-                                                    </span>
-                                                    <span className='text-sm dark:text-slate-200'>
-                                                        {new Date(
-                                                            data.joinedAt
-                                                        ).toLocaleDateString()}
-                                                    </span>
+                                                    <span className='font-medium text-sm dark:text-slate-300'>Joined:</span>
+                                                    <span className='text-sm dark:text-slate-200'>{new Date(data.joinedAt).toLocaleDateString()}</span>
                                                 </div>
                                             </div>
                                         </CardContent>
@@ -210,19 +148,16 @@ export const MembersTab = ({ members }: any) => {
                                 </div>
                             ) : (
                                 // Form state - show invite form
-                                <div className='space-y-4'>
-                                    <div>
-                                        <Label
-                                            htmlFor='member-name'
-                                            className='dark:text-slate-300'
-                                        >
+                                <div className='space-y-6'>
+                                    <div className='space-y-2'>
+                                        <Label htmlFor='member-name' className='dark:text-slate-300'>
                                             Name
                                         </Label>
                                         <Input
                                             id='member-name'
                                             placeholder='John Doe'
                                             value={formData.name}
-                                            className='dark:bg-slate-700 mt-3 dark:border-slate-600 dark:text-white dark:placeholder-slate-400'
+                                            className='dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400'
                                             onChange={(e) =>
                                                 setFormData((prev) => ({
                                                     ...prev,
@@ -237,33 +172,17 @@ export const MembersTab = ({ members }: any) => {
                             <DialogFooter>
                                 {data ? (
                                     // Success state buttons
-                                    <Button
-                                        onClick={handleCloseDialog}
-                                        className='bg-slate-600 hover:bg-slate-700 dark:bg-slate-600 dark:hover:bg-slate-500 text-white'
-                                    >
+                                    <Button onClick={handleCloseDialog} className='bg-slate-600 hover:bg-slate-700 dark:bg-slate-600 dark:hover:bg-slate-500 text-white'>
                                         Close
                                     </Button>
                                 ) : (
                                     // Form state buttons
                                     <>
-                                        <Button
-                                            variant='outline'
-                                            onClick={handleCloseDialog}
-                                            className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'
-                                        >
+                                        <Button variant='outline' onClick={handleCloseDialog} className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'>
                                             Cancel
                                         </Button>
-                                        <Button
-                                            onClick={handleSubmit}
-                                            disabled={
-                                                !formData.name ||
-                                                isCreatingMember
-                                            }
-                                            className='bg-slate-600 hover:bg-slate-700 dark:bg-slate-600 dark:hover:bg-slate-500 text-white disabled:bg-slate-400 disabled:dark:bg-slate-600'
-                                        >
-                                            {isCreatingMember
-                                                ? "Sending..."
-                                                : "Send Invitation"}
+                                        <Button onClick={handleSubmit} disabled={!formData.name || isCreatingMember} className='bg-slate-600 hover:bg-slate-700 dark:bg-slate-600 dark:hover:bg-slate-500 text-white disabled:bg-slate-400 disabled:dark:bg-slate-600'>
+                                            {isCreatingMember ? "Sending..." : "Send Invitation"}
                                         </Button>
                                     </>
                                 )}
@@ -278,86 +197,39 @@ export const MembersTab = ({ members }: any) => {
                     <CardContent className='p-4'>
                         <div className='flex items-center justify-between'>
                             <div>
-                                <h3 className='font-medium text-slate-800 dark:text-slate-200'>
-                                    Recently Added Member
-                                </h3>
+                                <h3 className='font-medium text-slate-800 dark:text-slate-200'>Recently Added Member</h3>
                                 <div className='mt-2 space-y-1'>
                                     <p className='text-sm dark:text-slate-300'>
-                                        <span className='font-medium'>
-                                            Name:
-                                        </span>{" "}
-                                        {data.name}
+                                        <span className='font-medium'>Name:</span> {data.name}
                                     </p>
                                     <div className='flex items-center justify-between'>
                                         <p className='text-sm dark:text-slate-300'>
-                                            <span className='font-medium'>
-                                                Email:
-                                            </span>{" "}
-                                            {data.email}
+                                            <span className='font-medium'>Email:</span> {data.email}
                                         </p>
-                                        <Button
-                                            variant='ghost'
-                                            size='sm'
-                                            className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                            onClick={() =>
-                                                copyToClipboard(
-                                                    data.email,
-                                                    "Email"
-                                                )
-                                            }
-                                        >
+                                        <Button variant='ghost' size='sm' className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700' onClick={() => copyToClipboard(data.email, "Email")}>
                                             <Copy className='w-3 h-3' />
                                         </Button>
                                     </div>
                                     <p className='text-sm dark:text-slate-300'>
-                                        <span className='font-medium'>
-                                            Role:
-                                        </span>{" "}
-                                        {data.role}
+                                        <span className='font-medium'>Role:</span> {data.role}
                                     </p>
                                     <p className='text-sm dark:text-slate-300'>
-                                        <span className='font-medium'>ID:</span>{" "}
-                                        {data.id}
+                                        <span className='font-medium'>ID:</span> {data.id}
                                     </p>
                                     {data.password && (
                                         <div className='flex items-center justify-between'>
                                             <p className='text-sm dark:text-slate-300'>
-                                                <span className='font-medium'>
-                                                    Password:
-                                                </span>{" "}
-                                                <span className='font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded'>
-                                                    {data.password}
-                                                </span>
+                                                <span className='font-medium'>Password:</span> <span className='font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded'>{data.password}</span>
                                             </p>
-                                            <Button
-                                                variant='ghost'
-                                                size='sm'
-                                                className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                                onClick={() =>
-                                                    copyToClipboard(
-                                                        data.password!,
-                                                        "Password"
-                                                    )
-                                                }
-                                            >
+                                            <Button variant='ghost' size='sm' className='h-6 w-6 p-0 hover:bg-slate-200 dark:hover:bg-slate-700' onClick={() => copyToClipboard(data.password!, "Password")}>
                                                 <Copy className='w-3 h-3' />
                                             </Button>
                                         </div>
                                     )}
-                                    <p className='text-xs text-muted-foreground dark:text-slate-400'>
-                                        Joined{" "}
-                                        {new Date(
-                                            data.joinedAt
-                                        ).toLocaleDateString()}
-                                    </p>
+                                    <p className='text-xs text-muted-foreground dark:text-slate-400'>Joined {new Date(data.joinedAt).toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                onClick={() => setData(null)}
-                                className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'
-                            >
+                            <Button variant='outline' size='sm' onClick={() => setData(null)} className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'>
                                 ✕
                             </Button>
                         </div>
@@ -367,129 +239,67 @@ export const MembersTab = ({ members }: any) => {
 
             <div className='space-y-3'>
                 {members.members.map((member) => (
-                    <Card
-                        key={member.id}
-                        className='dark:bg-slate-800 dark:border-slate-700'
-                    >
+                    <Card key={member.id} className='dark:bg-slate-800 dark:border-slate-700'>
                         <CardContent className='p-4'>
                             {/* Mobile view - stacked layout */}
                             <div className='flex flex-col gap-3 md:hidden'>
-                                <h3 className='font-medium dark:text-white'>
-                                    {member.name}
-                                </h3>
+                                <h3 className='font-medium dark:text-white'>{member.name}</h3>
                                 <div className='flex items-center justify-between gap-2'>
-                                    <span className='text-sm text-muted-foreground dark:text-slate-300'>
-                                        {member.email}
-                                    </span>
+                                    <span className='text-sm text-muted-foreground dark:text-slate-300'>{member.email}</span>
                                 </div>
                                 <div className='flex items-center justify-between'>
-                                    <Badge
-                                        variant={
-                                            member.role === "owner"
-                                                ? "default"
-                                                : "secondary"
-                                        }
-                                        className={
-                                            member.role === "owner"
-                                                ? "bg-slate-600 text-white dark:bg-slate-600"
-                                                : "bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200"
-                                        }
-                                    >
+                                    <Badge variant={member.role === "owner" ? "default" : "secondary"} className={member.role === "owner" ? "bg-slate-600 text-white dark:bg-slate-600" : "bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200"}>
                                         {member.role}
                                     </Badge>
-                                    {member.role !== "owner" &&
-                                        permissions.canRemoveMembers && (
-                                            <Button
-                                                variant='outline'
-                                                size='sm'
-                                                className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'
-                                                onClick={() =>
-                                                    handleRemoveMember(
-                                                        member.id
-                                                    )
-                                                }
-                                            >
-                                                <Trash2 className='w-4 h-4' />
-                                            </Button>
-                                        )}
+                                    {member.role !== "owner" && permissions.canRemoveMembers && (
+                                        <Button variant='outline' size='sm' className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300' onClick={() => handleRemoveMember(member.id)}>
+                                            <Trash2 className='w-4 h-4' />
+                                        </Button>
+                                    )}
                                 </div>
-                                <p className='text-xs text-muted-foreground dark:text-slate-400'>
-                                    Joined{" "}
-                                    {new Date(
-                                        member.joinedAt
-                                    ).toLocaleDateString()}
-                                </p>
+                                <p className='text-xs text-muted-foreground dark:text-slate-400'>Joined {new Date(member.joinedAt).toLocaleDateString()}</p>
                             </div>
 
                             {/* Desktop view - single row layout */}
                             <div className='hidden md:grid md:grid-cols-12 gap-4 items-center'>
                                 {/* Name */}
                                 <div className='col-span-2'>
-                                    <span className='font-medium dark:text-white text-sm'>
-                                        {member.name}
-                                    </span>
+                                    <span className='font-medium dark:text-white text-sm'>{member.name}</span>
                                 </div>
 
                                 {/* Email with copy button */}
                                 <div className='col-span-3 flex items-center gap-2'>
-                                    <span className='text-sm text-muted-foreground dark:text-slate-300 truncate'>
-                                        {member.email}
-                                    </span>
+                                    <span className='text-sm text-muted-foreground dark:text-slate-300 truncate'>{member.email}</span>
                                 </div>
 
                                 {/* Role */}
                                 <div className='col-span-2'>
-                                    <Badge
-                                        variant={
-                                            member.role === "owner"
-                                                ? "default"
-                                                : "secondary"
-                                        }
-                                        className={
-                                            member.role === "owner"
-                                                ? "bg-slate-600 text-white dark:bg-slate-600"
-                                                : "bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200"
-                                        }
-                                    >
+                                    <Badge variant={member.role === "owner" ? "default" : "secondary"} className={member.role === "owner" ? "bg-slate-600 text-white dark:bg-slate-600" : "bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-200"}>
                                         {member.role}
                                     </Badge>
                                 </div>
 
                                 {/* Joined date */}
                                 <div className='col-span-1'>
-                                    <span className='text-xs text-muted-foreground dark:text-slate-400'>
-                                        {new Date(
-                                            member.joinedAt
-                                        ).toLocaleDateString()}
-                                    </span>
+                                    <span className='text-xs text-muted-foreground dark:text-slate-400'>{new Date(member.joinedAt).toLocaleDateString()}</span>
                                 </div>
 
                                 <div className='col-span-3 flex items-center gap-2'></div>
                                 {/* Action button */}
                                 <div className='col-span-1 flex justify-end'>
-                                    {member.role !== "owner" &&
-                                        permissions.canRemoveMembers && (
-                                            <>
-                                                {isRemovingMember ? (
-                                                    <>Removing...</>
-                                                ) : (
-                                                    <>
-                                                        <Button
-                                                            variant='outline'
-                                                            size='sm'
-                                                            className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'
-                                                            onClick={() =>
-                                                                handleRemoveMember(
-                                                                    member.id
-                                                                )
-                                                            }
-                                                        >
-                                                            <Trash2 className='w-4 h-4' />
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </>
-                                        )}
+                                    {member.role !== "owner" && permissions.canRemoveMembers && (
+                                        <>
+                                            {isRemovingMember ? (
+                                                <>Removing...</>
+                                            ) : (
+                                                <>
+                                                    <Button variant='outline' size='sm' className='border-slate-300 hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300' onClick={() => handleRemoveMember(member.id)}>
+                                                        <Trash2 className='w-4 h-4' />
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

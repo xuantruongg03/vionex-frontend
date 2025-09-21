@@ -54,20 +54,15 @@ class WebSocketService {
     }
 
     // New hybrid approach: HTTP first, then WebSocket
-    async joinRoom(
-        roomId: string,
-        peerId: string,
-        password?: string,
-        userInfo?: any
-    ) {
+    async joinRoom(roomId: string, peerId: string, password?: string, userInfo?: any) {
         try {
             console.log("[WS] Starting hybrid join process for room:", roomId);
-            
+
             // Step 1: Join room via HTTP API first
             const joinResponse = await fetch(`${HTTP_API_URL}/room/${roomId}/join`, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
                     peerId,
@@ -78,7 +73,7 @@ class WebSocketService {
 
             if (!joinResponse.ok) {
                 const error = await joinResponse.json();
-                throw new Error(error.message || 'Failed to join room via HTTP');
+                throw new Error(error.message || "Failed to join room via HTTP");
             }
 
             const joinResult = await joinResponse.json();
@@ -91,20 +86,20 @@ class WebSocketService {
                         resolve();
                         return;
                     }
-                    this.socket?.once('connect', () => resolve());
+                    this.socket?.once("connect", () => resolve());
                 });
             }
 
             // Step 2: Connect WebSocket to room
             const socketId = this.getSocketId();
             if (!socketId) {
-                throw new Error('WebSocket not connected');
+                throw new Error("WebSocket not connected");
             }
 
             const wsConnectResponse = await fetch(`${HTTP_API_URL}/room/${roomId}/connect-websocket`, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
                     peerId,
@@ -114,16 +109,16 @@ class WebSocketService {
 
             if (!wsConnectResponse.ok) {
                 const error = await wsConnectResponse.json();
-                throw new Error(error.message || 'Failed to connect WebSocket');
+                throw new Error(error.message || "Failed to connect WebSocket");
             }
 
             console.log("[WS] WebSocket connected to room:", roomId);
 
             // Step 3: Setup media room
             const mediaSetupResponse = await fetch(`${HTTP_API_URL}/room/${roomId}/setup-media`, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
                     peerId,
@@ -132,17 +127,17 @@ class WebSocketService {
 
             if (!mediaSetupResponse.ok) {
                 const error = await mediaSetupResponse.json();
-                throw new Error(error.message || 'Failed to setup media');
+                throw new Error(error.message || "Failed to setup media");
             }
 
             const mediaSetupResult = await mediaSetupResponse.json();
             console.log("[WS] Media setup completed:", mediaSetupResult);
 
             // Now emit WebSocket event to complete the process
-            this.socket?.emit("sfu:join-complete", { 
-                roomId, 
-                peerId, 
-                routerRtpCapabilities: mediaSetupResult.routerRtpCapabilities 
+            this.socket?.emit("sfu:join-complete", {
+                roomId,
+                peerId,
+                routerRtpCapabilities: mediaSetupResult.routerRtpCapabilities,
             });
 
             return {
@@ -151,21 +146,10 @@ class WebSocketService {
                 roomData: joinResult.roomData,
                 routerRtpCapabilities: mediaSetupResult.routerRtpCapabilities,
             };
-
         } catch (error) {
             console.error("[WS] Hybrid join failed:", error);
             throw error;
         }
-    }
-
-    // Legacy method for backward compatibility
-    joinRoomLegacy(
-        roomId: string,
-        peerId: string,
-        password?: string,
-        userInfo?: any
-    ) {
-        this.socket?.emit("sfu:join", { roomId, peerId, password, userInfo });
     }
 }
 

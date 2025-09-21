@@ -1,12 +1,5 @@
 import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,13 +27,8 @@ const VideoPreviewSection = ({ user }: { user: any }) => {
     return (
         <div className='space-y-4'>
             <div>
-                <Label>Preview Your Camera & Audio</Label>
-                <VideoPreview
-                    userName={user.name}
-                    localStream={localStream}
-                    toggleVideo={toggleVideo}
-                    toggleAudio={toggleAudio}
-                />
+                <Label className='mb-2'>Preview Your Camera & Audio</Label>
+                <VideoPreview userName={user.name} localStream={localStream} toggleVideo={toggleVideo} toggleAudio={toggleAudio} />
             </div>
         </div>
     );
@@ -52,11 +40,7 @@ interface CreateRoomDialogProps {
     organizationId: string;
 }
 
-export const CreateRoomDialog = ({
-    open,
-    onOpenChange,
-    organizationId,
-}: CreateRoomDialogProps) => {
+export const CreateRoomDialog = ({ open, onOpenChange, organizationId }: CreateRoomDialogProps) => {
     const [roomForm, setRoomForm] = useState({
         name: "",
         description: "",
@@ -66,10 +50,7 @@ export const CreateRoomDialog = ({
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
-    const handleCreateRoom = async (data: {
-        name: string;
-        description: string;
-    }) => {
+    const handleCreateRoom = async (data: { name: string; description: string }) => {
         createOrgRoom({
             ...data,
             organizationId: organizationId,
@@ -96,11 +77,7 @@ export const CreateRoomDialog = ({
                 navigate(`/room/${roomId}`);
                 toast.success("Meeting room created successfully!");
             } else {
-                toast.error(
-                    response.message ||
-                        response.data?.message ||
-                        "Failed to create room"
-                );
+                toast.error(response.message || response.data?.message || "Failed to create room");
             }
         });
     };
@@ -117,17 +94,15 @@ export const CreateRoomDialog = ({
             <DialogContent className='max-w-6xl'>
                 <DialogHeader>
                     <DialogTitle>Create Meeting Room</DialogTitle>
-                    <DialogDescription>
-                        Create a new secure room for your organization meetings.
-                    </DialogDescription>
+                    <DialogDescription>Create a new secure room for your organization meetings.</DialogDescription>
                 </DialogHeader>
 
                 <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
                     {open && <VideoPreviewSection user={user} />}
 
                     {/* Right Column - Room Settings */}
-                    <div className='space-y-4'>
-                        <div>
+                    <div className='space-y-6'>
+                        <div className='space-y-2'>
                             <Label htmlFor='room-name'>Room Name</Label>
                             <Input
                                 id='room-name'
@@ -141,10 +116,8 @@ export const CreateRoomDialog = ({
                                 }
                             />
                         </div>
-                        <div>
-                            <Label htmlFor='room-description'>
-                                Description
-                            </Label>
+                        <div className='space-y-2'>
+                            <Label htmlFor='room-description'>Description</Label>
                             <Textarea
                                 id='room-description'
                                 placeholder='Morning team meeting'
@@ -161,27 +134,13 @@ export const CreateRoomDialog = ({
                 </div>
 
                 <DialogFooter>
-                    <Button
-                        variant='outline'
-                        onClick={() => onOpenChange(false)}
-                    >
+                    <Button variant='outline' onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
-                    <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                    >
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={
-                                !roomForm.name.trim() || isCreatingOrgRoom
-                            }
-                            className='bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
-                        >
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        <Button onClick={handleSubmit} disabled={!roomForm.name.trim() || isCreatingOrgRoom} className='bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'>
                             <CheckCircle className='mr-2 h-4 w-4' />
-                            {isCreatingOrgRoom
-                                ? "Creating..."
-                                : "Create & Join Room"}
+                            {isCreatingOrgRoom ? "Creating..." : "Create & Join Room"}
                             <ArrowRight className='ml-2 h-4 w-4' />
                         </Button>
                     </motion.div>

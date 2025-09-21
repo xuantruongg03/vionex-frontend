@@ -1,18 +1,3 @@
-// Legacy interfaces - can be removed in future
-export interface RoomSession {
-    roomId: string; // Direct room ID
-    organizationId: string;
-    userId: string;
-    permissions: string[];
-}
-
-export interface CreateRoomSessionRequest {
-    roomId: string; // Direct room ID
-    organizationId: string;
-    userId: string;
-    permissions?: string[];
-}
-
 /**
  * Check if a room ID is an organization room
  */
