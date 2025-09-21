@@ -167,36 +167,28 @@
   }
 }
 
-/* Google Login custom button styles */
-.google-login-custom {
-  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
-  transition: all 0.2s ease-in-out;
+/* Google Login custom button styles - simplified */
+.google-login-button {
+  font-family: inherit;
+  transition: background-color 0.2s ease-in-out;
 }
 
-.google-login-custom:hover {
-  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.2);
+.google-login-button:hover {
+  background-color: inherit;
 }
 
-.google-login-custom:focus {
+.google-login-button:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
+  box-shadow: none;
 }
 
-/* Roboto font utility class */
-.font-roboto {
-  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
-}
-
-/* Dark mode specific styles for Google login */
+/* Remove any special styling for Google login in dark mode */
 @media (prefers-color-scheme: dark) {
-  .google-login-custom {
-    border-color: #374151;
-    background-color: #1f2937;
+  .google-login-button {
+    background-color: inherit;
   }
   
-  .google-login-custom:hover {
-    border-color: #4b5563;
-    background-color: #111827;
-    box-shadow: 0 2px 8px 0 rgba(255,255,255,0.1);
+  .google-login-button:hover {
+    background-color: inherit;
   }
 }
