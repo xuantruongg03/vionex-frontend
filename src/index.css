@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -165,16 +167,36 @@
   }
 }
 
-/* Google Login button width fix using transform scale */
-.google-login-wrapper {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  overflow: hidden;
+/* Google Login custom button styles */
+.google-login-custom {
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  transition: all 0.2s ease-in-out;
 }
 
-.google-login-wrapper > div {
-  transform: scaleX(1.69);
-  transform-origin: center;
-  width: 236px;
+.google-login-custom:hover {
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.2);
+}
+
+.google-login-custom:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
+}
+
+/* Roboto font utility class */
+.font-roboto {
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+
+/* Dark mode specific styles for Google login */
+@media (prefers-color-scheme: dark) {
+  .google-login-custom {
+    border-color: #374151;
+    background-color: #1f2937;
+  }
+  
+  .google-login-custom:hover {
+    border-color: #4b5563;
+    background-color: #111827;
+    box-shadow: 0 2px 8px 0 rgba(255,255,255,0.1);
+  }
 }
