@@ -92,10 +92,8 @@ export class ProducerManager {
 
             // Priority 1: Both video and audio available
             if (hasValidVideo && hasValidAudio) {
-                await Promise.all([
-                    this.publishVideoTrack(videoTrack),
-                    this.publishAudioTrack(audioTrack),
-                ]);
+                await this.publishAudioTrack(audioTrack);
+                await this.publishVideoTrack(videoTrack);
             }
             // Priority 2: Only audio available
             else if (!hasValidVideo && hasValidAudio) {
@@ -107,24 +105,8 @@ export class ProducerManager {
             }
             // Priority 4: No media available - notify user and skip
             else {
-                // toast.info("No camera or microphone available");
                 return false;
             }
-
-            // Show success message based on what was published
-            // const publishedCount = this.context.refs.producersRef.current.size;
-            // if (publishedCount > 0) {
-            //     if (hasValidVideo && hasValidAudio) {
-            //         toast.success("Video and audio connected successfully");
-            //     } else if (hasValidVideo) {
-            //         toast.success("Video connected successfully (no audio)");
-            //     } else if (hasValidAudio) {
-            //         toast.success("Audio connected successfully (no video)");
-            //     }
-            // } else {
-            //     toast.warning("Failed to connect media");
-            //     return false;
-            // }
 
             return true;
         } catch (error) {
@@ -184,7 +166,7 @@ export class ProducerManager {
                     encodings: encodings,
                     appData: {
                         type: "webcam",
-                        video: track.enabled, // default true
+                        video: track.enabled, 
                         audio: false,
                         platform: isMobile ? "mobile" : "desktop",
                     },

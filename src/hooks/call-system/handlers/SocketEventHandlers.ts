@@ -246,7 +246,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             } else {
                 toast.success(`Successfully pinned user`);
             }
-            // Note: pinnedPeerId should be managed in RoomManager.togglePinUser
         } else {
             toast.error(`Failed to pin user: ${data.message}`);
         }
@@ -436,21 +435,16 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.on("sfu:stream-added", this.handleStreamAdded);
         socket.on("sfu:stream-metadata-updated", this.handleStreamMetadataUpdated);
         socket.on("sfu:stream-removed", (data: any) => {
-            const streamId = data.streamId || data.stream_id;
+            const streamId = data.streamId;
             if (streamId) {
-                console.log(`Removing stream: ${streamId}`);
-                this.streamManager.removeStream(streamId);
+                this.streamManager.removeStream(streamId, data.isScreenShare, data.publisherId);
 
                 // Also remove from consuming tracking
                 this.streamManager.removeFromConsuming(streamId);
 
-                // Parse stream ID to show appropriate toast for screen share
-                const parts = streamId.split("_");
-                const publisherId = parts[0];
-                const mediaType = parts[1];
-
-                if (mediaType === "screen" || mediaType === "screen_audio") {
-                    toast.info(`${publisherId} stopped screen sharing`);
+                // Use isScreenShare from data instead of parsing streamId
+                if (data.isScreenShare) {
+                    toast.info(`${data.publisherId} stopped screen sharing`);
                 }
             }
         });

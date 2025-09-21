@@ -168,7 +168,7 @@ const Auth = () => {
                             </div>
 
                             <div className='w-full google-login-wrapper'>
-                                <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme='outline' size='large' width='100%' text={isLogin ? "signin_with" : "signup_with"} />
+                                <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme='outline' size='large' width='100%' text={isLogin ? "signin_with" : "signup_with"} useOneTap={false} />
                             </div>
 
                             <div className='text-center text-sm'>

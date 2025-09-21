@@ -1,5 +1,6 @@
 import { useSocket } from "@/contexts/SocketContext";
 import { useCallback, useEffect } from "react";
+import { useSelector } from "react-redux";
 
 type ResponseEvt = { requestId: string; text: string };
 type ErrorEvt = { requestId: string; message: string };
@@ -9,12 +10,19 @@ type Handlers = {
     onError: (m: ErrorEvt) => void;
 };
 
+interface RootState {
+    room: {
+        organizationId: string | null;
+    };
+}
+
 function genId() {
     return crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
 
 export default function useAskChatBot(roomId: string, handlers: Handlers) {
     const { socket } = useSocket();
+    const organizationId = useSelector((state: RootState) => state.room.organizationId);
 
     useEffect(() => {
         if (!socket) return;
@@ -34,10 +42,15 @@ export default function useAskChatBot(roomId: string, handlers: Handlers) {
     const sendQuestion = useCallback(
         (question: string) => {
             const requestId = genId();
-            socket.emit("chatbot:ask", { id: requestId, roomId, text: question });
+            socket.emit("chatbot:ask", {
+                id: requestId,
+                roomId,
+                text: question,
+                organizationId,
+            });
             return Promise.resolve({ requestId });
         },
-        [socket, roomId]
+        [socket, roomId, organizationId]
     );
 
     return { sendQuestion };

@@ -165,16 +165,36 @@
   }
 }
 
-/* Google Login button width fix using transform scale */
-.google-login-wrapper {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  overflow: hidden;
+/* Google Login button font size fix to match UI buttons (text-sm = 14px) */
+.google-login-wrapper iframe {
+  height: 40px !important;
 }
 
-.google-login-wrapper > div {
-  transform: scaleX(1.69);
-  transform-origin: center;
-  width: 236px;
+/* Target Google's button text specifically */
+.google-login-wrapper .nsm7Bb-HzV7m-LgbsSe {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  font-family: inherit !important;
+}
+
+/* Additional selectors for different Google button implementations */
+.google-login-wrapper button span {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.google-login-wrapper .nsm7Bb-HzV7m-LgbsSe-MJoBVe {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+/* Ensure consistent styling across all Google button elements */
+.google-login-wrapper * {
+  font-family: inherit !important;
+}
+
+.google-login-wrapper div[role="button"] {
+  font-size: 14px !important;
+  font-weight: 500 !important;
 }

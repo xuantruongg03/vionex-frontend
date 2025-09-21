@@ -1,257 +1,327 @@
-# Vionex - Enterprise Video Conferencing Platform
-
 <p align="center">
-  <img src="https://res.cloudinary.com/dcweof28t/image/upload/v1750399380/image_products/favicon_vo2jtz.png" alt="Vionex Logo" width="400"/>
+  <img src="https://res.cloudinary.com/dcweof28t/image/upload/v1750399380/image_products/favicon_vo2jtz.png" alt="Vionex Logo" width="200"/>
 </p>
 
 <p align="center">
-  <strong>A cutting-edge, scalable video conferencing solution built with modern web technologies</strong>
+  <img src="https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React"/>
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite"/>
+  <img src="https://img.shields.io/badge/WebRTC-333333?style=for-the-badge&logo=webrtc&logoColor=white" alt="WebRTC"/>
+  <img src="https://img.shields.io/badge/Tailwind-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind"/>
+  <img src="https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white" alt="Socket.io"/>
 </p>
 
-<p align="center">
-  <a href="https://vionex-frontend.vercel.app/" target="_blank">🚀 Live Demo</a>
-</p>
+# 🎥 Vionex Frontend
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-21+-green.svg" alt="Node.js"></a>
-  <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-18+-blue.svg" alt="React"></a>
-  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5+-blue.svg" alt="TypeScript"></a>
-  <a href="https://webrtc.org/"><img src="https://img.shields.io/badge/WebRTC-Latest-orange.svg" alt="WebRTC"></a>
-  <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-5+-purple.svg" alt="Vite"></a>
-</p>
+Modern, enterprise-grade video conferencing client with AI-powered features and real-time collaboration tools.
 
----
+## 🚀 Overview
 
-## Overview
+**Vionex Frontend** is a cutting-edge React application that provides a comprehensive video conferencing experience. Built with modern web technologies, it delivers seamless real-time communication with advanced features like AI transcription, semantic search, and interactive collaboration tools.
 
-Vionex is a professional-grade, real-time video conferencing platform designed for modern enterprises. Built with React, TypeScript, and WebRTC, it delivers high-quality video communication with advanced features like screen sharing, real-time chat, and intelligent media routing through our Selective Forwarding Unit (SFU) architecture.
+### ✨ Key Features
 
-## Key Features
+- **HD Video Conferencing**: Crystal-clear video calls with WebRTC SFU architecture
+- **AI-Powered Transcription**: Real-time speech-to-text display during meetings
+- **Semantic Search**: Search through meeting transcripts intelligently
+- **Organization Support**: Multi-tenant interface with organization management
+- **Real-time Chat**: Instant messaging within meeting rooms
+- **Interactive Whiteboard**: Collaborative drawing and annotation tools
+- **Screen Sharing**: Desktop and application sharing capabilities
+- **Voting & Polls**: Real-time polling and quiz management
+- **Translation Cabin**: Multi-language translation support
+- **Responsive Design**: Seamless experience across all devices
 
-### Advanced Video Conferencing
+## 🛠️ Technology Stack
 
--   **Multi-participant Support**: Handle unlimited participants with efficient SFU architecture
--   **HD Video Quality**: Adaptive bitrate streaming for optimal quality
--   **Screen Sharing**: Professional screen sharing capabilities
--   **Picture-in-Picture**: Advanced layout management
+### **Frontend Framework**
+- **React 18+**: Modern component-based UI framework
+- **TypeScript**: Type-safe development experience
+- **Vite**: Lightning-fast build tool and dev server
+- **Tailwind CSS**: Utility-first styling framework
 
-### Enterprise Security
+### **UI & Components**
+- **shadcn/ui**: Beautiful, accessible component library
+- **Framer Motion**: Smooth animations and transitions
+- **Lucide React**: Modern icon library
+- **Excalidraw**: Collaborative whiteboard integration
 
--   **Room Protection**: Password-protected meeting rooms
--   **Secure Connections**: End-to-end encrypted communications
--   **Access Control**: Granular permission management
+### **State Management & Data**
+- **Redux Toolkit**: Predictable state management
+- **React Query**: Server state management
+- **Zustand**: Lightweight state management
 
-### Collaboration Tools
+### **Real-time Communication**
+- **WebRTC**: Peer-to-peer media streaming
+- **Socket.IO**: Real-time bidirectional communication
+- **MediaSoup Client**: Professional SFU integration
 
--   **Real-time Chat**: Integrated messaging system with file sharing
--   **Interactive Whiteboard**: Collaborative drawing with permission controls
--   **File Sharing**: Support for images, documents, and PDFs
--   **Recording**: Meeting recording capabilities (coming soon)
+### **AI & Advanced Features**
+- **Web Audio API**: Advanced audio processing
+- **Speech Recognition API**: Voice commands
+- **WebRTC VAD**: Voice activity detection
+- **Real-time Transcription**: AI-powered speech-to-text
 
-### Professional Controls
+### **Development Tools**
+- **ESLint**: Code quality enforcement
+- **Prettier**: Code formatting
+- **TypeScript**: Static type checking
+- **Docker**: Containerized development
 
--   **Media Management**: Granular audio/video controls
--   **User Management**: Pin speakers, manage participants
--   **Responsive Design**: Seamless experience across all devices
--   **Voice Activity Detection**: Intelligent speaker highlighting
-
-### Educational & Enterprise Features
-
--   **Interactive Quizzes**: Create and conduct real-time quizzes with multiple question types
--   **Secret Voting**: Anonymous voting system for decision making
--   **Behavior Monitoring**: Advanced attention tracking for educational settings
--   **Translation Cabin**: Real-time language translation capabilities
--   **Network Monitoring**: Connection quality analysis and diagnostics
-
-## Technology Stack
-
-### Frontend Architecture
-
--   **React 18+** - Modern component-based UI framework
--   **TypeScript 5+** - Type-safe development experience
--   **Vite** - Lightning-fast build tool and dev server
--   **Tailwind CSS** - Utility-first styling framework
--   **shadcn/ui** - Beautiful, accessible component library
--   **Framer Motion** - Smooth animations and transitions
--   **Redux Toolkit** - Predictable state management
-
-### Real-time Communication
-
--   **WebRTC** - Peer-to-peer media streaming
--   **MediaSoup Client** - Professional SFU implementation
--   **Socket.IO** - Real-time bidirectional communication
--   **PeerJS** - Simplified WebRTC abstraction
-
-### Advanced Features
-
--   **Excalidraw** - Collaborative whiteboard drawing
--   **Web Audio API** - Advanced audio processing
--   **WebRTC VAD** - Voice activity detection
-
-### Development & Deployment
-
--   **Docker** - Containerized deployment
--   **Nginx** - High-performance web server
--   **ESLint** - Code quality enforcement
--   **Prettier** - Code formatting
-
-## Quick Features Demo
-
-🎯 **Try these features in our live demo**: [https://vionex-frontend.vercel.app/](https://vionex-frontend.vercel.app/)
-
--   **Video Conferencing**: HD video calls with unlimited participants
--   **Screen Sharing**: Share your screen with crystal clear quality  
--   **Interactive Whiteboard**: Collaborate in real-time with drawing tools
--   **Live Chat**: Send messages and share files instantly
--   **Quiz System**: Create interactive quizzes for education/training
--   **Secret Voting**: Make decisions with anonymous voting
--   **Translation**: Real-time language translation
-
-## Quick Start
+## 📋 Quick Start
 
 ### Prerequisites
-
-Ensure you have the following installed:
-
--   **Node.js** 21+ ([Download](https://nodejs.org/))
--   **npm** or **bun** package manager
--   **Git** for version control
+- **Node.js** 18.0+ ([Download](https://nodejs.org/))
+- **npm**, **yarn**, or **bun** package manager
+- **Git** for version control
 
 ### Installation
 
-1. **Clone the repository**
+```bash
+# Clone the repository
+git clone https://github.com/xuantruongg03/groupchat-video-call.git
+cd groupchat-video-call
 
-    ```bash
-    git clone https://github.com/xuantruongg03/video-call-group.git
-    cd video-call-group
-    ```
+# Install dependencies
+npm install
+# or
+bun install
 
-2. **Install dependencies**
+# Create environment file
+cp .env.example .env
+```
 
-    ```bash
-    # Using npm
-    npm install
+### Environment Configuration
 
-    # Using bun (recommended for faster installs)
-    bun install
-    ```
+Create a `.env` file in the root directory:
 
-3. **Environment Configuration**
+```env
+# Backend API
+VITE_SERVER_URL=http://localhost:3000
 
-    Create a `.env` file in the root directory:
+# Cloudinary (for file uploads)
+VITE_CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+VITE_CLOUDINARY_UPLOAD_PRESET=your-upload-preset
 
-    ```env
-    VITE_SERVER_URL=YOUR_SERVER_URL
+# Google OAuth (optional)
+VITE_GOOGLE_CLIENT_ID=your-google-client-id
+```
 
-    VITE_CLOUDINARY_CLOUD_NAME=YOUR_CLOUDINARY_CLOUD_NAME
-    VITE_CLOUDINARY_UPLOAD_PRESET=YOUR_CLOUDINARY_UPLOAD_PRESET
+### Development
 
-    # Google OAuth
-    VITE_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
-    ```
+```bash
+# Start development server
+npm run dev
+# or
+bun dev
 
-4. **Start Development Server**
-
-    ```bash
-    # Using npm
-    npm run dev
-
-    # Using bun
-    bun run dev
-    ```
-
-    The application will be available at `http://localhost:5173`
+# Open http://localhost:5173 in your browser
+```
 
 ### Production Build
-
-Generate optimized production assets:
 
 ```bash
 # Build for production
 npm run build
 
-# Preview production build locally
+# Preview production build
 npm run preview
+
+# Deploy to your hosting platform
 ```
-### Production Considerations
 
-The included Nginx configuration is optimized for:
+### Docker Development
 
--   Serving React SPA with proper routing
--   WebRTC traffic handling
--   Security headers
--   Gzip compression
--   Static asset caching
+```bash
+# Build and run with Docker
+docker build -t vionex-frontend .
+docker run -p 5173:5173 vionex-frontend
 
-## Project Architecture
+# Or use Docker Compose
+docker-compose up -d
+```
+
+## 📁 Project Architecture
 
 ```
 src/
-├── components/           # Reusable React components
-│   ├── ui/              # shadcn/ui components
-│   ├── Dialogs/         # Modal components
-│   ├── Layout/          # Layout components
-│   └── VideoGrid.tsx    # Main video grid component
-├── hooks/               # Custom React hooks
-├── interfaces/          # TypeScript type definitions
-├── pages/               # Application pages/routes
-├── redux/               # State management (Redux Toolkit)
-├── services/            # API and external service integrations
-├── utils/               # Utility functions and helpers
-└── configs/             # Application configuration files
+├── components/              # 🧩 Reusable React components
+│   ├── ui/                 # shadcn/ui base components
+│   ├── VideoGrid.tsx       # Main video conferencing interface
+│   ├── ChatSidebar.tsx     # Real-time messaging component
+│   ├── ParticipantsList.tsx# Participant management
+│   ├── WhiteBoard.tsx      # Collaborative whiteboard
+│   └── VideoControls.tsx   # Media control interface
+├── hooks/                  # 🪝 Custom React hooks
+│   ├── useWebRTC.ts       # WebRTC connection management
+│   ├── useSocket.ts       # Socket.IO integration
+│   └── useTranscription.ts# AI transcription hooks
+├── interfaces/             # 📝 TypeScript type definitions
+├── pages/                  # 📄 Application pages/routes
+│   ├── LoginPage.tsx      # Authentication page
+│   ├── DashboardPage.tsx  # User dashboard
+│   └── MeetingPage.tsx    # Main meeting interface
+├── redux/                  # 🗄️ State management
+│   ├── slices/            # Redux Toolkit slices
+│   └── store.ts           # Store configuration
+├── services/               # 🔌 API integrations
+│   ├── api.ts             # Backend API client
+│   ├── webrtc.ts          # WebRTC service
+│   └── socket.ts          # Socket.IO service
+├── utils/                  # 🛠️ Utility functions
+└── configs/                # ⚙️ Configuration files
 ```
 
-### Key Components
+### 🎯 Key Features & Components
 
--   **VideoGrid**: Main video conferencing interface with adaptive layouts
--   **ChatSidebar**: Real-time messaging component with file sharing
--   **ParticipantsList**: Meeting participant management
--   **VideoControls**: Comprehensive media control interface
--   **WhiteBoard**: Collaborative whiteboard with permission system
--   **QuizSidebar**: Interactive quiz creation and management
--   **SecretVotingDialog**: Anonymous voting system
--   **TranslationCabinSidebar**: Real-time translation interface
--   **NetworkMonitorDialog**: Connection quality monitoring
--   **BehaviorMonitoring**: Attention and engagement tracking
+#### **Video Conferencing**
+- **VideoGrid**: Adaptive video layout with speaker focus
+- **VideoControls**: Camera, microphone, screen sharing controls
+- **ParticipantsList**: Participant management with permissions
 
-## Contributing
+#### **Real-time Communication**
+- **ChatSidebar**: Instant messaging with file sharing
+- **Socket Integration**: Real-time event handling
+- **Notification System**: In-app notifications and alerts
 
-We welcome contributions from the community! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
+#### **AI-Powered Features**
+- **TranscriptionDisplay**: Live speech-to-text transcription
+- **SemanticSearch**: Intelligent transcript search
+- **ChatbotInterface**: AI assistant integration
+
+#### **Interactive Tools**
+- **WhiteBoard**: Collaborative drawing with Excalidraw
+- **QuizSidebar**: Interactive quiz creation and management
+- **VotingDialog**: Real-time polling and voting system
+- **TranslationCabin**: Multi-language translation interface
+
+#### **Organization Management**
+- **OrganizationSelector**: Multi-tenant organization switching
+- **UserManagement**: User roles and permissions
+- **MeetingHistory**: Organization-scoped meeting history
+
+## 🚀 Backend Integration
+
+This frontend connects to the **Vionex Backend** microservices architecture:
+
+```
+Frontend (React) ←→ API Gateway ←→ Microservices
+                                    ├── Auth Service
+                                    ├── Room Service  
+                                    ├── SFU Service
+                                    ├── Chat Service
+                                    ├── Audio Service (AI)
+                                    ├── Semantic Service
+                                    ├── Chatbot Service (AI)
+                                    └── Interaction Service
+```
+
+### 🔗 API Endpoints Used
+- **Authentication**: `/api/auth/*` - User login, organization management
+- **Rooms**: `/api/rooms/*` - Meeting room operations
+- **WebSocket**: `/socket.io` - Real-time communication
+- **Chat**: Real-time messaging via WebSocket
+- **Media**: WebRTC signaling through SFU service
+- **AI Features**: Transcription, semantic search, chatbot integration
+
+### 📡 Real-time Features
+- **WebRTC**: Direct peer-to-peer media streaming
+- **Socket.IO**: Chat, notifications, room events
+- **gRPC Streaming**: AI transcription and responses
+- **WebSocket**: Organization-aware real-time updates
+
+## 🔐 Security Features
+
+- **JWT Authentication**: Secure token-based authentication
+- **Organization Isolation**: Multi-tenant data separation
+- **WebRTC Security**: DTLS encryption for media streams
+- **API Security**: Request validation and rate limiting
+- **CORS Protection**: Cross-origin request security
+
+## 🎨 UI/UX Features
+
+- **Responsive Design**: Mobile-first responsive layout
+- **Dark/Light Mode**: Theme switching capability
+- **Accessibility**: WCAG compliant components
+- **Animations**: Smooth transitions with Framer Motion
+- **Loading States**: Skeleton loaders and progress indicators
+- **Error Handling**: Graceful error boundaries and feedback
+
+## 📱 Device Support
+
+- **Desktop**: Full feature set with advanced controls
+- **Tablet**: Touch-optimized interface with gesture support
+- **Mobile**: Streamlined mobile experience
+- **PWA Ready**: Progressive Web App capabilities
+- **Cross-browser**: Chrome, Firefox, Safari, Edge support
+
+## 🤝 Contributing
+
+We welcome contributions to improve Vionex Frontend!
 
 ### Development Workflow
-
 1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add some amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
+2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+3. **Make** your changes with proper TypeScript types
+4. **Test** your changes thoroughly
+5. **Commit** with conventional commits: `git commit -m 'feat: add amazing feature'`
+6. **Push** to your branch: `git push origin feature/amazing-feature`
+7. **Submit** a Pull Request with detailed description
 
 ### Code Standards
+- **TypeScript**: Follow strict type checking
+- **ESLint**: Use provided configuration
+- **Prettier**: Auto-format code before commits
+- **Testing**: Add tests for new features
+- **Documentation**: Update README for new features
 
--   Follow TypeScript best practices
--   Use Prettier for code formatting
--   Ensure ESLint passes
--   Write meaningful commit messages
--   Add tests for new features
+### Development Setup
+```bash
+# Install dependencies
+npm install
 
-## License
+# Run linting
+npm run lint
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for complete details.
+# Run type checking
+npm run type-check
 
-## Related Projects
+# Run tests
+npm run test
 
--   **[Vionex Backend](https://github.com/xuantruongg03/vionex-backend-monorepo)** - Microservices backend architecture
--   **API Documentation** - OpenAPI/Swagger documentation (coming soon)
+# Start development server
+npm run dev
+```
 
-## Support
+## 📜 License
 
--   **Issues**: [GitHub Issues](https://github.com/xuantruongg03/video-call-group/issues)
--   **Documentation**: [Wiki](https://github.com/xuantruongg03/video-call-group/wiki) (coming soon)
--   **Community**: [Discussions](https://github.com/xuantruongg03/video-call-group/discussions)
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+### What you can do:
+- ✅ Use for personal and commercial projects
+- ✅ Modify and distribute
+- ✅ Private use
+- ✅ Include in proprietary software
+
+### What you must do:
+- 📝 Include the original license
+- 📝 Include copyright notice
+
+## 🔗 Related Projects
+
+- **[Vionex Backend](https://github.com/xuantruongg03/vionex-backend)** - Microservices backend with AI features
+- **[Vionex API Documentation](https://github.com/xuantruongg03/vionex-docs)** - API documentation and guides
+
+## 📞 Support & Contact
+
+- **Issues**: [GitHub Issues](https://github.com/xuantruongg03/groupchat-video-call/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/xuantruongg03/groupchat-video-call/discussions)
+- **Email**: xuantruongg03@gmail.com
+- **Documentation**: [Wiki](https://github.com/xuantruongg03/groupchat-video-call/wiki)
 
 ---
 
 <p align="center">
-  <strong>Built with ❤️ by the xuantruongg003</strong>
+  <strong>Built with ❤️ by the Vionex Team</strong><br>
+  <em>Empowering seamless communication through modern web technologies</em>
 </p>
