@@ -165,6 +165,20 @@
   }
 }
 
+/* Google Login button styling */
+.google-login-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+.google-login-wrapper > div {
+  transform: scaleX(1.69);
+  transform-origin: center;
+  width: 236px;
+}
+
 /* Google Login button font size fix to match UI buttons (text-sm = 14px) */
 .google-login-wrapper iframe {
   height: 40px !important;
@@ -197,4 +211,35 @@
 .google-login-wrapper div[role="button"] {
   font-size: 14px !important;
   font-weight: 500 !important;
+}
+
+/* Fix for logged-in state (profile/continue button) */
+.google-login-wrapper button[data-idom-class] {
+  min-height: 40px !important;
+  height: 40px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  padding: 8px 16px !important;
+}
+
+/* Target the profile/account selection button specifically */
+.google-login-wrapper .nsm7Bb-HzV7m-LgbsSe-bN97Pc-sM5MNb {
+  min-height: 40px !important;
+  height: 40px !important;
+  font-size: 14px !important;
+}
+
+/* Fix for account selection dropdown */
+.google-login-wrapper .g_id_signin {
+  min-height: 40px !important;
+}
+
+/* Ensure all Google button variants maintain consistent height */
+.google-login-wrapper button,
+.google-login-wrapper [role="button"] {
+  min-height: 40px !important;
+  height: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
