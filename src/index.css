@@ -165,4 +165,64 @@
   }
 }
 
-/* Remove Google login container styling since we're using custom button now */
+/* Google Login button custom styling */
+.google-login-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+.google-login-container > div {
+  width: 100% !important;
+}
+
+/* Style the Google button to match our design */
+.google-login-container div[role="button"] {
+  width: 100% !important;
+  height: 40px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  background: white !important;
+  transition: all 0.2s !important;
+  box-shadow: none !important;
+}
+
+.google-login-container div[role="button"]:hover {
+  background: #f9fafb !important;
+}
+
+/* Dark mode styles */
+.dark .google-login-container div[role="button"] {
+  background: transparent !important;
+  border-color: #4b5563 !important;
+  color: white !important;
+}
+
+.dark .google-login-container div[role="button"]:hover {
+  background: #1f2937 !important;
+}
+
+/* Hide the default Google text and replace with custom text */
+.google-login-container div[role="button"] > div:last-child {
+  display: none !important;
+}
+
+.google-login-container div[role="button"]::after {
+  content: "Sign In by Google";
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: inherit;
+}
+
+/* Keep the Google logo visible */
+.google-login-container div[role="button"] > div:first-child {
+  display: flex !important;
+  align-items: center !important;
+}
