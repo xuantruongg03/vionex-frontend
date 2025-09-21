@@ -1,14 +1,3 @@
-/*!
- * Copyright (c) 2025 xuantruongg003
- *
- * This software is licensed for non-commercial use only.
- * You may use, study, and modify this code for educational and research purposes.
- *
- * Commercial use of this code, in whole or in part, is strictly prohibited
- * without prior written permission from the author.
- *
- * Author Contact: lexuantruong098@gmail.com
- */
 
 import { useState } from "react";
 import { Building } from "lucide-react";
