@@ -165,9 +165,6 @@
   }
 }
 
-/* Google Login button width fix using transform scale */
-
-
 /* Google Login button font size fix to match UI buttons (text-sm = 14px) */
 .google-login-wrapper iframe {
   height: 40px !important;
