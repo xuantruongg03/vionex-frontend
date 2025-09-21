@@ -165,19 +165,8 @@
   }
 }
 
-/* Google Login button styling */
-.google-login-wrapper {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  overflow: hidden;
-}
+/* Google Login button width fix using transform scale */
 
-.google-login-wrapper > div {
-  transform: scaleX(1.69);
-  transform-origin: center;
-  width: 236px;
-}
 
 /* Google Login button font size fix to match UI buttons (text-sm = 14px) */
 .google-login-wrapper iframe {
