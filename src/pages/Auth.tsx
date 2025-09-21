@@ -167,11 +167,15 @@ const Auth = () => {
                                 <span className='absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 px-2 text-xs text-muted-foreground'>OR</span>
                             </div>
 
-                            <div className='w-full'>
-                                {/* Use GoogleLogin directly with custom container */}
-                                <div className='google-login-container w-full'>
-                                    <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme='outline' size='large' width='100%' text='signin_with' shape='rectangular' logo_alignment='left' useOneTap={false} />
-                                </div>
+                            <div className='w-full google-login-wrapper'>
+                                <GoogleLogin 
+                                    onSuccess={handleGoogleSuccess} 
+                                    onError={handleGoogleError} 
+                                    theme='outline' 
+                                    size='large' 
+                                    width='100%' 
+                                    text={isLogin ? "signin_with" : "signup_with"}
+                                    useOneTap={false} />
                             </div>
 
                             <div className='text-center text-sm'>
