@@ -468,9 +468,3 @@ export function useCallRefactored(roomId: string, password?: string) {
         sendTransport: refs.sendTransportRef.current,
     };
 }
-
-// Export socket access for backward compatibility
-export const getSocket = () => {
-    console.warn("getSocket is deprecated, use useSocket hook from SocketContext instead");
-    return null;
-};

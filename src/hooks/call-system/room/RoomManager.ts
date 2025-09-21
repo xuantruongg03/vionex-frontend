@@ -1,8 +1,6 @@
-import { toast } from "sonner";
-import { Device } from "mediasoup-client";
 import { ActionRoomType } from "@/interfaces/action";
+import { toast } from "sonner";
 import { CallSystemContext } from "../types";
-import { isOrganizationRoomToken } from "@/utils/roomSecurity";
 
 /**
  * Room Manager Module

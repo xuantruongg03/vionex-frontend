@@ -66,7 +66,7 @@ const Room = () => {
             }
         } else {
             // Fallback to search params
-            const roomIdFromParams = searchParams.get("roomId");
+            const roomIdFromParams = searchParams.get("idroom");
             if (roomIdFromParams) {
                 setRoomId(roomIdFromParams);
 
