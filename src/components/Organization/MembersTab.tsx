@@ -1,18 +1,16 @@
-import { useState } from "react";
-import { UserPlus, Trash2, Copy } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Member } from "@/services/orgService";
 import useCreateMember from "@/hooks/org/use-create-member";
-import { useUserPermissions } from "@/hooks/org/use-user-permissions";
-import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
 import useRemoveMember from "@/hooks/org/use-remove-member";
-import { useSelector } from "react-redux";
+import { useUserPermissions } from "@/hooks/org/use-user-permissions";
+import { useQueryClient } from "@tanstack/react-query";
+import { Copy, Trash2, UserPlus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface MemberData {
     id: string;

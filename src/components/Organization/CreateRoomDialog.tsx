@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import VideoPreview from "@/components/VideoPreview";
 import useCreateRoomOrg from "@/hooks/org/use-create-room";
 import { useCallRefactored as useCall } from "@/hooks/use-call-refactored";
+import { cleanupGlobalMedia } from "@/services/MediaStreamService";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -82,6 +83,13 @@ export const CreateRoomDialog = ({ open, onOpenChange, organizationId }: CreateR
         });
     };
 
+    const handleCancel = () => {
+        // Cleanup video preview when canceling
+        cleanupGlobalMedia();
+        setRoomForm({ name: "", description: "" });
+        onOpenChange(false);
+    };
+
     const handleSubmit = async () => {
         if (!roomForm.name.trim()) return;
         await handleCreateRoom(roomForm);
@@ -134,7 +142,7 @@ export const CreateRoomDialog = ({ open, onOpenChange, organizationId }: CreateR
                 </div>
 
                 <DialogFooter>
-                    <Button variant='outline' onClick={() => onOpenChange(false)}>
+                    <Button variant='outline' onClick={handleCancel}>
                         Cancel
                     </Button>
                     <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
