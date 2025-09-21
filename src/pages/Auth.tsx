@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,27 @@ const Auth = () => {
     const { login, isPending: isLoggingIn } = useLogin();
     const { register, isPending: isRegistering } = useRegister();
     const { googleLogin, isPending: isGoogleLoggingIn } = useGoogleLogin();
+    // Clear Google session on component mount to always show login button
+    useEffect(() => {
+        // Clear Google's stored session to prevent automatic account selection
+        if ((window as any).google?.accounts) {
+            (window as any).google.accounts.id.disableAutoSelect();
+            
+            // Additional cleanup
+            const googleSignInElements = document.querySelectorAll('[data-gsi-client-id]');
+            googleSignInElements.forEach(element => {
+                element.remove();
+            });
+        }
+        
+        // Clear any stored Google credentials from localStorage/sessionStorage
+        try {
+            localStorage.removeItem('google_oauth_state');
+            sessionStorage.removeItem('google_oauth_state');
+        } catch (error) {
+            // Ignore localStorage errors
+        }
+    }, []);
 
     // Google OAuth success handler
     const handleGoogleSuccess = async (credentialResponse: any) => {
@@ -168,7 +189,19 @@ const Auth = () => {
                             </div>
 
                             <div className='w-full google-login-wrapper'>
-                                <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} theme='outline' size='large' width='100%' text={isLogin ? "signin_with" : "signup_with"} useOneTap={false} />
+                                <GoogleLogin 
+                                    onSuccess={handleGoogleSuccess} 
+                                    onError={handleGoogleError} 
+                                    theme='outline' 
+                                    size='large' 
+                                    width='100%' 
+                                    text={isLogin ? "signin_with" : "signup_with"}
+                                    useOneTap={false}
+                                    auto_select={false}
+                                    cancel_on_tap_outside={true}
+                                    prompt_parent_id="google-login-wrapper"
+                                    context={isLogin ? "signin" : "signup"}
+                                />
                             </div>
 
                             <div className='text-center text-sm'>
