@@ -15,8 +15,6 @@ interface NetworkMonitorDialogProps {
 
 export const NetworkMonitorDialog = ({ isOpen, onClose, transport: externalTransport }: NetworkMonitorDialogProps) => {
     const [isMonitoringEnabled, setIsMonitoringEnabled] = useState(false);
-    const countdownRef = useRef<NodeJS.Timeout | null>(null);
-    const [timeLeft, setTimeLeft] = useState<number>(5);
     const monitoringIntervalMs = 5000;
 
     // Check if transport is available and connected
@@ -37,53 +35,26 @@ export const NetworkMonitorDialog = ({ isOpen, onClose, transport: externalTrans
         });
     }, []);
 
-    const { networkStats, startMonitoring } = useNetworkMonitor({
+    const { networkStats, startMonitoring, stopMonitoring } = useNetworkMonitor({
         transport: externalTransport,
         onPoorNetworkDetected: handlePoorNetworkDetected,
         onGoodNetworkDetected: handleGoodNetworkDetected,
+        interval: monitoringIntervalMs,
     });
 
     useEffect(() => {
-        const tick = () => {
-            setTimeLeft((prev) => {
-                if (prev === 1) {
-                    // Only start monitoring if transport is available and connected
-                    if (isTransportReady) {
-                        startMonitoring();
-                    } else {
-                        toast.error("Unable to monitor - no connection", {
-                            description: "Please wait for WebRTC connection to be established",
-                        });
-                    }
-                    return monitoringIntervalMs / 1000;
-                }
-                return prev - 1;
-            });
-        };
-
-        if (isMonitoringEnabled && externalTransport) {
-            setTimeLeft(monitoringIntervalMs / 1000);
-            countdownRef.current = setInterval(tick, 1000);
+        if (isMonitoringEnabled && isTransportReady) {
+            startMonitoring();
         } else {
-            if (countdownRef.current) {
-                clearInterval(countdownRef.current);
-                countdownRef.current = null;
-            }
+            stopMonitoring();
         }
 
         return () => {
-            if (countdownRef.current) {
-                clearInterval(countdownRef.current);
-                countdownRef.current = null;
-            }
+            stopMonitoring();
         };
-    }, [isMonitoringEnabled, startMonitoring, monitoringIntervalMs, isTransportReady]);
+    }, [isMonitoringEnabled, isTransportReady, startMonitoring, stopMonitoring]);
 
     // Memoize format functions for better performance
-    const formatCountdown = useCallback((ms: number | null): string => {
-        return `${ms}`;
-    }, []);
-
     const formatValue = useCallback((value: number, unit: string, decimals: number = 0): string => {
         if (value === 0) return `0 ${unit}`;
 
@@ -101,21 +72,27 @@ export const NetworkMonitorDialog = ({ isOpen, onClose, transport: externalTrans
     // Memoize network quality calculations
     const networkQualityInfo = useMemo(() => {
         if (!externalTransport) {
-            return { label: "No transport", color: "text-orange-500" };
+            return { label: "No transport", color: "text-orange-500 dark:text-orange-400" };
         }
         if (externalTransport.connectionState !== "connected") {
-            return { label: "Connecting...", color: "text-orange-500" };
+            return { label: "Connecting...", color: "text-orange-500 dark:text-orange-400" };
         }
         if (!networkStats) {
-            return { label: "No data", color: "text-gray-500" };
+            return { label: "No data", color: "text-gray-500 dark:text-gray-400" };
         }
 
-        if (networkStats.isPoorNetwork) {
-            return { label: "Poor", color: "text-red-500" };
-        } else if (networkStats.isGoodNetwork) {
-            return { label: "Good", color: "text-green-500" };
-        } else {
-            return { label: "Fair", color: "text-yellow-500" };
+        // Sử dụng networkQuality từ webrtc-issue-detector
+        switch (networkStats.networkQuality) {
+            case "excellent":
+                return { label: "Excellent", color: "text-emerald-500 dark:text-emerald-400" };
+            case "good":
+                return { label: "Good", color: "text-green-500 dark:text-green-400" };
+            case "fair":
+                return { label: "Fair", color: "text-yellow-500 dark:text-yellow-400" };
+            case "poor":
+                return { label: "Poor", color: "text-red-500 dark:text-red-400" };
+            default:
+                return { label: "Unknown", color: "text-gray-500 dark:text-gray-400" };
         }
     }, [externalTransport, networkStats]);
 
@@ -140,11 +117,11 @@ export const NetworkMonitorDialog = ({ isOpen, onClose, transport: externalTrans
                 <div className='flex items-center space-x-2 my-4'>
                     <Switch id='network-monitoring' checked={isMonitoringEnabled} onCheckedChange={setIsMonitoringEnabled} disabled={!isTransportReady} />
                     <Label htmlFor='network-monitoring'>{isMonitoringEnabled ? "Monitoring" : "Monitoring off"}</Label>
-                    {!externalTransport && <span className='text-xs text-orange-500 ml-2'>(No transport)</span>}
-                    {externalTransport && !isTransportReady && <span className='text-xs text-orange-500 ml-2'>(Connecting...)</span>}
+                    {!externalTransport && <span className='text-xs text-orange-500 dark:text-orange-400 ml-2'>(No transport)</span>}
+                    {externalTransport && !isTransportReady && <span className='text-xs text-orange-500 dark:text-orange-400 ml-2'>(Connecting...)</span>}
                 </div>
 
-                <div className='space-y-4 bg-gray-50 p-4 rounded-md'>
+                <div className='space-y-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-md'>
                     <div className='flex justify-between items-center'>
                         <span className='text-sm font-medium'>Network Quality:</span>
                         <span className={`font-semibold ${getNetworkQualityColor()}`}>{getNetworkQualityLabel()}</span>
@@ -164,10 +141,42 @@ export const NetworkMonitorDialog = ({ isOpen, onClose, transport: externalTrans
                         <span className='text-sm font-medium'>Latency (RTT):</span>
                         <span className='font-mono'>{networkStats && networkStats.rtt !== null ? `${networkStats.rtt.toFixed(0)} ms` : "N/A"}</span>
                     </div>
+
+                    <div className='flex justify-between items-center'>
+                        <span className='text-sm font-medium'>Jitter:</span>
+                        <span className='font-mono'>{networkStats && networkStats.jitter !== null ? `${networkStats.jitter.toFixed(1)} ms` : "N/A"}</span>
+                    </div>
+
+                    <div className='flex justify-between items-center'>
+                        <span className='text-sm font-medium'>Packet Loss:</span>
+                        <span className='font-mono'>{networkStats && networkStats.packetLoss !== null ? `${networkStats.packetLoss.toFixed(1)}%` : "N/A"}</span>
+                    </div>
+
+                    {networkStats && (networkStats.inboundScore || networkStats.outboundScore) && (
+                        <>
+                            <div className='border-t pt-3 mt-3'>
+                                <div className='text-xs font-medium text-gray-600 dark:text-gray-300 mb-2'>MOS Scores (1-5)</div>
+
+                                {networkStats.inboundScore && (
+                                    <div className='flex justify-between items-center'>
+                                        <span className='text-sm font-medium'>Inbound Quality:</span>
+                                        <span className='font-mono'>{networkStats.inboundScore.toFixed(1)}/5</span>
+                                    </div>
+                                )}
+
+                                {networkStats.outboundScore && (
+                                    <div className='flex justify-between items-center'>
+                                        <span className='text-sm font-medium'>Outbound Quality:</span>
+                                        <span className='font-mono'>{networkStats.outboundScore.toFixed(1)}/5</span>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
 
-                <div className='mt-2 text-xs text-gray-500'>
-                    <p>{!externalTransport ? "Waiting for WebRTC connection setup..." : !isTransportReady ? `Transport is ${externalTransport.connectionState}...` : isMonitoringEnabled ? `Next update in ${formatCountdown(timeLeft)} seconds` : "Network monitoring is off"}</p>
+                <div className='mt-2 text-xs text-gray-500 dark:text-gray-400'>
+                    <p>{!externalTransport ? "Waiting for WebRTC connection setup..." : !isTransportReady ? `Transport is ${externalTransport.connectionState}...` : isMonitoringEnabled ? `Monitoring active - using webrtc-issue-detector` : "Network monitoring is off"}</p>
                 </div>
 
                 <DialogFooter className='mt-4 sm:justify-center'>

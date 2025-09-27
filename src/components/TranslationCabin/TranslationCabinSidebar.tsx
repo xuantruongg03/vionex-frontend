@@ -60,16 +60,16 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
 
     // Listen for cabin updates (this is handled by SocketEventHandlerManager automatically)
     // We just need to refresh the list when we detect changes
-    useEffect(() => {
-        // Auto-refresh cabin list periodically when sidebar is open
-        if (!isOpen) return;
+    // useEffect(() => {
+    //     // Auto-refresh cabin list periodically when sidebar is open
+    //     if (!isOpen) return;
 
-        const interval = setInterval(() => {
-            refetchCabins();
-        }, 5000); // Refresh every 5 seconds
+    //     const interval = setInterval(() => {
+    //         refetchCabins();
+    //     }, 5000); // Refresh every 5 seconds
 
-        return () => clearInterval(interval);
-    }, [isOpen]);
+    //     return () => clearInterval(interval);
+    // }, [isOpen]);
 
     const handleCreateTranslation = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -140,11 +140,9 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                         <Globe className='h-5 w-5' />
                         Translation Cabin
                     </h2>
-                    {isMobile && (
-                        <Button variant='ghost' size='icon' onClick={() => setIsOpen(false)} className='h-8 w-8'>
-                            <X className='h-4 w-4' />
-                        </Button>
-                    )}
+                    <Button variant='ghost' size='icon' onClick={() => setIsOpen(false)} className='h-8 w-8'>
+                        <X className='h-4 w-4' />
+                    </Button>
                 </div>
 
                 {/* Tab Navigation */}
