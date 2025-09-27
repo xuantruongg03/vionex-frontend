@@ -165,25 +165,29 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
         Object.entries(breakpointConfigs).forEach(([key, config]) => {
             const cols = config.cols;
             let layout = createDefaultLayout(usersToShow, cols);
-            if (selectedLayoutTemplate) {
-                layout = LAYOUT_TEMPLATES.find((template) => template.id === selectedLayoutTemplate)?.layout(usersToShow, cols);
-            }
 
-            // Add remaining users slot if needed
-            if (remainingUsers.length > 0) {
-                const totalItems = usersToShow.length;
-                layout.push({
-                    i: "remaining",
-                    x: totalItems % cols,
-                    y: Math.floor(totalItems / cols),
-                    w: 1,
-                    h: 1,
-                    minW: 1,
-                    minH: 1,
-                    maxW: 2,
-                    maxH: 2,
-                    static: false,
-                });
+            if (selectedLayoutTemplate) {
+                const template = LAYOUT_TEMPLATES.find((template) => template.id === selectedLayoutTemplate);
+                if (template) {
+                    layout = template.layout(usersToShow, cols, remainingUsers.length);
+                }
+            } else {
+                // Default behavior: add remaining slot for default layout
+                if (remainingUsers.length > 0) {
+                    const totalItems = usersToShow.length;
+                    layout.push({
+                        i: "remaining",
+                        x: totalItems % cols,
+                        y: Math.floor(totalItems / cols),
+                        w: 1,
+                        h: 1,
+                        minW: 1,
+                        minH: 1,
+                        maxW: 2,
+                        maxH: 2,
+                        static: false,
+                    });
+                }
             }
 
             newLayouts[key] = layout;
