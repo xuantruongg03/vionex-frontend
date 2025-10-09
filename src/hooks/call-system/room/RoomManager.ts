@@ -11,6 +11,7 @@ export class RoomManager {
     private context: CallSystemContext;
     private mediaManager?: any;
     private transportManager?: any;
+    private socketEventHandlers?: any;
 
     constructor(context: CallSystemContext) {
         this.context = context;
@@ -31,19 +32,19 @@ export class RoomManager {
     }
 
     /**
+     * Set socket event handlers reference
+     */
+    setSocketEventHandlers(socketEventHandlers: any) {
+        this.socketEventHandlers = socketEventHandlers;
+    }
+
+    /**
      * Join room
      */
     joinRoom = async (password?: string): Promise<boolean> => {
-        if (
-            !this.context.refs.apiServiceRef.current ||
-            !this.context.room.username
-        ) {
-            console.error(
-                "[RoomManager] Service not initialized or username missing"
-            );
-            this.context.setters.setError(
-                "Service not initialized or username missing"
-            );
+        if (!this.context.refs.apiServiceRef.current || !this.context.room.username) {
+            console.error("[RoomManager] Service not initialized or username missing");
+            this.context.setters.setError("Service not initialized or username missing");
             return false;
         }
 
@@ -72,44 +73,33 @@ export class RoomManager {
             });
 
             // Wait for join success and router capabilities
-            const joinSuccess = await new Promise<boolean>(
-                (resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        reject(new Error("Join timeout"));
-                    }, 10000);
+            const joinSuccess = await new Promise<boolean>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error("Join timeout"));
+                }, 10000);
 
-                    const handleJoinSuccess = () => {
-                        clearTimeout(timeout);
-                        this.context.setters.setIsConnected(true);
-                        this.context.setters.setIsJoined(true);
-                        resolve(true);
-                    };
+                const handleJoinSuccess = () => {
+                    clearTimeout(timeout);
+                    this.context.setters.setIsConnected(true);
+                    this.context.setters.setIsJoined(true);
+                    resolve(true);
+                };
 
-                    const handleJoinError = (error: any) => {
-                        clearTimeout(timeout);
-                        reject(new Error(error.message || "Join failed"));
-                    };
+                const handleJoinError = (error: any) => {
+                    clearTimeout(timeout);
+                    reject(new Error(error.message || "Join failed"));
+                };
 
-                    this.context.refs.socketRef.current?.once(
-                        "sfu:join-success",
-                        handleJoinSuccess
-                    );
-                    this.context.refs.socketRef.current?.once(
-                        "sfu:error",
-                        handleJoinError
-                    );
-                }
-            );
+                this.context.refs.socketRef.current?.once("sfu:join-success", handleJoinSuccess);
+                this.context.refs.socketRef.current?.once("sfu:error", handleJoinError);
+            });
 
             if (joinSuccess) {
                 toast.success("Joined room successfully");
 
                 // Auto-initialize local media after joining
                 setTimeout(async () => {
-                    if (
-                        !this.context.refs.localStreamRef.current &&
-                        this.mediaManager
-                    ) {
+                    if (!this.context.refs.localStreamRef.current && this.mediaManager) {
                         await this.mediaManager.initializeLocalMedia();
                         // Force sync metadata after initialization to ensure correct state
                         setTimeout(async () => {
@@ -125,8 +115,7 @@ export class RoomManager {
             let errorMessage = "Failed to join room";
 
             if (error.message?.includes("ECONNREFUSED")) {
-                errorMessage =
-                    "Cannot connect to server. Please check if the service is running.";
+                errorMessage = "Cannot connect to server. Please check if the service is running.";
             } else if (error.message?.includes("ROOM_PASSWORD_REQUIRED")) {
                 errorMessage = "This room requires a password";
             } else if (error.message?.includes("INVALID_ROOM_PASSWORD")) {
@@ -192,11 +181,7 @@ export class RoomManager {
      * Toggle room lock/unlock
      */
     toggleLockRoom = (password?: string) => {
-        if (
-            !this.context.setters.setIsJoined ||
-            !this.context.roomId ||
-            !this.context.refs.socketRef.current
-        ) {
+        if (!this.context.setters.setIsJoined || !this.context.roomId || !this.context.refs.socketRef.current) {
             toast.error("Not connected to room");
             return;
         }
@@ -251,23 +236,9 @@ export class RoomManager {
 
                         // Show appropriate message
                         if (res.stillInPriority) {
-                            toast.success(
-                                `Unpinned user ${peerId} (still in priority view)`
-                            );
-                            console.log(
-                                `[RoomManager] User ${peerId} unpinned - still in priority, consumers maintained`
-                            );
+                            toast.success(`Unpinned user ${peerId} (still in priority view)`);
                         } else {
-                            toast.success(
-                                `Unpinned user ${peerId} - ${
-                                    res.consumersRemoved?.length || 0
-                                } consumers removed`
-                            );
-                            console.log(
-                                `[RoomManager] User ${peerId} unpinned - removed ${
-                                    res.consumersRemoved?.length || 0
-                                } consumers`
-                            );
+                            toast.success(`Unpinned user ${peerId}`);
                         }
                     } else {
                         toast.error(res.message || "Failed to unpin user");
@@ -295,27 +266,27 @@ export class RoomManager {
                             payload: { pinnedUsers: peerId },
                         });
 
+                        // Process consumers created by pin action
+                        if (res.consumersCreated && res.consumersCreated.length > 0) {
+                            // Use socketEventHandlers to create consumers
+                            if (this.socketEventHandlers) {
+                                const consumerManager = this.socketEventHandlers.getConsumerManager();
+                                res.consumersCreated.forEach((consumerData: any) => {
+                                    consumerManager.createConsumer(consumerData);
+                                });
+                            } else {
+                                console.error("[RoomManager] socketEventHandlers not available for creating consumers");
+                            }
+                        }
+
                         // Show appropriate message
                         if (res.alreadyPriority) {
-                            toast.success(
-                                `Pinned user ${peerId} (already in priority view)`
-                            );
-                            console.log(
-                                `[RoomManager] User ${peerId} pinned - already in priority, no new consumers created`
-                            );
+                            toast.success(`Pinned user ${peerId} (already in priority view)`);
                         } else {
-                            toast.success(
-                                `Pinned user ${peerId} - ${
-                                    res.consumersCreated?.length || 0
-                                } consumers created`
-                            );
-                            console.log(
-                                `[RoomManager] User ${peerId} pinned - created ${
-                                    res.consumersCreated?.length || 0
-                                } consumers`
-                            );
+                            toast.success(`Pinned user ${peerId}`);
                         }
                     } else {
+                        console.error("[RoomManager] Pin failed:", res.message);
                         toast.error(res.message || "Failed to pin user");
                     }
                 }
@@ -331,26 +302,15 @@ export class RoomManager {
 
         try {
             // Ensure peerId is set before making the request
-            if (
-                this.context.room.username &&
-                this.context.refs.apiServiceRef.current
-            ) {
-                this.context.refs.apiServiceRef.current.setPeerId(
-                    this.context.room.username
-                );
+            if (this.context.room.username && this.context.refs.apiServiceRef.current) {
+                this.context.refs.apiServiceRef.current.setPeerId(this.context.room.username);
             }
 
-            const result =
-                await this.context.refs.apiServiceRef.current.getStreams(
-                    this.context.roomId
-                );
+            const result = await this.context.refs.apiServiceRef.current.getStreams(this.context.roomId);
             const streams = result.streams || [];
 
             // Auto-consume remote streams
-            if (
-                this.context.refs.recvTransportRef.current &&
-                streams.length > 0
-            ) {
+            if (this.context.refs.recvTransportRef.current && streams.length > 0) {
                 for (const stream of streams) {
                     // Skip own streams
                     if (stream.publisherId === this.context.room.username) {
@@ -358,17 +318,8 @@ export class RoomManager {
                     }
 
                     // Validate streamId - filter out non-stream objects
-                    if (
-                        !stream.streamId ||
-                        stream.streamId === "undefined" ||
-                        typeof stream.streamId !== "string" ||
-                        !stream.publisherId ||
-                        !stream.producerId
-                    ) {
-                        console.warn(
-                            "Invalid or incomplete stream object in getRemoteStreams:",
-                            stream
-                        );
+                    if (!stream.streamId || stream.streamId === "undefined" || typeof stream.streamId !== "string" || !stream.publisherId || !stream.producerId) {
+                        console.warn("Invalid or incomplete stream object in getRemoteStreams:", stream);
                         continue;
                     }
 
@@ -378,52 +329,28 @@ export class RoomManager {
                     }
 
                     // Check if already consuming this stream
-                    if (
-                        this.context.refs.consumingStreamsRef.current.has(
-                            stream.streamId
-                        )
-                    ) {
+                    if (this.context.refs.consumingStreamsRef.current.has(stream.streamId)) {
                         continue;
                     }
 
                     try {
                         // Mark as consuming to prevent duplicates
-                        this.context.refs.consumingStreamsRef.current.add(
-                            stream.streamId
-                        );
+                        this.context.refs.consumingStreamsRef.current.add(stream.streamId);
 
                         // Use WebSocket consume for consistency
                         if (this.context.refs.socketRef.current) {
-                            this.context.refs.socketRef.current.emit(
-                                "sfu:consume",
-                                {
-                                    streamId: stream.streamId,
-                                    transportId:
-                                        this.context.refs.recvTransportRef
-                                            .current.id,
-                                }
-                            );
+                            this.context.refs.socketRef.current.emit("sfu:consume", {
+                                streamId: stream.streamId,
+                                transportId: this.context.refs.recvTransportRef.current.id,
+                            });
                         } else {
                             // Fallback to HTTP if no WebSocket
-                            await this.context.refs.apiServiceRef.current.consumeHttp(
-                                this.context.refs.recvTransportRef.current.id,
-                                stream.streamId,
-                                this.context.refs.deviceRef.current
-                                    ?.rtpCapabilities,
-                                this.context.roomId,
-                                this.context.room.username
-                            );
+                            await this.context.refs.apiServiceRef.current.consumeHttp(this.context.refs.recvTransportRef.current.id, stream.streamId, this.context.refs.deviceRef.current?.rtpCapabilities, this.context.roomId, this.context.room.username);
                         }
                     } catch (error) {
-                        console.error(
-                            "Failed to consume remote stream:",
-                            stream.streamId,
-                            error
-                        );
+                        console.error("Failed to consume remote stream:", stream.streamId, error);
                         // Remove from consuming set on error
-                        this.context.refs.consumingStreamsRef.current.delete(
-                            stream.streamId
-                        );
+                        this.context.refs.consumingStreamsRef.current.delete(stream.streamId);
                     }
                 }
             }
@@ -442,13 +369,8 @@ export class RoomManager {
             const checkConnection = () => {
                 if (this.context.refs.socketRef.current?.id) {
                     // Set the peerId for HTTP authentication
-                    if (
-                        this.context.room.username &&
-                        this.context.refs.apiServiceRef.current
-                    ) {
-                        this.context.refs.apiServiceRef.current.setPeerId(
-                            this.context.room.username
-                        );
+                    if (this.context.room.username && this.context.refs.apiServiceRef.current) {
+                        this.context.refs.apiServiceRef.current.setPeerId(this.context.room.username);
                     }
                     resolve();
                 } else {

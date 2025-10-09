@@ -65,10 +65,6 @@ class MediaStreamService {
 
             return stream;
         } catch (errorVideoAudio) {
-            console.warn(
-                "Failed to get video+audio, trying video only:",
-                errorVideoAudio
-            );
             try {
                 // Try video only
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -80,10 +76,6 @@ class MediaStreamService {
                 });
                 return stream;
             } catch (errorVideo) {
-                console.warn(
-                    "Failed to get video, trying audio only:",
-                    errorVideo
-                );
                 try {
                     // Try audio only
                     const stream = await navigator.mediaDevices.getUserMedia({
@@ -95,10 +87,7 @@ class MediaStreamService {
                     });
                     return stream;
                 } catch (errorAudio) {
-                    console.warn(
-                        "Failed to get any media, creating empty stream:",
-                        errorAudio
-                    );
+                    console.warn("Failed to get any media, creating empty stream:", errorAudio);
                     // Create empty stream as fallback
                     return new MediaStream();
                 }
@@ -106,31 +95,96 @@ class MediaStreamService {
         }
     }
 
+    // Toggle video - Stop track when OFF (release hardware), return status
     toggleVideo(): boolean {
         if (!this._localStream) return false;
 
         const videoTrack = this._localStream.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = !videoTrack.enabled;
-            return videoTrack.enabled;
+
+        if (!videoTrack) {
+            console.warn("[MediaService] No video track to toggle");
+            return false;
         }
-        return false;
+
+        if (videoTrack.enabled) {
+            videoTrack.stop();
+            this._localStream.removeTrack(videoTrack);
+            return false;
+        } else {
+            // Track disabled - enable it
+            videoTrack.enabled = true;
+            return true;
+        }
+    }
+
+    // Request new video track
+    async requestVideoTrack(): Promise<MediaStreamTrack | null> {
+        try {
+            const videoStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 },
+                },
+            });
+
+            const newVideoTrack = videoStream.getVideoTracks()[0];
+            if (newVideoTrack && this._localStream) {
+                this._localStream.addTrack(newVideoTrack);
+                return newVideoTrack;
+            }
+            return null;
+        } catch (error) {
+            console.error("[MediaService] Failed to request camera:", error);
+            return null;
+        }
     }
 
     toggleAudio(): boolean {
         if (!this._localStream) return false;
 
         const audioTrack = this._localStream.getAudioTracks()[0];
-        if (audioTrack) {
-            audioTrack.enabled = !audioTrack.enabled;
-            return audioTrack.enabled;
+
+        if (!audioTrack) {
+            return false;
         }
-        return false;
+
+        if (audioTrack.enabled) {
+            audioTrack.stop();
+            this._localStream.removeTrack(audioTrack);
+            return false;
+        } else {
+            // Track disabled - enable it
+            audioTrack.enabled = true;
+            return true;
+        }
+    }
+
+    // Request new audio track
+    async requestAudioTrack(): Promise<MediaStreamTrack | null> {
+        try {
+            const audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
+            });
+
+            const newAudioTrack = audioStream.getAudioTracks()[0];
+            if (newAudioTrack && this._localStream) {
+                this._localStream.addTrack(newAudioTrack);
+                return newAudioTrack;
+            }
+            return null;
+        } catch (error) {
+            console.error("[MediaService] Failed to request microphone:", error);
+            return null;
+        }
     }
 
     cleanup(): void {
         if (this._localStream) {
-            console.log("[MediaService] Cleaning up local media stream");
             this._localStream.getTracks().forEach((track) => track.stop());
             this._localStream = null;
         }

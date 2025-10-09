@@ -225,12 +225,8 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                 }
             }
 
-            // Only disable toggle if camera is actually unavailable, not just off
-            if (hasCameraUnavailable || !hasVideoTracks) {
-                setCanToggleVideo(false);
-            } else {
-                setCanToggleVideo(true);
-            }
+            // FIX: Only disable toggle if camera is actually unavailable (permission denied or no hardware)
+            setCanToggleVideo(true);
 
             const audioTracks = localStream.stream.getAudioTracks();
             const hasAudioTracks = audioTracks.length > 0;
@@ -248,12 +244,8 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                 }
             }
 
-            // Only disable toggle if mic is actually unavailable, not just muted
-            if (hasMicUnavailable || !hasAudioTracks) {
-                setCanToggleAudio(false);
-            } else {
-                setCanToggleAudio(true);
-            }
+            // FIX: Only disable toggle if mic is actually unavailable (permission denied or no hardware)
+            setCanToggleAudio(true);
         }
     }, [streams, isVideoOff, isMuted]);
 
@@ -273,6 +265,7 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                     ],
                 });
             } catch (error) {
+                console.error("Error toggling video:", error);
                 toast.error("Can't toggle camera");
             }
         } else {
@@ -474,7 +467,29 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                     </div>
                 </div>
                 <VideoGrid streams={streams} screenStreams={screenStreams} isVideoOff={isVideoOff} users={users || []} isMuted={isMuted} speakingPeers={Array.from(speakingPeers)} isSpeaking={isSpeaking} togglePinUser={togglePinUser} removeTranslatedStream={removeTranslatedStream} />
-                <VideoControls isMuted={isMuted} isVideoOff={isVideoOff} onToggleMute={handleToggleAudio} onToggleVideo={handleToggleVideo} onToggleChat={handleToggleChat} onToggleWhiteboard={handleToggleWhiteboard} onToggleScreenShare={handleToggleScreenShare} isScreenSharing={isScreenSharing} onToggleLockRoom={handleToggleLockRoom} onToggleNetworkMonitor={handleToggleNetworkMonitor} onToggleTranslationCabin={handleToggleTranslationCabin} onToggleVoting={handleToggleVoting} onToggleQuiz={handleToggleQuiz} onToggleRecording={handleToggleRecording} isRecording={isRecording} isProcessing={isProcessing} onLeaveRoom={handleLeaveRoom} onToggleBehaviorMonitoring={handleToggleBehaviorMonitoring} isCreator={room.isCreator} isMonitorActive={isMonitorActive} onToggleLayout={handleToggleLayoutTemplate} />
+                <VideoControls
+                    isMuted={isMuted}
+                    isVideoOff={isVideoOff}
+                    onToggleMute={handleToggleAudio}
+                    onToggleVideo={handleToggleVideo}
+                    onToggleChat={handleToggleChat}
+                    onToggleWhiteboard={handleToggleWhiteboard}
+                    onToggleScreenShare={handleToggleScreenShare}
+                    isScreenSharing={isScreenSharing}
+                    onToggleLockRoom={handleToggleLockRoom}
+                    onToggleNetworkMonitor={handleToggleNetworkMonitor}
+                    onToggleTranslationCabin={handleToggleTranslationCabin}
+                    onToggleVoting={handleToggleVoting}
+                    onToggleQuiz={handleToggleQuiz}
+                    onToggleRecording={handleToggleRecording}
+                    isRecording={isRecording}
+                    isProcessing={isProcessing}
+                    onLeaveRoom={handleLeaveRoom}
+                    onToggleBehaviorMonitoring={handleToggleBehaviorMonitoring}
+                    isCreator={room.isCreator}
+                    isMonitorActive={isMonitorActive}
+                    onToggleLayout={handleToggleLayoutTemplate}
+                />
             </div>{" "}
             {uiState.isTranslationCabinOpen && (
                 <TranslationCabinSidebar

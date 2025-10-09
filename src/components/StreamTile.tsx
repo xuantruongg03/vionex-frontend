@@ -30,17 +30,20 @@ interface StreamTileProps {
 export const PinOverlay = ({ isPinned, togglePin, isLocal = false }: { isPinned?: boolean; togglePin?: () => void; isLocal?: boolean }) => {
     if (isLocal) return null;
 
+    const handlePinClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        togglePin?.();
+    };
+
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className='absolute top-1 left-1 z-20'>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className='absolute top-1 left-1 z-50' style={{ pointerEvents: "auto" }}>
             <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    togglePin?.();
-                }}
+                onClick={handlePinClick}
                 className={`
           flex items-center justify-center p-1.5 rounded-full 
-          transition-colors duration-200
-          ${isPinned ? "bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700" : "bg-black/60 dark:bg-black/75 text-white hover:bg-black/80 dark:hover:bg-black/90"}
+          transition-colors duration-200 cursor-pointer
+          ${isPinned ? "text-white hover:bg-blue-700 shadow-lg ring-2 ring-blue-400/50" : "bg-gray-700/80 text-white hover:bg-gray-600/90"}
         `}
                 title={isPinned ? "Unpin user" : "Pin user"}
             >
@@ -194,19 +197,13 @@ export const StreamTile = memo(
 
         return (
             <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.3 }} onClick={onClick} onMouseEnter={() => setShowControls(true)} onMouseLeave={() => setShowControls(false)} className={containerClasses}>
-                <div
-                    className={`relative bg-gray-800 dark:bg-gray-900 w-full h-full rounded-md overflow-hidden ${
-                        isActuallySpeaking && videoOff ? "ring-2 ring-green-400/60" : ""
-                    }`}
-                >
+                <div className={`relative bg-gray-800 dark:bg-gray-900 w-full h-full rounded-md overflow-hidden ${isActuallySpeaking && videoOff ? "ring-2 ring-green-400/60" : ""}`}>
                     <video
                         ref={videoRef}
                         autoPlay
                         playsInline
                         muted
-                        className={`w-full h-full object-cover transition-all duration-300 ${isScreen ? "screen-share" : ""} ${
-                            isActuallySpeaking && !videoOff ? "filter brightness-110 contrast-105" : ""
-                        }`}
+                        className={`w-full h-full object-cover transition-all duration-300 ${isScreen ? "screen-share" : ""} ${isActuallySpeaking && !videoOff ? "filter brightness-110 contrast-105" : ""}`}
                         style={{ display: videoOff ? "none" : "block" }}
                         onError={(e) => {
                             console.error("Video error:", {
@@ -225,7 +222,6 @@ export const StreamTile = memo(
                                 }, 1000);
                             }
                         }}
-
                     />
 
                     {isActuallySpeaking && !videoOff && !isScreen && (
@@ -388,7 +384,7 @@ export const StreamTile = memo(
                     )}
                 </div>
 
-                {(showControls || isPinned) && togglePin && <PinOverlay isPinned={isPinned} togglePin={handleTogglePin} isLocal={isLocal} />}
+                {showControls && togglePin && <PinOverlay isPinned={isPinned} togglePin={handleTogglePin} isLocal={isLocal} />}
 
                 {isPinned && (
                     <div className='absolute top-1 right-1 bg-blue-500 dark:bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm'>

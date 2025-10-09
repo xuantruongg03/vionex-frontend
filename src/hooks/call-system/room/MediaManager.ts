@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { mediaStreamService } from "@/services/MediaStreamService";
-import { CallSystemContext } from "../types";
+import { CallSystemContext, ProducerInfo } from "../types"; // FIX: Import ProducerInfo
 import { ProducerManager } from "../transports/ProducerManager";
 
 /**
@@ -54,32 +54,36 @@ export class MediaManager {
                 ...prev.filter((s) => s.id !== "local"),
             ]);
 
-            // Show success messages only if this is a new initialization
-            // if (!mediaStreamService.isInitializing) {
-            //     if (hasVideo && hasAudio) {
-            //         toast.success("Camera and microphone ready");
-            //     } else if (hasVideo) {
-            //         toast.info("Camera ready (microphone not available)");
-            //     } else if (hasAudio) {
-            //         toast.info("Microphone ready (camera not available)");
-            //     } else {
-            //         toast.info(
-            //             "Ready to join (camera and microphone not available)"
-            //         );
-            //     }
-            // }
-
             // Publish tracks if transports are ready - only if we don't have producers yet
-            if (
-                this.context.refs.sendTransportRef.current &&
-                this.context.refs.producersRef.current.size === 0
-            ) {
+            if (this.context.refs.sendTransportRef.current && this.context.refs.producersRef.current.size === 0) {
                 setTimeout(async () => {
-                    const publishResult =
-                        await this.producerManager.publishTracks();
+                    const publishResult = await this.producerManager.publishTracks();
                     if (publishResult) {
                         // FIXED: Sync metadata with actual track states after publishing
                         await this.syncMetadataWithTrackStates();
+
+                        // Update local UI based on actual producer states
+                        const producers = Array.from(this.context.refs.producersRef.current.values());
+                        const videoProducer = producers.find((p) => p.kind === "video" && !p.appData?.isScreenShare);
+                        const audioProducer = producers.find((p) => p.kind === "audio" && !p.appData?.isScreenShare);
+
+                        const hasVideo = videoProducer?.producer && !videoProducer.producer.closed && !videoProducer.producer.paused;
+                        const hasAudio = audioProducer?.producer && !audioProducer.producer.closed && !audioProducer.producer.paused;
+
+                        this.context.setters.setStreams((prev) =>
+                            prev.map((s) =>
+                                s.id === "local"
+                                    ? {
+                                          ...s,
+                                          metadata: {
+                                              ...s.metadata,
+                                              video: hasVideo,
+                                              audio: hasAudio,
+                                          },
+                                      }
+                                    : s
+                            )
+                        );
                     }
                 }, 1000);
             }
@@ -112,44 +116,35 @@ export class MediaManager {
 
     /**
      * Sync metadata with actual track states after publishing
+     * FIXED: Use producer.paused as source of truth (not track.enabled)
+     * Reason: Dummy tracks are always enabled, but producers are paused
      */
     private syncMetadataWithTrackStates = async (): Promise<void> => {
         try {
-            const localStream = mediaStreamService.localStream;
-            if (!localStream) return;
+            // Get producer states (more reliable than track states for dummy tracks)
+            const producers = Array.from(this.context.refs.producersRef.current.values());
 
-            // Get actual track states
-            const videoTracks = localStream.getVideoTracks();
-            const audioTracks = localStream.getAudioTracks();
+            const videoProducer = producers.find((p) => p.kind === "video" && !p.appData?.isScreenShare);
+            const audioProducer = producers.find((p) => p.kind === "audio" && !p.appData?.isScreenShare);
 
-            const videoEnabled =
-                videoTracks.length > 0 && videoTracks[0].enabled;
-            const audioEnabled =
-                audioTracks.length > 0 && audioTracks[0].enabled;
+            // Check producer.paused instead of track.enabled
+            // If producer doesn't exist or is paused → media is OFF
+            const videoEnabled = videoProducer?.producer && !videoProducer.producer.closed && !videoProducer.producer.paused;
+            const audioEnabled = audioProducer?.producer && !audioProducer.producer.closed && !audioProducer.producer.paused;
 
             // Update both video and audio streams with correct metadata via WebSocket
-            const streamId =
-                this.context.refs.currentStreamIdsRef.current.primary ||
-                this.context.refs.currentStreamIdsRef.current.video ||
-                this.context.refs.currentStreamIdsRef.current.audio;
+            const streamId = this.context.refs.currentStreamIdsRef.current.primary || this.context.refs.currentStreamIdsRef.current.video || this.context.refs.currentStreamIdsRef.current.audio;
 
             if (streamId && this.context.refs.socketRef.current) {
                 // Use WebSocket instead of HTTP
-                this.context.refs.socketRef.current.emit(
-                    "sfu:update-stream-metadata",
-                    {
-                        streamId: streamId,
-                        metadata: {
-                            video: videoEnabled,
-                            audio: audioEnabled,
-                        },
-                        roomId: this.context.roomId,
-                    }
-                );
-
-                console.log(
-                    `[MediaManager] Synced metadata via WebSocket - video: ${videoEnabled}, audio: ${audioEnabled}`
-                );
+                this.context.refs.socketRef.current.emit("sfu:update-stream-metadata", {
+                    streamId: streamId,
+                    metadata: {
+                        video: videoEnabled,
+                        audio: audioEnabled,
+                    },
+                    roomId: this.context.roomId,
+                });
             }
         } catch (error) {
             console.warn("Failed to sync metadata with track states:", error);
@@ -157,12 +152,69 @@ export class MediaManager {
     };
 
     /**
-     * Toggle video on/off
+     * FIX: Toggle video on/off
+     * When turning OFF: Stop track completely to release camera hardware
+     * When turning ON: Request camera access to get new track
      */
     toggleVideo = async (): Promise<boolean> => {
         try {
-            // Use global media service
-            const enabled = mediaStreamService.toggleVideo();
+            const localStream = mediaStreamService.localStream;
+            if (!localStream) {
+                console.error("[MediaManager] No local stream available");
+                return false;
+            }
+
+            const videoTrack = localStream.getVideoTracks()[0];
+            const isCurrentlyEnabled = videoTrack && videoTrack.enabled;
+
+            let enabled: boolean;
+
+            if (isCurrentlyEnabled) {
+                // Turning OFF - Stop track to release hardware
+                enabled = mediaStreamService.toggleVideo();
+
+                // Pause producer to stop streaming
+                const producers = Array.from(this.context.refs.producersRef.current.values());
+                const videoProducerInfo = producers.find((p) => p.kind === "video" && !p.appData?.isScreenShare);
+
+                if (videoProducerInfo && videoProducerInfo.producer && !videoProducerInfo.producer.closed) {
+                    if (!videoProducerInfo.producer.paused) {
+                        videoProducerInfo.producer.pause();
+                        console.log("[MediaManager] Video producer paused");
+                    }
+                }
+            } else {
+                // Turning ON - Request new camera access
+                const newVideoTrack = await mediaStreamService.requestVideoTrack();
+
+                if (newVideoTrack) {
+                    enabled = true;
+
+                    // Replace track in existing producer
+                    const producers = Array.from(this.context.refs.producersRef.current.values());
+                    const videoProducerInfo = producers.find((p) => p.kind === "video" && !p.appData?.isScreenShare);
+
+                    if (videoProducerInfo && videoProducerInfo.producer && !videoProducerInfo.producer.closed) {
+                        try {
+                            // Replace track to use new camera
+                            await videoProducerInfo.producer.replaceTrack({ track: newVideoTrack });
+                            console.log("[MediaManager] Video track replaced in producer");
+
+                            // Resume producer
+                            if (videoProducerInfo.producer.paused) {
+                                videoProducerInfo.producer.resume();
+                                console.log("[MediaManager] Video producer resumed");
+                            }
+                        } catch (error) {
+                            console.error("[MediaManager] Failed to replace video track:", error);
+                        }
+                    }
+                } else {
+                    console.error("[MediaManager] Failed to request camera");
+                    toast.error("Failed to enable camera");
+                    enabled = false;
+                }
+            }
 
             // Update local UI immediately
             this.context.setters.setStreams((prev) =>
@@ -173,6 +225,7 @@ export class MediaManager {
                               metadata: {
                                   ...stream.metadata,
                                   video: enabled,
+                                  noCameraAvailable: false,
                               },
                           }
                         : stream
@@ -181,37 +234,23 @@ export class MediaManager {
 
             // Update stream metadata via WebSocket
             try {
-                if (
-                    this.context.refs.socketRef.current &&
-                    this.context.room.username
-                ) {
-                    // Try to use video-specific streamId first, then primary
-                    const streamId =
-                        this.context.refs.currentStreamIdsRef.current.video ||
-                        this.context.refs.currentStreamIdsRef.current.primary;
+                if (this.context.refs.socketRef.current && this.context.room.username) {
+                    const streamId = this.context.refs.currentStreamIdsRef.current.video || this.context.refs.currentStreamIdsRef.current.primary;
 
                     if (streamId) {
-                        // Get current audio state from the service
-                        const localStream = mediaStreamService.localStream;
-                        const audioTrack = localStream?.getAudioTracks()[0];
-                        const audioEnabled = audioTrack
-                            ? audioTrack.enabled
-                            : false;
+                        // FIXED: Get audio state from producer, not track (for dummy track compatibility)
+                        const producers = Array.from(this.context.refs.producersRef.current.values());
+                        const audioProducer = producers.find((p) => p.kind === "audio" && !p.appData?.isScreenShare);
+                        const audioEnabled = audioProducer?.producer && !audioProducer.producer.closed && !audioProducer.producer.paused;
 
-                        // Use WebSocket instead of HTTP
-                        this.context.refs.socketRef.current.emit(
-                            "sfu:update-stream-metadata",
-                            {
-                                streamId: streamId,
-                                metadata: {
-                                    video: enabled,
-                                    audio: audioEnabled,
-                                },
-                                roomId: this.context.roomId,
-                            }
-                        );
-                    } else {
-                        console.warn("No streamId available for video update");
+                        this.context.refs.socketRef.current.emit("sfu:update-stream-metadata", {
+                            streamId: streamId,
+                            metadata: {
+                                video: enabled,
+                                audio: audioEnabled,
+                            },
+                            roomId: this.context.roomId,
+                        });
                     }
                 }
             } catch (error) {
@@ -220,7 +259,7 @@ export class MediaManager {
 
             return enabled;
         } catch (error) {
-            console.error("[Media] Error toggling video:", error);
+            console.error("[MediaManager] Error toggling video:", error);
             return false;
         }
     };
@@ -230,8 +269,65 @@ export class MediaManager {
      */
     toggleAudio = async (): Promise<boolean> => {
         try {
-            // Use global media service
-            const enabled = mediaStreamService.toggleAudio();
+            // Get local stream and check current audio state
+            const localStream = mediaStreamService.localStream;
+            if (!localStream) {
+                console.error("[MediaManager] No local stream available");
+                return false;
+            }
+
+            const audioTrack = localStream.getAudioTracks()[0];
+            const isCurrentlyEnabled = audioTrack && audioTrack.enabled;
+
+            let enabled: boolean;
+
+            if (isCurrentlyEnabled) {
+                // Turning OFF - Stop track to release hardware
+                enabled = mediaStreamService.toggleAudio();
+
+                // Pause producer to stop streaming
+                const producers = Array.from(this.context.refs.producersRef.current.values());
+                const audioProducerInfo = producers.find((p) => p.kind === "audio");
+
+                if (audioProducerInfo && audioProducerInfo.producer && !audioProducerInfo.producer.closed) {
+                    if (!audioProducerInfo.producer.paused) {
+                        audioProducerInfo.producer.pause();
+                        console.log("[MediaManager] Audio producer paused");
+                    }
+                }
+            } else {
+                // Turning ON - Request new microphone access
+                const newAudioTrack = await mediaStreamService.requestAudioTrack();
+
+                if (newAudioTrack) {
+                    console.log("[MediaManager] Audio turned ON - microphone acquired");
+                    enabled = true;
+
+                    // Replace track in existing producer
+                    const producers = Array.from(this.context.refs.producersRef.current.values());
+                    const audioProducerInfo = producers.find((p) => p.kind === "audio");
+
+                    if (audioProducerInfo && audioProducerInfo.producer && !audioProducerInfo.producer.closed) {
+                        try {
+                            // Replace track to use new microphone
+                            await audioProducerInfo.producer.replaceTrack({ track: newAudioTrack });
+                            console.log("[MediaManager] Audio track replaced in producer");
+
+                            // Resume producer
+                            if (audioProducerInfo.producer.paused) {
+                                audioProducerInfo.producer.resume();
+                                console.log("[MediaManager] Audio producer resumed");
+                            }
+                        } catch (error) {
+                            console.error("[MediaManager] Failed to replace audio track:", error);
+                        }
+                    }
+                } else {
+                    console.error("[MediaManager] Failed to request microphone");
+                    toast.error("Failed to enable microphone");
+                    enabled = false;
+                }
+            }
 
             // Update local UI immediately
             this.context.setters.setStreams((prev) =>
@@ -242,6 +338,8 @@ export class MediaManager {
                               metadata: {
                                   ...stream.metadata,
                                   audio: enabled,
+                                  // FIX: If we can toggle, microphone is available
+                                  noMicroAvailable: false,
                               },
                           }
                         : stream
@@ -251,44 +349,30 @@ export class MediaManager {
             // Update VAD microphone state immediately
             if (this.vadManager) {
                 this.vadManager.updateMicrophoneState(enabled);
-                console.log(
-                    `[MediaManager] VAD microphone updated immediately: ${
-                        enabled ? "enabled" : "disabled"
-                    }`
-                );
+                console.log(`[MediaManager] VAD microphone updated immediately: ${enabled ? "enabled" : "disabled"}`);
             }
 
             // Update stream metadata via WebSocket
             try {
-                if (
-                    this.context.refs.socketRef.current &&
-                    this.context.room.username
-                ) {
+                if (this.context.refs.socketRef.current && this.context.room.username) {
                     // Try to use audio-specific streamId first, then primary
-                    const streamId =
-                        this.context.refs.currentStreamIdsRef.current.audio ||
-                        this.context.refs.currentStreamIdsRef.current.primary;
+                    const streamId = this.context.refs.currentStreamIdsRef.current.audio || this.context.refs.currentStreamIdsRef.current.primary;
 
                     if (streamId) {
-                        // Get current video state from the service
-                        const localStream = mediaStreamService.localStream;
-                        const videoTrack = localStream?.getVideoTracks()[0];
-                        const videoEnabled = videoTrack
-                            ? videoTrack.enabled
-                            : false;
+                        // FIXED: Get video state from producer, not track (for dummy track compatibility)
+                        const producers = Array.from(this.context.refs.producersRef.current.values());
+                        const videoProducer = producers.find((p) => p.kind === "video" && !p.appData?.isScreenShare);
+                        const videoEnabled = videoProducer?.producer && !videoProducer.producer.closed && !videoProducer.producer.paused;
 
                         // Use WebSocket instead of HTTP
-                        this.context.refs.socketRef.current.emit(
-                            "sfu:update-stream-metadata",
-                            {
-                                streamId: streamId,
-                                metadata: {
-                                    audio: enabled,
-                                    video: videoEnabled,
-                                },
-                                roomId: this.context.roomId,
-                            }
-                        );
+                        this.context.refs.socketRef.current.emit("sfu:update-stream-metadata", {
+                            streamId: streamId,
+                            metadata: {
+                                audio: enabled,
+                                video: videoEnabled,
+                            },
+                            roomId: this.context.roomId,
+                        });
                     } else {
                         console.warn("No streamId available for audio update");
                     }
@@ -310,24 +394,17 @@ export class MediaManager {
     toggleScreenShare = async (): Promise<boolean> => {
         try {
             // Stop screen sharing if currently active
-            if (
-                this.context.setters.setIsScreenSharing &&
-                this.context.refs.screenStreamRef.current
-            ) {
+            if (this.context.setters.setIsScreenSharing && this.context.refs.screenStreamRef.current) {
                 // Stop all tracks
-                this.context.refs.screenStreamRef.current
-                    .getTracks()
-                    .forEach((track) => {
-                        track.stop();
-                    });
+                this.context.refs.screenStreamRef.current.getTracks().forEach((track) => {
+                    track.stop();
+                });
 
                 // Clean up producers - unpublish screen share streams
                 this.producerManager.unpublishScreenShare();
 
                 // Update UI state - remove from screen streams
-                this.context.setters.setScreenStreams((prev) =>
-                    prev.filter((stream) => stream.id !== "screen-local")
-                );
+                this.context.setters.setScreenStreams((prev) => prev.filter((stream) => stream.id !== "screen-local"));
 
                 this.context.refs.screenStreamRef.current = null;
                 this.context.setters.setIsScreenSharing(false);
@@ -339,8 +416,7 @@ export class MediaManager {
             console.log("[MediaManager] Checking screen share requirements:", {
                 hasSendTransport: !!this.context.refs.sendTransportRef.current,
                 sendTransportId: this.context.refs.sendTransportRef.current?.id,
-                sendTransportState:
-                    this.context.refs.sendTransportRef.current?.connectionState,
+                sendTransportState: this.context.refs.sendTransportRef.current?.connectionState,
                 hasDevice: !!this.context.refs.deviceRef.current,
                 deviceLoaded: this.context.refs.deviceRef.current?.loaded,
             });
@@ -389,10 +465,7 @@ export class MediaManager {
             ]);
 
             // Publish screen share tracks
-            const publishResult =
-                await this.producerManager.publishScreenShareTracks(
-                    screenStream
-                );
+            const publishResult = await this.producerManager.publishScreenShareTracks(screenStream);
 
             if (publishResult) {
                 this.context.setters.setIsScreenSharing(true);
@@ -413,27 +486,21 @@ export class MediaManager {
 
             // Clean up on error
             if (this.context.refs.screenStreamRef.current) {
-                this.context.refs.screenStreamRef.current
-                    .getTracks()
-                    .forEach((track) => {
-                        track.stop();
-                    });
+                this.context.refs.screenStreamRef.current.getTracks().forEach((track) => {
+                    track.stop();
+                });
                 this.context.refs.screenStreamRef.current = null;
             }
 
             this.context.setters.setIsScreenSharing(false);
-            this.context.setters.setScreenStreams((prev) =>
-                prev.filter((stream) => stream.id !== "screen-local")
-            );
+            this.context.setters.setScreenStreams((prev) => prev.filter((stream) => stream.id !== "screen-local"));
 
             if ((error as any).name === "NotAllowedError") {
                 toast.error("You have denied screen sharing");
             } else if ((error as any).name === "NotFoundError") {
                 toast.error("No source found for sharing");
             } else {
-                toast.error(
-                    "Cannot start screen sharing: " + (error as Error).message
-                );
+                toast.error("Cannot start screen sharing: " + (error as Error).message);
             }
 
             return false;
@@ -446,11 +513,9 @@ export class MediaManager {
     handleScreenShareEnded = () => {
         if (this.context.refs.screenStreamRef.current) {
             // Stop all tracks
-            this.context.refs.screenStreamRef.current
-                .getTracks()
-                .forEach((track) => {
-                    track.stop();
-                });
+            this.context.refs.screenStreamRef.current.getTracks().forEach((track) => {
+                track.stop();
+            });
 
             // Clean up producers - unpublish screen share streams
             this.producerManager.unpublishScreenShare();
@@ -460,9 +525,7 @@ export class MediaManager {
             this.context.setters.setIsScreenSharing(false);
 
             // Remove from screen streams
-            this.context.setters.setScreenStreams((prev) =>
-                prev.filter((stream) => stream.id !== "screen-local")
-            );
+            this.context.setters.setScreenStreams((prev) => prev.filter((stream) => stream.id !== "screen-local"));
 
             toast.info("Stopped screen sharing");
         }
