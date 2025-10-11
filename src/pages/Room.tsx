@@ -94,12 +94,12 @@ const Room = () => {
                         userInfo: user,
                     },
                 });
-                const newRoomId = `${Math.random()
-                    .toString(36)
-                    .substring(2, CONSTANT.ROOM_ID_LENGTH)}`;
-                navigate(`/room/${newRoomId}`);
-                // const newRoomId = "test";
+                // const newRoomId = `${Math.random()
+                //     .toString(36)
+                //     .substring(2, CONSTANT.ROOM_ID_LENGTH)}`;
                 // navigate(`/room/${newRoomId}`);
+                const newRoomId = "test";
+                navigate(`/room/${newRoomId}`);
             })
             .catch((error) => {
                 console.error("API check failed:", error);
@@ -177,7 +177,7 @@ const Room = () => {
             }
 
             // Regular room logic (existing)
-            if (user?.name) {
+            if (user && user.name) {
                 // If user has a name from authentication, use it directly
                 try {
                     const res = await checkUsername(user.name);

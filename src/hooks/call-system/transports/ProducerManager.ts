@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { CallSystemContext } from "../types";
+import { createBlackVideoTrack, createSilentAudioTrack } from "@/utils/dummy-tracks";
 
 /**
  * Producer Manager Module
@@ -36,15 +37,13 @@ export class ProducerManager {
                 this.context.refs.currentStreamIdsRef.current.video = streamId;
                 // If this is the first stream, also set as primary
                 if (!this.context.refs.currentStreamIdsRef.current.primary) {
-                    this.context.refs.currentStreamIdsRef.current.primary =
-                        streamId;
+                    this.context.refs.currentStreamIdsRef.current.primary = streamId;
                 }
             } else if (kind === "audio") {
                 this.context.refs.currentStreamIdsRef.current.audio = streamId;
                 // If this is the first stream, also set as primary
                 if (!this.context.refs.currentStreamIdsRef.current.primary) {
-                    this.context.refs.currentStreamIdsRef.current.primary =
-                        streamId;
+                    this.context.refs.currentStreamIdsRef.current.primary = streamId;
                 }
             }
         }
@@ -54,10 +53,7 @@ export class ProducerManager {
      * Publish local media tracks
      */
     publishTracks = async (): Promise<boolean> => {
-        if (
-            !this.context.refs.localStreamRef.current ||
-            !this.context.refs.sendTransportRef.current
-        ) {
+        if (!this.context.refs.localStreamRef.current || !this.context.refs.sendTransportRef.current) {
             return false;
         }
 
@@ -80,32 +76,25 @@ export class ProducerManager {
                 return false;
             }
 
-            const videoTrack =
-                this.context.refs.localStreamRef.current.getVideoTracks()[0];
-            const audioTrack =
-                this.context.refs.localStreamRef.current.getAudioTracks()[0];
+            const videoTrack = this.context.refs.localStreamRef.current.getVideoTracks()[0];
+            const audioTrack = this.context.refs.localStreamRef.current.getAudioTracks()[0];
 
-            const hasValidVideo =
-                videoTrack && videoTrack.readyState === "live";
-            const hasValidAudio =
-                audioTrack && audioTrack.readyState === "live";
+            const hasValidVideo = videoTrack && videoTrack.readyState === "live";
+            const hasValidAudio = audioTrack && audioTrack.readyState === "live";
+            // Publish audio (real or dummy)
+            if (hasValidAudio) {
+                await this.publishAudioTrack(audioTrack, false);
+            } else {
+                const dummyAudioTrack = createSilentAudioTrack();
+                await this.publishAudioTrack(dummyAudioTrack, true); // true = pause immediately
+            }
 
-            // Priority 1: Both video and audio available
-            if (hasValidVideo && hasValidAudio) {
-                await this.publishAudioTrack(audioTrack);
-                await this.publishVideoTrack(videoTrack);
-            }
-            // Priority 2: Only audio available
-            else if (!hasValidVideo && hasValidAudio) {
-                await this.publishAudioTrack(audioTrack);
-            }
-            // Priority 3: Only video available
-            else if (hasValidVideo && !hasValidAudio) {
-                await this.publishVideoTrack(videoTrack);
-            }
-            // Priority 4: No media available - notify user and skip
-            else {
-                return false;
+            // Publish video (real or dummy)
+            if (hasValidVideo) {
+                await this.publishVideoTrack(videoTrack, false);
+            } else {
+                const dummyVideoTrack = createBlackVideoTrack();
+                await this.publishVideoTrack(dummyVideoTrack, true); // true = pause immediately
             }
 
             return true;
@@ -120,25 +109,19 @@ export class ProducerManager {
 
     /**
      * Publish video track
+     * @param track - Video track to publish
+     * @param pauseImmediately - If true, pause producer immediately after creation (for dummy tracks)
      */
-    private publishVideoTrack = async (
-        track: MediaStreamTrack
-    ): Promise<boolean> => {
+    private publishVideoTrack = async (track: MediaStreamTrack, pauseImmediately = false): Promise<boolean> => {
         // Check if device supports video codecs
-        const videoCodecs =
-            this.context.refs.deviceRef.current?.rtpCapabilities.codecs?.filter(
-                (c) => c.kind === "video"
-            );
+        const videoCodecs = this.context.refs.deviceRef.current?.rtpCapabilities.codecs?.filter((c) => c.kind === "video");
         if (!videoCodecs || videoCodecs.length === 0) {
             return false;
         }
 
         try {
             // Check if device is mobile for encoding adjustments
-            const isMobile =
-                /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-                    navigator.userAgent
-                );
+            const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
             const encodings = isMobile
                 ? [
@@ -160,17 +143,19 @@ export class ProducerManager {
                       { maxBitrate: 900000 },
                   ];
 
-            const videoProducer =
-                await this.context.refs.sendTransportRef.current!.produce({
-                    track: track,
-                    encodings: encodings,
-                    appData: {
-                        type: "webcam",
-                        video: track.enabled, 
-                        audio: false,
-                        platform: isMobile ? "mobile" : "desktop",
-                    },
-                });
+            const videoProducer = await this.context.refs.sendTransportRef.current!.produce({
+                track: track,
+                encodings: encodings,
+                appData: {
+                    type: "webcam",
+                    // FIXED: Use inverse of pauseImmediately instead of track.enabled
+                    // If pausing immediately (dummy track), video should be false
+                    video: !pauseImmediately,
+                    audio: false,
+                    platform: isMobile ? "mobile" : "desktop",
+                    isDummy: pauseImmediately, // Mark as dummy if paused immediately
+                },
+            });
 
             this.context.refs.producersRef.current.set(videoProducer.id, {
                 producerId: videoProducer.id,
@@ -179,6 +164,12 @@ export class ProducerManager {
                 appData: videoProducer.appData,
                 producer: videoProducer,
             });
+
+            // If this is a dummy producer, pause it immediately
+            if (pauseImmediately) {
+                videoProducer.pause();
+            }
+
             return true;
         } catch (videoError) {
             console.error("[WS] Failed to produce video:", videoError);
@@ -188,29 +179,28 @@ export class ProducerManager {
 
     /**
      * Publish audio track
+     * @param track - Audio track to publish
+     * @param pauseImmediately - If true, pause producer immediately after creation (for dummy tracks)
      */
-    private publishAudioTrack = async (
-        track: MediaStreamTrack
-    ): Promise<boolean> => {
+    private publishAudioTrack = async (track: MediaStreamTrack, pauseImmediately = false): Promise<boolean> => {
         // Check if device supports audio codecs
-        const audioCodecs =
-            this.context.refs.deviceRef.current?.rtpCapabilities.codecs?.filter(
-                (c) => c.kind === "audio"
-            );
+        const audioCodecs = this.context.refs.deviceRef.current?.rtpCapabilities.codecs?.filter((c) => c.kind === "audio");
         if (!audioCodecs || audioCodecs.length === 0) {
             return false;
         }
 
         try {
-            const audioProducer =
-                await this.context.refs.sendTransportRef.current!.produce({
-                    track: track,
-                    appData: {
-                        type: "mic",
-                        video: false,
-                        audio: track.enabled,
-                    },
-                });
+            const audioProducer = await this.context.refs.sendTransportRef.current!.produce({
+                track: track,
+                appData: {
+                    type: "mic",
+                    video: false,
+                    // FIXED: Use inverse of pauseImmediately instead of track.enabled
+                    // If pausing immediately (dummy track), audio should be false
+                    audio: !pauseImmediately,
+                    isDummy: pauseImmediately, // Mark as dummy if paused immediately
+                },
+            });
 
             this.context.refs.producersRef.current.set(audioProducer.id, {
                 producerId: audioProducer.id,
@@ -219,6 +209,11 @@ export class ProducerManager {
                 appData: audioProducer.appData,
                 producer: audioProducer,
             });
+
+            // If this is a dummy producer, pause it immediately
+            if (pauseImmediately) {
+                audioProducer.pause();
+            }
 
             return true;
         } catch (audioError) {
@@ -230,9 +225,7 @@ export class ProducerManager {
     /**
      * Publish screen share tracks
      */
-    publishScreenShareTracks = async (
-        screenStream: MediaStream
-    ): Promise<boolean> => {
+    publishScreenShareTracks = async (screenStream: MediaStream): Promise<boolean> => {
         if (!this.context.refs.sendTransportRef.current) {
             toast.error("Cannot start screen sharing: Not connected");
             return false;
@@ -243,51 +236,42 @@ export class ProducerManager {
             const videoTrack = screenStream.getVideoTracks()[0];
             if (videoTrack && this.context.refs.sendTransportRef.current) {
                 try {
-                    const screenVideoProducer =
-                        await this.context.refs.sendTransportRef.current.produce(
+                    const screenVideoProducer = await this.context.refs.sendTransportRef.current.produce({
+                        track: videoTrack,
+                        encodings: [
                             {
-                                track: videoTrack,
-                                encodings: [
-                                    {
-                                        maxBitrate: 500000,
-                                        scaleResolutionDownBy: 4,
-                                    },
-                                    {
-                                        maxBitrate: 1500000,
-                                        scaleResolutionDownBy: 2,
-                                    },
-                                    {
-                                        maxBitrate: 3000000,
-                                        scaleResolutionDownBy: 1,
-                                    },
-                                ],
-                                codecOptions: {
-                                    videoGoogleStartBitrate: 1000,
-                                },
-                                appData: {
-                                    video: true,
-                                    audio: false,
-                                    type: "screen",
-                                    isScreenShare: true,
-                                },
-                            }
-                        );
+                                maxBitrate: 500000,
+                                scaleResolutionDownBy: 4,
+                            },
+                            {
+                                maxBitrate: 1500000,
+                                scaleResolutionDownBy: 2,
+                            },
+                            {
+                                maxBitrate: 3000000,
+                                scaleResolutionDownBy: 1,
+                            },
+                        ],
+                        codecOptions: {
+                            videoGoogleStartBitrate: 1000,
+                        },
+                        appData: {
+                            video: true,
+                            audio: false,
+                            type: "screen",
+                            isScreenShare: true,
+                        },
+                    });
 
-                    this.context.refs.producersRef.current.set(
-                        screenVideoProducer.id,
-                        {
-                            producerId: screenVideoProducer.id,
-                            streamId: "",
-                            kind: "video",
-                            appData: screenVideoProducer.appData,
-                            producer: screenVideoProducer,
-                        }
-                    );
+                    this.context.refs.producersRef.current.set(screenVideoProducer.id, {
+                        producerId: screenVideoProducer.id,
+                        streamId: "",
+                        kind: "video",
+                        appData: screenVideoProducer.appData,
+                        producer: screenVideoProducer,
+                    });
                 } catch (error) {
-                    console.error(
-                        "[WS] Failed to produce screen video:",
-                        error
-                    );
+                    console.error("[WS] Failed to produce screen video:", error);
                     throw error;
                 }
             }
@@ -296,38 +280,29 @@ export class ProducerManager {
             const audioTrack = screenStream.getAudioTracks()[0];
             if (audioTrack && this.context.refs.sendTransportRef.current) {
                 try {
-                    const screenAudioProducer =
-                        await this.context.refs.sendTransportRef.current.produce(
-                            {
-                                track: audioTrack,
-                                codecOptions: {
-                                    opusStereo: true,
-                                    opusDtx: true,
-                                },
-                                appData: {
-                                    video: false,
-                                    audio: true,
-                                    type: "screen_audio",
-                                    isScreenShare: true,
-                                },
-                            }
-                        );
+                    const screenAudioProducer = await this.context.refs.sendTransportRef.current.produce({
+                        track: audioTrack,
+                        codecOptions: {
+                            opusStereo: true,
+                            opusDtx: true,
+                        },
+                        appData: {
+                            video: false,
+                            audio: true,
+                            type: "screen_audio",
+                            isScreenShare: true,
+                        },
+                    });
 
-                    this.context.refs.producersRef.current.set(
-                        screenAudioProducer.id,
-                        {
-                            producerId: screenAudioProducer.id,
-                            streamId: "",
-                            kind: "audio",
-                            appData: screenAudioProducer.appData,
-                            producer: screenAudioProducer,
-                        }
-                    );
+                    this.context.refs.producersRef.current.set(screenAudioProducer.id, {
+                        producerId: screenAudioProducer.id,
+                        streamId: "",
+                        kind: "audio",
+                        appData: screenAudioProducer.appData,
+                        producer: screenAudioProducer,
+                    });
                 } catch (error) {
-                    console.error(
-                        "[WS] Failed to produce screen audio:",
-                        error
-                    );
+                    console.error("[WS] Failed to produce screen audio:", error);
                     // Audio failure shouldn't stop screen sharing
                 }
             }
@@ -345,11 +320,7 @@ export class ProducerManager {
     unpublishScreenShare = () => {
         // Clean up producers - unpublish screen share streams
         this.context.refs.producersRef.current.forEach((info, producerId) => {
-            if (
-                (info?.appData && info.appData.type === "screen") ||
-                (info?.appData && info.appData.type === "screen_audio") ||
-                (info?.appData && info.appData.isScreenShare)
-            ) {
+            if ((info?.appData && info.appData.type === "screen") || (info?.appData && info.appData.type === "screen_audio") || (info?.appData && info.appData.isScreenShare)) {
                 // Send unpublish to server (server will generate the streamId)
                 this.context.refs.socketRef.current?.emit("sfu:unpublish", {
                     streamId: info.streamId || producerId,

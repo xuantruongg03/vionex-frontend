@@ -131,13 +131,17 @@ export class StreamManager {
                 const isAudioStream = data.kind === "audio" || mediaType.includes("mic");
                 const isVideoStream = data.kind === "video" || mediaType.includes("webcam");
 
+                // FIXED: Use data.metadata if available (from server), otherwise fallback to kind detection
+                // This ensures metadata updates from server take precedence over initial detection
                 const metadata: StreamMetadata = {
-                    video: isVideoStream,
-                    audio: isAudioStream,
                     type: isAudioStream ? "mic" : "webcam",
                     isScreenShare: false,
                     peerId: publisherId,
+                    // Spread data.metadata first, then set defaults if not present
                     ...data.metadata,
+                    // Only set video/audio if not already in data.metadata
+                    video: data.metadata?.video !== undefined ? data.metadata.video : isVideoStream,
+                    audio: data.metadata?.audio !== undefined ? data.metadata.audio : isAudioStream,
                 };
 
                 // Check if stream has tracks before adding to UI

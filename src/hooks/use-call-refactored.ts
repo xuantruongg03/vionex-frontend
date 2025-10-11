@@ -114,6 +114,9 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     const eventHandlerManager = new SocketEventHandlerManager(context, streamManager, consumerManager, producerManager, transportManager);
 
+    // Set socketEventHandlers reference for RoomManager to create consumers
+    roomManager.setSocketEventHandlers(eventHandlerManager);
+
     // Set cross-references for auto-publishing
     transportManager.setManagers(producerManager, mediaManager);
 

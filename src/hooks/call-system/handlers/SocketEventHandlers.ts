@@ -26,6 +26,11 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         this.transportManager = transportManager;
     }
 
+    // Getter for consumerManager (used by RoomManager)
+    getConsumerManager() {
+        return this.consumerManager;
+    }
+
     // Basic connection handlers
     handleConnect = () => {
         this.context.setters.setIsConnected(true);
@@ -178,6 +183,20 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         await this.consumerManager.createConsumer(data);
     };
 
+    // FIX: Handle consumer-skipped event to prevent timeout
+    // This is emitted when stream is not in priority list (e.g., user not in top N)
+    handleConsumerSkipped = (data: { streamId: string; message?: string }) => {
+        console.log(`[SocketEventHandlers] ⏭️  Consumer skipped for stream ${data.streamId}: ${data.message || "not in priority"}`);
+
+        // Remove from consuming tracking since we won't get a consumer for this stream
+        this.streamManager.removeFromConsuming(data.streamId);
+
+        // Optional: Show a subtle toast for debugging (can be removed in production)
+        // toast.info(`Stream ${data.streamId} skipped (not in priority)`);
+
+        // Stream will be consumed later if it becomes priority (e.g., when user starts speaking)
+    };
+
     handleConsumerResumed = async (data: any) => {
         await this.consumerManager.resumeConsumer(data);
     };
@@ -239,39 +258,36 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     };
 
     // Pin/Unpin response handlers
-    handlePinResponse = (data: { success: boolean; message: string; consumersCreated?: any[]; alreadyPriority?: boolean; existingConsumer?: boolean }) => {
+    handlePinResponse = (data: { success: boolean; message: string; consumersCreated?: any[]; alreadyPriority?: boolean; existingConsumer?: boolean; pinnedPeerId?: string }) => {
         if (data.success) {
-            if (data.alreadyPriority) {
-                toast.info(`User is already in priority view`);
-            } else {
-                toast.success(`Successfully pinned user`);
+            // Process consumers created by pin action
+            if (data.consumersCreated && data.consumersCreated.length > 0) {
+                // Create consumers for each stream
+                data.consumersCreated.forEach((consumerData) => {
+                    this.consumerManager.createConsumer(consumerData);
+                });
             }
         } else {
             toast.error(`Failed to pin user: ${data.message}`);
         }
     };
 
-    handleUnpinResponse = (data: { success: boolean; message: string; consumersRemoved?: string[]; stillInPriority?: boolean }) => {
+    handleUnpinResponse = (data: { success: boolean; message: string; consumersRemoved?: string[]; stillInPriority?: boolean; unpinnedPeerId?: string }) => {
         if (data.success) {
-            if (data.stillInPriority) {
-                toast.info(`User unpinned but still in priority view`);
-            } else {
-                toast.success(`Successfully unpinned user`);
+            // Process consumers removed by unpin action
+            if (data.consumersRemoved && data.consumersRemoved.length > 0) {
+                // Remove consumers
+                data.consumersRemoved.forEach((consumerId) => {
+                    const consumerInfo = this.context.refs.consumersRef.current.get(consumerId);
+                    if (consumerInfo) {
+                        consumerInfo.consumer.close();
+                        this.context.refs.consumersRef.current.delete(consumerId);
+                    }
+                });
             }
         } else {
             toast.error(`Failed to unpin user: ${data.message}`);
         }
-    };
-
-    // Broadcast event handlers (when other users pin/unpin)
-    handleUserPinned = (data: { pinnerPeerId: string; pinnedPeerId: string; roomId: string }) => {
-        // Optional: Show notification when someone else pins a user
-        console.log(`${data.pinnerPeerId} pinned ${data.pinnedPeerId}`);
-    };
-
-    handleUserUnpinned = (data: { unpinnerPeerId: string; unpinnedPeerId: string; roomId: string }) => {
-        // Optional: Show notification when someone else unpins a user
-        console.log(`${data.unpinnerPeerId} unpinned ${data.unpinnedPeerId}`);
     };
 
     // Legacy handlers (keeping for compatibility)
@@ -451,6 +467,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Consumer handlers
         socket.on("sfu:consumer-created", this.handleConsumerCreated);
+        socket.on("sfu:consumer-skipped", this.handleConsumerSkipped); // FIX: Handle skipped consumers
         socket.on("sfu:consumer-resumed", this.handleConsumerResumed);
         socket.on("sfu:consumer-removed", this.handleConsumerRemoved);
 
@@ -468,9 +485,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.on("sfu:pin-user-response", this.handlePinResponse);
         socket.on("sfu:unpin-user-response", this.handleUnpinResponse);
 
-        // Pin/Unpin broadcast events (when other users pin/unpin)
-        socket.on("sfu:user-pinned", this.handleUserPinned);
-        socket.on("sfu:user-unpinned", this.handleUserUnpinned);
         socket.on("sfu:unpin-success", this.handleUnpinSuccess);
         socket.on("sfu:unpin-error", this.handleUnpinError);
 
@@ -514,6 +528,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Consumer handlers
         socket.off("sfu:consumer-created", this.handleConsumerCreated);
+        socket.off("sfu:consumer-skipped", this.handleConsumerSkipped); // FIX: Cleanup skipped consumer handler
         socket.off("sfu:consumer-resumed", this.handleConsumerResumed);
         socket.off("sfu:consumer-removed", this.handleConsumerRemoved);
 
@@ -530,10 +545,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // Pin/Unpin response handlers
         socket.off("sfu:pin-user-response", this.handlePinResponse);
         socket.off("sfu:unpin-user-response", this.handleUnpinResponse);
-
-        // Pin/Unpin broadcast events
-        socket.off("sfu:user-pinned", this.handleUserPinned);
-        socket.off("sfu:user-unpinned", this.handleUserUnpinned);
 
         // Legacy handlers
         socket.off("sfu:pin-success", this.handlePinSuccess);
