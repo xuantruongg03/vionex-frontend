@@ -15,6 +15,8 @@
 
 Modern, enterprise-grade video conferencing client with AI-powered features and real-time collaboration tools.
 
+**🌐 Live Demo**: [https://vionex.website](https://vionex.website)
+
 ## 🚀 Overview
 
 **Vionex Frontend** is a cutting-edge React application that provides a comprehensive video conferencing experience. Built with modern web technologies, it delivers seamless real-time communication with advanced features like AI transcription, semantic search, and interactive collaboration tools.
@@ -314,6 +316,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📞 Support & Contact
 
+- **Website**: [https://vionex.website](https://vionex.website)
 - **Issues**: [GitHub Issues](https://github.com/xuantruongg03/groupchat-video-call/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/xuantruongg03/groupchat-video-call/discussions)
 - **Email**: xuantruongg03@gmail.com
