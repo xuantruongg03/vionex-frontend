@@ -7,8 +7,8 @@ import { useSelector } from "react-redux";
 import "react-resizable/css/styles.css";
 import { StreamTile } from "./StreamTile";
 import { useVideoGrid } from "@/hooks/use-video-grid";
-import { calculateGridDimensions, createDefaultLayout } from "@/utils/gridLayout";
-import LAYOUT_TEMPLATES from "./Templates/LayoutTemplate";
+import { calculateGridDimensions, createDefaultLayout, getOptimalLayout } from "@/utils/gridLayout";
+import LAYOUT_TEMPLATES, { getLayoutCapacity } from "./Templates/LayoutTemplate";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -44,6 +44,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
         isUserUsingTranslation,
         screenShareUsers,
         sortedUsers,
+        processUsersForDisplay,
     } = useVideoGrid(streams, screenStreams, users, speakingPeers, myPeerId, room);
 
     const [draggedItemPrevPos, setDraggedItemPrevPos] = useState<{
@@ -52,78 +53,108 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
         y: number;
     } | null>(null);
 
-    // Helper: handle translation toggle
-    // const handleToggleTranslation = useCallback(
-    //     async (userId: string, enable: boolean) => {
-    //         try {
-    //             if (enable) {
-    //                 const translatedStreamId = `translated_${userId}_vi_en`;
-    //                 if (consumeTranslationStream) {
-    //                     await consumeTranslationStream(translatedStreamId);
-    //                 }
-    //             } else {
-    //                 if (revertTranslationStream) {
-    //                     revertTranslationStream(userId);
-    //                 }
-    //             }
-    //         } catch (error) {
-    //             console.error(
-    //                 `[VideoGrid] Error toggling translation for ${userId}:`,
-    //                 error
-    //             );
-    //         }
-    //     },
-    //     [consumeTranslationStream, revertTranslationStream]
-    // );
-
     // Get local user
     const localUser = users.find((u) => u.peerId === myPeerId || u.peerId === "local");
     const isLocalOnlyMode = sortedUsers.length === 0 && screenShareUsers.length === 0;
 
-    // Process users for display - OPTIMIZED to avoid circular dependencies
+    // FIX: Calculate grid dimensions FIRST
+    const headerHeight = 100;
+    const availableHeight = useMemo(() => (typeof window !== "undefined" ? window.innerHeight - headerHeight : 660), []);
+
+    // [REFACTOR] Process users for display - use hook function
+    const allValidUsers = useMemo(() => {
+        return processUsersForDisplay(selectedLayoutTemplate, localUser, room.pinnedUsers);
+    }, [processUsersForDisplay, selectedLayoutTemplate, localUser, room.pinnedUsers]);
+
+    // Calculate grid cols based on total users
+    const baseGridCols = useMemo(() => {
+        // FIX: Only force 4 cols for specific templates (not 'auto')
+        // 'auto' is the default layout and should use optimal grid sizing
+        const needsFixedGrid = selectedLayoutTemplate && selectedLayoutTemplate !== "auto";
+
+        if (needsFixedGrid) {
+            return 4; // Standard grid for sidebar, spotlight, top-hero-bar
+        }
+
+        // Original logic for auto/default layout
+        const layout = getOptimalLayout(Math.min(allValidUsers.length, 12));
+        return layout.cols;
+    }, [allValidUsers.length, selectedLayoutTemplate]);
+
+    // FIX: Calculate max display users based on grid cols and selected layout
+    const maxDisplayUsers = useMemo(() => {
+        const cols = baseGridCols;
+        const rows = 3; // Standard 3 rows
+
+        // If auto layout or no layout, use default capacity (cols * rows - 1)
+        const needsFixedGrid = selectedLayoutTemplate && selectedLayoutTemplate !== "auto";
+        if (!needsFixedGrid) {
+            return cols * rows - 1; // Default: varies based on grid size
+        }
+
+        // Get capacity for selected layout (sidebar, spotlight, top-hero-bar)
+        // Spotlight doesn't reserve slot for remaining indicator
+        const includeRemaining = selectedLayoutTemplate !== "spotlight";
+        const capacity = getLayoutCapacity(selectedLayoutTemplate, cols, rows, includeRemaining);
+
+        // If capacity calculation fails, fallback based on grid size
+        return capacity !== null ? capacity : cols * rows - 1;
+    }, [selectedLayoutTemplate, baseGridCols, allValidUsers.length]);
+
+    // Slice users based on calculated capacity
     const processedUsers = useMemo(() => {
-        const regularParticipants = localUser ? [localUser, ...sortedUsers] : sortedUsers;
-
-        // Filter out invalid users before combining
-        const validRegularParticipants = regularParticipants.filter((user) => user && user.peerId);
-        const validScreenShareUsers = screenShareUsers.filter((user) => user && user.peerId);
-
-        const allParticipants = [...validScreenShareUsers, ...validRegularParticipants];
-        const maxDisplayUsers = 11;
-
-        const usersToDisplay = allParticipants.slice(0, maxDisplayUsers);
-        const remainingUsersCount = allParticipants.slice(maxDisplayUsers);
+        const usersToDisplay = allValidUsers.slice(0, maxDisplayUsers);
+        const remainingUsersCount = allValidUsers.slice(maxDisplayUsers);
 
         return {
             usersToDisplay,
             remainingUsersCount,
         };
-    }, [sortedUsers, localUser, screenShareUsers, room.pinnedUsers]);
+    }, [allValidUsers, maxDisplayUsers]);
 
     // Update state only when needed
     useEffect(() => {
         const { usersToDisplay, remainingUsersCount } = processedUsers;
 
+        // Special handling for spotlight: no remaining users
+        const finalRemainingUsers = selectedLayoutTemplate === "spotlight" ? [] : remainingUsersCount;
+
         // Check before setState to avoid unnecessary renders
         const peerIds = (arr: User[]) => arr.map((u) => u.peerId).join(",");
-        if (peerIds(usersToShow) !== peerIds(usersToDisplay) || peerIds(remainingUsers) !== peerIds(remainingUsersCount)) {
+        if (peerIds(usersToShow) !== peerIds(usersToDisplay) || peerIds(remainingUsers) !== peerIds(finalRemainingUsers)) {
             setUsersToShow(usersToDisplay);
-            setRemainingUsers(remainingUsersCount);
+            setRemainingUsers(finalRemainingUsers);
         }
-    }, [processedUsers]); // Remove circular dependencies
+    }, [processedUsers, selectedLayoutTemplate]); // Remove circular dependencies
 
-    // Calculate grid dimensions - MEMOIZED
-    const headerHeight = 100;
-    const availableHeight = useMemo(
-        () => (typeof window !== "undefined" ? window.innerHeight - headerHeight : 660),
-        [] // Only calculate once
-    );
+    // Calculate totalDisplayItems and grid dimensions
+    // Spotlight layout never shows remaining users indicator
+    const totalDisplayItems = useMemo(() => {
+        const hasRemaining = selectedLayoutTemplate === "spotlight" ? false : remainingUsers.length > 0;
+        return usersToShow.length + (hasRemaining ? 1 : 0);
+    }, [usersToShow.length, remainingUsers.length, selectedLayoutTemplate]);
 
-    const totalDisplayItems = useMemo(() => usersToShow.length + (remainingUsers.length > 0 ? 1 : 0), [usersToShow.length, remainingUsers.length]);
+    // Memoize needsFixedGrid check to avoid recalculation
+    const needsFixedGrid = useMemo(() => {
+        return selectedLayoutTemplate && selectedLayoutTemplate !== "auto";
+    }, [selectedLayoutTemplate]);
 
+    // FIX: Use baseGridCols for grid dimensions, NOT recalculated from totalDisplayItems
+    // This ensures layout templates render with correct column count
     const gridDimensions = useMemo(() => {
-        return calculateGridDimensions(
-            totalDisplayItems,
+        // Only force fixed 4×3 grid for specific templates (not 'auto')
+        // 'auto' is the default and should use optimal sizing
+        let itemsForCalculation = totalDisplayItems;
+
+        if (needsFixedGrid) {
+            // Force calculation for full 4×3 grid (12 items) for sidebar, spotlight, top-hero-bar
+            itemsForCalculation = 12;
+        }
+
+        // Calculate dimensions using totalDisplayItems to get correct rowCount
+        // Then recalculate gridHeight based on baseGridCols for consistency
+        const dims = calculateGridDimensions(
+            itemsForCalculation,
             availableHeight,
             16, // containerPadding
             16, // marginSize
@@ -131,13 +162,41 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
             500, // maxRowHeightLimit
             currentBreakpoint
         );
-    }, [totalDisplayItems, availableHeight, currentBreakpoint]);
+
+        // Recalculate actualRows based on baseGridCols for accurate height
+        const actualRows = Math.ceil(totalDisplayItems / baseGridCols);
+        const actualItemHeight = dims.rowHeight + 16; // marginSize
+        const calculatedHeight = actualRows * actualItemHeight + 16 * 2; // containerPadding
+
+        // Use availableHeight as minimum to prevent small background
+        const gridHeight = Math.max(calculatedHeight, availableHeight);
+
+        return {
+            ...dims,
+            gridCols: baseGridCols,
+            actualRows,
+            gridHeight,
+        };
+    }, [totalDisplayItems, availableHeight, currentBreakpoint, baseGridCols, needsFixedGrid]);
 
     const { gridCols, rowHeight, gridHeight } = gridDimensions;
 
-    // Generate layouts - OPTIMIZED
-    const breakpointConfigs = useMemo(
-        () => ({
+    // Memoize breakpoint configurations
+    const breakpointConfigs = useMemo(() => {
+        // FIX: Only force baseGridCols for specific templates (not 'auto')
+        // 'auto' should use responsive grid like default
+        if (needsFixedGrid) {
+            return {
+                lg: { cols: baseGridCols },
+                md: { cols: baseGridCols },
+                sm: { cols: baseGridCols },
+                xs: { cols: baseGridCols },
+                xxs: { cols: baseGridCols },
+            };
+        }
+
+        // Original responsive logic for auto/default layout
+        return {
             lg: { cols: gridCols },
             md: { cols: gridCols },
             sm: {
@@ -149,9 +208,8 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
             xxs: {
                 cols: totalDisplayItems === 2 || totalDisplayItems === 3 ? 1 : 1,
             },
-        }),
-        [gridCols, totalDisplayItems]
-    );
+        };
+    }, [gridCols, totalDisplayItems, needsFixedGrid, baseGridCols]);
 
     useEffect(() => {
         if (isLocalOnlyMode) {
@@ -161,7 +219,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
 
         const newLayouts: { [key: string]: any[] } = {};
 
-        // Tạo layout cho từng breakpoint với logic riêng
+        // Create layout for each breakpoint with specific logic
         Object.entries(breakpointConfigs).forEach(([key, config]) => {
             const cols = config.cols;
             let layout = createDefaultLayout(usersToShow, cols);
@@ -194,17 +252,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
         });
 
         setLayouts(newLayouts);
-    }, [
-        usersToShow,
-        remainingUsers.length, // Only length, not the array itself
-        gridCols,
-        isLocalOnlyMode,
-        totalDisplayItems,
-        setLayouts,
-        selectedLayoutTemplate,
-        room.pinnedUsers,
-        breakpointConfigs, // Memoized config
-    ]);
+    }, [usersToShow, remainingUsers.length, gridCols, isLocalOnlyMode, totalDisplayItems, setLayouts, selectedLayoutTemplate, room.pinnedUsers, breakpointConfigs]);
 
     const createOccupancyMap = (layout: any[], gridWidth = 3, gridHeight = 3) => {
         const grid: boolean[][] = Array.from({ length: gridHeight }, () => Array.from({ length: gridWidth }, () => false));
@@ -291,7 +339,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
             const overlappedItems = layout.filter((item: any) => item.i !== newItem.i && checkOverlap(newItem, item));
 
             if (overlappedItems.length > 0 && overlappedItems[0].w > newItem.w) {
-                // Reset item về vị trí ban đầu
+                // Reset item to original position
                 const resetLayout = layout.map((item: any) => {
                     if (item.i === newItem.i) {
                         return {
@@ -302,7 +350,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
                     }
                     return item;
                 });
-                // Cập nhật layout với vị trí đã reset
+                // Update layout with reset position
                 setLayouts((prev) => ({
                     ...prev,
                     [currentBreakpoint]: resetLayout,
@@ -329,7 +377,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
                     item.y = slot.y;
                     markOccupiedSlots(occupancyMap, item);
                 } else {
-                    console.warn("Không tìm được chỗ trống cho item", item.i);
+                    console.warn("Cannot find empty slot for item", item.i);
                 }
             });
 
@@ -363,22 +411,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
 
                 return (
                     <div key={user.peerId} className='participant-container h-full w-full'>
-                        <StreamTile
-                            stream={screenStream}
-                            userName={`${originalUser} - Screen Share`}
-                            isSpeaking={false}
-                            onClick={() => {}}
-                            videoOff={false}
-                            micOff={false}
-                            audioStream={null}
-                            isScreen={true}
-                            isPinned={isUserPinned(originalUser)}
-                            togglePin={() => togglePinUser(originalUser)}
-                            hasTranslation={false}
-                            isUsingTranslation={false}
-                            // onToggleTranslation={handleToggleTranslation}
-                            userInfo={user.userInfo} // Pass user info for screen share streams too
-                        />
+                        <StreamTile stream={screenStream} userName={`${originalUser} - Screen Share`} isSpeaking={false} onClick={() => {}} videoOff={false} micOff={false} audioStream={null} isScreen={true} isPinned={isUserPinned(originalUser)} togglePin={() => togglePinUser(originalUser)} hasTranslation={false} isUsingTranslation={false} userInfo={user.userInfo} />
                     </div>
                 );
             }
@@ -410,7 +443,6 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
 
             return (
                 <div key={user.peerId} className='participant-container h-full w-full'>
-                    {/* REFACTORED: Always use StreamTile, provide fallback stream if needed */}
                     <StreamTile
                         stream={
                             userStream || {
@@ -430,40 +462,24 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
                         togglePin={() => togglePinUser(user.peerId)}
                         hasTranslation={hasUserTranslation(user.peerId)}
                         isUsingTranslation={isUserUsingTranslation(user.peerId)}
-                        // onToggleTranslation={handleToggleTranslation}
-                        userInfo={user.userInfo} // Pass user info for avatar and email
+                        userInfo={user.userInfo}
                     />
                 </div>
             );
         },
-        [
-            // Reduced dependencies - only the essentials
-            myPeerId,
-            isVideoOff,
-            isMuted,
-            isSpeaking,
-            streams,
-            speakingPeers,
-            getUserStream,
-            getUserAudioStream,
-            isUserPinned,
-            hasUserTranslation,
-            isUserUsingTranslation,
-            togglePinUser,
-            // handleToggleTranslation,
-        ]
+        [myPeerId, isVideoOff, isMuted, isSpeaking, streams, speakingPeers, getUserStream, getUserAudioStream, isUserPinned, hasUserTranslation, isUserUsingTranslation, togglePinUser]
     );
 
-    // Main grid layout - Move this useMemo to before early returns to avoid hooks order violation
+    // Memoize breakpoint columns for ResponsiveGridLayout
     const breakpointCols = useMemo(
         () => ({
-            lg: gridCols,
-            md: gridCols,
-            sm: totalDisplayItems === 2 ? 2 : totalDisplayItems === 3 ? 3 : Math.min(gridCols, 2),
-            xs: totalDisplayItems === 2 || totalDisplayItems === 3 ? 1 : Math.min(gridCols, 2),
-            xxs: totalDisplayItems === 2 || totalDisplayItems === 3 ? 1 : 1,
+            lg: breakpointConfigs.lg.cols,
+            md: breakpointConfigs.md.cols,
+            sm: breakpointConfigs.sm.cols,
+            xs: breakpointConfigs.xs.cols,
+            xxs: breakpointConfigs.xxs.cols,
         }),
-        [gridCols, totalDisplayItems]
+        [breakpointConfigs]
     );
 
     // Full screen local user mode - refactored to use StreamTile consistently
@@ -487,7 +503,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
                                         metadata: {},
                                     }
                                 }
-                                userName={`${localUser?.peerId || "Bạn"} (You)`}
+                                userName={`${localUser?.peerId || "You"} (You)`}
                                 isSpeaking={isSpeaking || speakingPeers.includes(localUser?.peerId || "")}
                                 onClick={() => {}}
                                 videoOff={isUserScreenSharing(localUser.peerId) ? false : isVideoOff}
@@ -500,11 +516,11 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
                             />
                         ) : (
                             <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-950 rounded-lg'>
-                                <SharedAvatar userName='Bạn' size='w-16 h-16' textSize='text-2xl' />
-                                <span className='text-white text-2xl mt-4'>Bạn</span>
+                                <SharedAvatar userName='You' size='w-16 h-16' textSize='text-2xl' />
+                                <span className='text-white text-2xl mt-4'>You</span>
                             </div>
                         )}
-                        <span className='absolute top-4 left-4 bg-blue-600 dark:bg-blue-700 text-white text-xs px-4 py-2 rounded shadow'>Bạn</span>
+                        <span className='absolute top-4 left-4 bg-blue-600 dark:bg-blue-700 text-white text-xs px-4 py-2 rounded shadow'>You</span>
                     </div>
                 </div>
             </div>
@@ -512,8 +528,8 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
     }
 
     return (
-        <div id='video-grid' className='video-grid flex flex-col gap-4 relative dark:bg-gray-950'>
-            <div style={{ height: gridHeight, maxHeight: gridHeight }}>
+        <div id='video-grid' className='video-grid flex flex-col gap-4 relative dark:bg-gray-950' style={{ minHeight: availableHeight }}>
+            <div style={{ height: "100%", minHeight: gridHeight }}>
                 {layouts.lg && layouts.lg.length > 0 && (
                     <ResponsiveGridLayout
                         className='layout'
@@ -545,7 +561,7 @@ export const VideoGrid = memo(({ streams, screenStreams, isVideoOff, isMuted, us
                     >
                         {usersToShow.map(renderUserGridItem)}
 
-                        {remainingUsers.length > 0 && (
+                        {remainingUsers.length > 0 && selectedLayoutTemplate !== "spotlight" && (
                             <div key='remaining' className='participant-container h-full w-full'>
                                 <div className='h-full w-full'>
                                     <div className='flex flex-col items-center justify-center h-full w-full bg-gray-900 dark:bg-gray-800 rounded-lg shadow-md'>
