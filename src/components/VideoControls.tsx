@@ -1,14 +1,9 @@
 import { useIsMobile } from "@/hooks/use-mobile";
-import * as Icon from "../lib/icon"
+import * as Icon from "../lib/icon";
 import { useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { Button } from "./ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
 interface VideoControlsProps {
     isMuted: boolean;
@@ -18,6 +13,7 @@ interface VideoControlsProps {
     isProcessing: boolean;
     isCreator?: boolean;
     isMonitorActive?: boolean;
+    unreadMessageCount?: number;
     onToggleMute: () => void;
     onToggleVideo: () => void;
     onToggleChat: () => void;
@@ -34,29 +30,7 @@ interface VideoControlsProps {
     onToggleLayout: () => void;
 }
 
-export const VideoControls = ({
-    isMuted,
-    isVideoOff,
-    onToggleMute,
-    onToggleVideo,
-    onToggleChat,
-    onToggleWhiteboard,
-    onToggleScreenShare,
-    onToggleLockRoom,
-    onToggleNetworkMonitor,
-    onToggleVoting,
-    onToggleQuiz,
-    onToggleRecording,
-    onLeaveRoom,
-    onToggleBehaviorMonitoring,
-    onToggleTranslationCabin,
-    onToggleLayout,
-    isScreenSharing,
-    isRecording,
-    isProcessing,
-    isCreator = false,
-    isMonitorActive = false,
-}: VideoControlsProps) => {
+export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo, onToggleChat, onToggleWhiteboard, onToggleScreenShare, onToggleLockRoom, onToggleNetworkMonitor, onToggleVoting, onToggleQuiz, onToggleRecording, onLeaveRoom, onToggleBehaviorMonitoring, onToggleTranslationCabin, onToggleLayout, isScreenSharing, isRecording, isProcessing, isCreator = false, isMonitorActive = false, unreadMessageCount = 0 }: VideoControlsProps) => {
     const room = useSelector((state: any) => state.room);
     const isMobile = useIsMobile();
     const [showControls, setShowControls] = useState(true);
@@ -65,14 +39,9 @@ export const VideoControls = ({
 
     if (!showControls) {
         return (
-            <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setShowControls(true)}
-                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-xl z-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 h-10 w-10"
-            >
-                <div className="flex items-center justify-center w-5 h-5">
-                    <Icon.ChevronUp className="dark:text-gray-300" />
+            <Button variant='outline' size='icon' onClick={() => setShowControls(true)} className='absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-xl z-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 h-10 w-10'>
+                <div className='flex items-center justify-center w-5 h-5'>
+                    <Icon.ChevronUp className='dark:text-gray-300' />
                 </div>
             </Button>
         );
@@ -85,35 +54,28 @@ export const VideoControls = ({
             title: "Hidden controls",
             onClick: () => setShowControls(false),
             icon: <Icon.ChevronDown />,
-            className:
-                "bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600",
+            className: "bg-white hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600",
         },
         {
             key: "mute",
             title: "Microphone",
             onClick: onToggleMute,
             icon: isMuted ? <Icon.MicOff /> : <Icon.Mic />,
-            className: isMuted
-                ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200"
-                : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
+            className: isMuted ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200" : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
         },
         {
             key: "video",
             title: "Camera",
             onClick: onToggleVideo,
             icon: isVideoOff ? <Icon.VideoOff /> : <Icon.Video />,
-            className: isVideoOff
-                ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200"
-                : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
+            className: isVideoOff ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200" : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
         },
         {
             key: "screen",
             title: "Screen Share",
             onClick: onToggleScreenShare,
             icon: isScreenSharing ? <Icon.ScreenShareOff /> : <Icon.ScreenShare />,
-            className: isScreenSharing
-                ? "bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-800/50 dark:text-gray-200"
-                : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
+            className: isScreenSharing ? "bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-800/50 dark:text-gray-200" : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
         },
         ...(isMobile
             ? []
@@ -122,9 +84,13 @@ export const VideoControls = ({
                       key: "chat",
                       title: "Chat",
                       onClick: onToggleChat,
-                      icon: <Icon.MessageCircle />,
-                      className:
-                          "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
+                      icon: (
+                          <div className='relative'>
+                              <Icon.MessageCircle />
+                              {unreadMessageCount > 0 && <span className='absolute -top-1 -right-1 bg-red-500 rounded-full h-2 w-2 animate-pulse border border-white dark:border-gray-800' />}
+                          </div>
+                      ),
+                      className: "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
                   },
               ]),
         {
@@ -132,8 +98,7 @@ export const VideoControls = ({
             title: "Leave",
             onClick: onLeaveRoom,
             icon: <Icon.LogOut />,
-            className:
-                "bg-red-500 hover:bg-red-600 text-white dark:bg-red-700 dark:hover:bg-red-800",
+            className: "bg-red-500 hover:bg-red-600 text-white dark:bg-red-700 dark:hover:bg-red-800",
             variant: "destructive" as const,
         },
     ];
@@ -146,7 +111,12 @@ export const VideoControls = ({
                       key: "chat",
                       title: "Chat",
                       onClick: onToggleChat,
-                      icon: <Icon.MessageCircle />,
+                      icon: (
+                          <div className='relative'>
+                              <Icon.MessageCircle />
+                              {unreadMessageCount > 0 && <span className='absolute -top-1 -right-1 bg-red-500 rounded-full h-2 w-2 border border-white dark:border-gray-700' />}
+                          </div>
+                      ),
                       className: "",
                       variant: "outline" as const,
                   },
@@ -159,9 +129,7 @@ export const VideoControls = ({
                       title: "Behavior monitoring",
                       onClick: onToggleBehaviorMonitoring,
                       icon: <Icon.Cctv />,
-                      className: isMonitorActive
-                          ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200"
-                          : "",
+                      className: isMonitorActive ? "bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 dark:text-gray-200" : "",
                       variant: "outline" as const,
                   },
               ]
@@ -251,90 +219,45 @@ export const VideoControls = ({
 
     // Find the Leave Room button and remove it from primary controls for separate rendering
     const leaveRoomButton = primaryControls.find((btn) => btn.key === "leave");
-    const otherPrimaryControls = primaryControls.filter(
-        (btn) => btn.key !== "leave"
-    );
+    const otherPrimaryControls = primaryControls.filter((btn) => btn.key !== "leave");
 
     return (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-1 bg-white p-3 md:p-3.5 rounded-full shadow-xl z-50 dark:bg-gray-900 dark:border dark:border-gray-700 transition-all duration-300 min-w-[280px]">
-            <div
-                ref={scrollContainerRef}
-                className={`flex items-center justify-between overflow-x-auto snap-x snap-mandatory max-w-[400px] no-scrollbar`}
-            >
+        <div className='absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-1 bg-white p-3 md:p-3.5 rounded-full shadow-xl z-50 dark:bg-gray-900 dark:border dark:border-gray-700 transition-all duration-300 min-w-[280px]'>
+            <div ref={scrollContainerRef} className={`flex items-center justify-between overflow-x-auto snap-x snap-mandatory max-w-[400px] no-scrollbar`}>
                 {/* Left side: Primary controls except Leave Room */}
-                <div className="flex items-center gap-2 md:gap-3">
+                <div className='flex items-center gap-2 md:gap-3'>
                     {otherPrimaryControls.map((button) => (
-                        <div key={button.key} className="snap-start">
+                        <div key={button.key} className='snap-start'>
                             {" "}
-                            <Button
-                                variant={button.variant || "outline"}
-                                size="icon"
-                                title={button.title}
-                                onClick={button.onClick}
-                                className={`${button.className} h-10 w-10 md:h-10 md:w-10`}
-                                disabled={button.onClick === undefined}
-                            >
-                                <div className="flex items-center justify-center w-5 h-5">
-                                    {button.icon}
-                                </div>
+                            <Button variant={button.variant || "outline"} size='icon' title={button.title} onClick={button.onClick} className={`${button.className} h-10 w-10 md:h-10 md:w-10`} disabled={button.onClick === undefined}>
+                                <div className='flex items-center justify-center w-5 h-5'>{button.icon}</div>
                             </Button>
                         </div>
                     ))}
                 </div>
 
                 {/* Controls on right side: Three dots menu and Leave Room button */}
-                <div className="flex items-center gap-2 md:gap-3">
+                <div className='flex items-center gap-2 md:gap-3'>
                     {/* Three dots dropdown for secondary controls */}
                     {secondaryControls.length > 0 && (
-                        <DropdownMenu
-                            open={dropdownOpen}
-                            onOpenChange={setDropdownOpen}
-                            modal={false}
-                        >
+                        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen} modal={false}>
                             <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 h-10 w-10 md:h-10 md:w-10 ml-2"
-                                    aria-label="More video controls"
-                                    aria-expanded={dropdownOpen}
-                                    aria-haspopup="menu"
-                                >
-                                    <div className="flex items-center justify-center w-5 h-5">
-                                        <Icon.MoreVertical aria-hidden="true" />
+                                <Button variant='outline' size='icon' className='dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 h-10 w-10 md:h-10 md:w-10 ml-2' aria-label='More video controls' aria-expanded={dropdownOpen} aria-haspopup='menu'>
+                                    <div className='flex items-center justify-center w-5 h-5'>
+                                        <Icon.MoreVertical aria-hidden='true' />
                                     </div>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                align="start"
-                                side="top"
-                                sideOffset={8}
-                                className="w-56 p-2 rounded-xl shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700"
-                                role="menu"
-                                aria-label="Video controls menu"
-                            >
+                            <DropdownMenuContent align='start' side='top' sideOffset={8} className='w-56 p-2 rounded-xl shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700' role='menu' aria-label='Video controls menu'>
                                 {secondaryControls.map((item) => {
                                     return (
-                                        <DropdownMenuItem
-                                            key={item.key}
-                                            onClick={item.onClick}
-                                            disabled={
-                                                item.onClick === undefined
-                                            }
-                                            className="flex items-center gap-3 py-3 px-3 my-1 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700 focus:bg-gray-100"
-                                            role="menuitem"
-                                        >
-                                            <span className="w-8 h-8 flex items-center justify-center bg-gray-50 dark:bg-gray-700 rounded-full">
-                                                <div
-                                                    className="flex items-center justify-center w-5 h-5"
-                                                    aria-hidden="true"
-                                                >
+                                        <DropdownMenuItem key={item.key} onClick={item.onClick} disabled={item.onClick === undefined} className='flex items-center gap-3 py-3 px-3 my-1 cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 dark:focus:bg-gray-700 focus:bg-gray-100' role='menuitem'>
+                                            <span className='w-8 h-8 flex items-center justify-center bg-gray-50 dark:bg-gray-700 rounded-full'>
+                                                <div className='flex items-center justify-center w-5 h-5' aria-hidden='true'>
                                                     {item.icon}
                                                 </div>
                                             </span>
-                                            <span className="text-sm font-medium dark:text-gray-200">
-                                                {item.title}
-                                            </span>
+                                            <span className='text-sm font-medium dark:text-gray-200'>{item.title}</span>
                                         </DropdownMenuItem>
                                     );
                                 })}
@@ -344,17 +267,9 @@ export const VideoControls = ({
 
                     {/* Leave Room button (always at the end) */}
                     {leaveRoomButton && (
-                        <div className="snap-start">
-                            <Button
-                                variant={leaveRoomButton.variant || "outline"}
-                                size="icon"
-                                title={leaveRoomButton.title}
-                                onClick={leaveRoomButton.onClick}
-                                className={`${leaveRoomButton.className} h-10 w-10 md:h-10 md:w-10 ml-1`}
-                            >
-                                <div className="flex items-center justify-center w-5 h-5">
-                                    {leaveRoomButton.icon}
-                                </div>
+                        <div className='snap-start'>
+                            <Button variant={leaveRoomButton.variant || "outline"} size='icon' title={leaveRoomButton.title} onClick={leaveRoomButton.onClick} className={`${leaveRoomButton.className} h-10 w-10 md:h-10 md:w-10 ml-1`}>
+                                <div className='flex items-center justify-center w-5 h-5'>{leaveRoomButton.icon}</div>
                             </Button>
                         </div>
                     )}
