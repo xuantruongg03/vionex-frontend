@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import { toast } from "sonner";
+import { useSelector } from "react-redux";
 
 export interface Message {
     id: string;
@@ -29,17 +30,19 @@ export interface Message {
 
 export function useChat(roomId: string, userName: string) {
     const [messages, setMessages] = useState<Message[]>([]);
-    const [pendingMessages, setPendingMessages] = useState<
-        Map<string, Message>
-    >(new Map());
+    const [pendingMessages, setPendingMessages] = useState<Map<string, Message>>(new Map());
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+
+    const orgId = useMemo(() => {
+        return (state: any) => state.room.organizationId;
+    }, []);
+    const organizationId = useSelector(orgId);
 
     // Use Socket Context
     const { socket } = useSocket();
 
     // Create temporary ID for messages
-    const generateTempId = () =>
-        `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     useEffect(() => {
         if (!socket?.connected) return;
@@ -52,56 +55,29 @@ export function useChat(roomId: string, userName: string) {
             setPendingMessages((currentPending) => {
                 const tempId = Array.from(currentPending.keys()).find((id) => {
                     const pending = currentPending.get(id);
-                    if (!pending || pending.sender !== message.sender)
-                        return false;
+                    if (!pending || pending.sender !== message.sender) return false;
 
                     if (pending.fileUrl && message.fileUrl) {
-                        return (
-                            pending.fileName === message.fileName &&
-                            pending.fileType === message.fileType &&
-                            Math.abs(
-                                new Date(pending.timestamp).getTime() -
-                                    new Date(message.timestamp).getTime()
-                            ) < 10000
-                        );
+                        return pending.fileName === message.fileName && pending.fileType === message.fileType && Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 10000;
                     }
 
-                    return (
-                        pending.text === message.text &&
-                        Math.abs(
-                            new Date(pending.timestamp).getTime() -
-                                new Date(message.timestamp).getTime()
-                        ) < 5000
-                    );
+                    return pending.text === message.text && Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 5000;
                 });
 
                 if (tempId) {
-                    setMessages((prev) =>
-                        prev.map((msg) =>
-                            msg.id === tempId
-                                ? { ...message, isConfirmed: true }
-                                : msg
-                        )
-                    );
+                    setMessages((prev) => prev.map((msg) => (msg.id === tempId ? { ...message, isConfirmed: true } : msg)));
                     const newPending = new Map(currentPending);
                     newPending.delete(tempId);
                     return newPending;
                 } else {
-                    setMessages((prev) => [
-                        ...prev,
-                        { ...message, isConfirmed: true },
-                    ]);
+                    setMessages((prev) => [...prev, { ...message, isConfirmed: true }]);
                     return currentPending;
                 }
             });
         };
 
         const handleChatHistory = (history: Message[]) => {
-            setMessages(
-                Array.isArray(history)
-                    ? history.map((msg) => ({ ...msg, isConfirmed: true }))
-                    : []
-            );
+            setMessages(Array.isArray(history) ? history.map((msg) => ({ ...msg, isConfirmed: true })) : []);
         };
 
         socket.on("chat:message", handleNewMessage);
@@ -148,6 +124,7 @@ export function useChat(roomId: string, userName: string) {
                 senderName: userName,
                 text: text.trim(),
                 replyTo: tempMessage.replyTo,
+                orgId: organizationId,
             },
         });
 
@@ -156,13 +133,7 @@ export function useChat(roomId: string, userName: string) {
         setTimeout(() => {
             setPendingMessages((prev) => {
                 if (prev.has(tempId)) {
-                    setMessages((prevMsgs) =>
-                        prevMsgs.map((msg) =>
-                            msg.id === tempId
-                                ? { ...msg, isPending: false, isFailed: true }
-                                : msg
-                        )
-                    );
+                    setMessages((prevMsgs) => prevMsgs.map((msg) => (msg.id === tempId ? { ...msg, isPending: false, isFailed: true } : msg)));
                     const newMap = new Map(prev);
                     newMap.delete(tempId);
                     return newMap;
@@ -177,11 +148,7 @@ export function useChat(roomId: string, userName: string) {
 
         const maxFileSize = 1 * 1024 * 1024; // 1MB
         if (file.size > maxFileSize) {
-            toast.error(
-                "File too large! Maximum allowed size is 1MB. Your file: " +
-                    (file.size / 1024 / 1024).toFixed(2) +
-                    "MB"
-            );
+            toast.error("File too large! Maximum allowed size is 1MB. Your file: " + (file.size / 1024 / 1024).toFixed(2) + "MB");
             return;
         }
 
@@ -208,11 +175,7 @@ export function useChat(roomId: string, userName: string) {
         reader.onload = (e) => {
             const base64Data = e.target?.result as string;
 
-            setMessages((prev) =>
-                prev.map((msg) =>
-                    msg.id === tempId ? { ...msg, fileUrl: base64Data } : msg
-                )
-            );
+            setMessages((prev) => prev.map((msg) => (msg.id === tempId ? { ...msg, fileUrl: base64Data } : msg)));
 
             socket.emit("chat:file", {
                 roomId,
@@ -230,13 +193,7 @@ export function useChat(roomId: string, userName: string) {
         };
 
         reader.onerror = () => {
-            setMessages((prev) =>
-                prev.map((msg) =>
-                    msg.id === tempId
-                        ? { ...msg, isPending: false, isFailed: true }
-                        : msg
-                )
-            );
+            setMessages((prev) => prev.map((msg) => (msg.id === tempId ? { ...msg, isPending: false, isFailed: true } : msg)));
             setPendingMessages((prev) => {
                 const newMap = new Map(prev);
                 newMap.delete(tempId);
@@ -249,13 +206,7 @@ export function useChat(roomId: string, userName: string) {
         setTimeout(() => {
             setPendingMessages((prev) => {
                 if (prev.has(tempId)) {
-                    setMessages((prevMsgs) =>
-                        prevMsgs.map((msg) =>
-                            msg.id === tempId
-                                ? { ...msg, isPending: false, isFailed: true }
-                                : msg
-                        )
-                    );
+                    setMessages((prevMsgs) => prevMsgs.map((msg) => (msg.id === tempId ? { ...msg, isPending: false, isFailed: true } : msg)));
                     const newMap = new Map(prev);
                     newMap.delete(tempId);
                     return newMap;
@@ -276,9 +227,7 @@ export function useChat(roomId: string, userName: string) {
             const message = messages.find((msg) => msg.id === messageId);
             if (message?.isFailed && !message.fileUrl) {
                 sendMessage(message.text);
-                setMessages((prev) =>
-                    prev.filter((msg) => msg.id !== messageId)
-                );
+                setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
             }
         },
         deleteMessage: (messageId: string) => {
