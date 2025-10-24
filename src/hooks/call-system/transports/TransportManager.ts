@@ -313,7 +313,6 @@ export class TransportManager {
             }
         });
 
-        // ✅ SAU KHI setup xong ALL event listeners, mới publish
         // If local stream already exists and no producers yet, publish tracks
         if (this.context.refs.localStreamRef.current && 
             this.context.refs.producersRef.current.size === 0 && 
@@ -321,15 +320,17 @@ export class TransportManager {
             
             console.log('[TransportManager] 🎬 Local stream exists, will publish tracks');
             
-            // Use nextTick to ensure all event listeners are attached
-            setTimeout(async () => {
+            // Use queueMicrotask for immediate but async execution
+            // This ensures all event listeners are attached in current call stack
+            // but executes immediately in next microtask (faster than setTimeout)
+            queueMicrotask(async () => {
                 console.log('[TransportManager] 📢 Calling publishTracks() now...');
                 try {
                     await this.producerManager?.publishTracks();
                 } catch (err) {
                     console.error('[TransportManager] ❌ Failed to publish:', err);
                 }
-            }, 100); // Short delay to ensure event loop completion
+            });
         }
     };
 
