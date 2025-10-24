@@ -41,7 +41,14 @@ export const QRCodeDialog = ({ isOpen, onClose, roomId }: QRCodeDialogProps) => 
                     <DialogTitle>QR Code</DialogTitle>
                 </DialogHeader>
                 <div className='flex flex-col items-center py-6'>
-                    <QRCode value={roomUrl} size={256} />
+                    <div className='bg-white p-4 rounded-lg shadow-sm'>
+                        <QRCode
+                            value={roomUrl}
+                            size={256}
+                            level='H' // High error correction for better scanning
+                            includeMargin={true} // Add margin for better scanning
+                        />
+                    </div>
                     <p className='mt-4 text-center text-sm text-muted-foreground'>Scan the QR code to join the meeting</p>
                     <p className='mt-2 px-4 text-center text-xs font-medium break-all'>{roomUrl}</p>
                     <video ref={videoRef} className='hidden' />
