@@ -380,16 +380,16 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             return newSet;
         });
 
-        // ENHANCED: Auto-remove speaking indicator after 3 seconds
-        // This handles cases where stop-speaking event is missed
-        setTimeout(() => {
-            this.context.setters.setSpeakingPeers((prev) => {
-                const newSet = new Set(prev);
-                newSet.delete(data.peerId);
-                return newSet;
-            });
-            console.log(`[SocketEventHandlers] Auto-removed speaking indicator for ${data.peerId}`);
-        }, 3000);
+        // // ENHANCED: Auto-remove speaking indicator after 3 seconds
+        // // This handles cases where stop-speaking event is missed
+        // setTimeout(() => {
+        //     this.context.setters.setSpeakingPeers((prev) => {
+        //         const newSet = new Set(prev);
+        //         newSet.delete(data.peerId);
+        //         return newSet;
+        //     });
+        //     console.log(`[SocketEventHandlers] Auto-removed speaking indicator for ${data.peerId}`);
+        // }, 3000);
     };
 
     handleUserStoppedSpeaking = (data: { peerId: string }) => {

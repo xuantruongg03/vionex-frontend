@@ -3,6 +3,7 @@ import { useCallRefactored as useCall } from "@/hooks/use-call-refactored";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useScreenRecorder } from "@/hooks/use-screen-recorder";
 import useUser from "@/hooks/use-user";
+import { useChat } from "@/hooks/use-chat";
 import { User } from "@/interfaces";
 import { ActionLogType } from "@/interfaces/action";
 import { TypeUserEvent } from "@/interfaces/behavior";
@@ -53,13 +54,18 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [canToggleVideo, setCanToggleVideo] = useState(true);
     const [canToggleAudio, setCanToggleAudio] = useState(true);
+    const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
     // Track if we've already attempted to join to prevent multiple join attempts
     const hasAttemptedJoin = useRef(false);
+    const lastReadMessageId = useRef<string | null>(null);
 
     const { isRecording, isProcessing, toggleRecording } = useScreenRecorder();
     //Room state from redux store
     const room = useSelector((state: any) => state.room);
+
+    // Hook to track chat messages for unread count
+    const { messages } = useChat(roomId ?? "", room.username ?? "");
 
     const {
         streams,
@@ -119,6 +125,26 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
     }, [roomId, room.username]); // Only depend on stable values
 
     const { sendLogsToServer, isMonitorActive, toggleBehaviorMonitoring } = useBehaviorMonitor({ roomId: roomId ?? "" });
+
+    // Track unread messages when chat is closed
+    useEffect(() => {
+        if (!uiState.isChatOpen) {
+            // Count new messages when chat is closed
+            const lastReadIndex = messages.findIndex((msg) => msg.id === lastReadMessageId.current);
+            const newMessages = lastReadIndex >= 0 ? messages.slice(lastReadIndex + 1) : messages;
+
+            // Only count messages from others that are confirmed
+            const unreadCount = newMessages.filter((msg) => msg.sender !== room.username && msg.isConfirmed).length;
+
+            setUnreadMessageCount(unreadCount);
+        } else {
+            // Reset counter when chat is opened and save last message ID
+            setUnreadMessageCount(0);
+            if (messages.length > 0) {
+                lastReadMessageId.current = messages[messages.length - 1].id;
+            }
+        }
+    }, [messages, uiState.isChatOpen, room.username]);
 
     const users = useMemo((): User[] => {
         // If we have users from the hybrid hook, use them (preferred path)
@@ -489,6 +515,7 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                     isCreator={room.isCreator}
                     isMonitorActive={isMonitorActive}
                     onToggleLayout={handleToggleLayoutTemplate}
+                    unreadMessageCount={unreadMessageCount}
                 />
             </div>{" "}
             {uiState.isTranslationCabinOpen && (

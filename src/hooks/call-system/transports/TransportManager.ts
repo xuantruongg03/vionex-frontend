@@ -144,7 +144,20 @@ export class TransportManager {
             callback: () => void,
             errback: (error: any) => void
         ) => {
+            const transportType = this.context.refs.sendTransportRef.current?.id === transport.id ? 'SEND' : 'RECEIVE';
+            
+            console.log(`[TransportManager] 🔌 ${transportType} transport CONNECT event triggered!`, {
+                transportId: transport.id,
+                dtlsRole: dtlsParameters.role,
+                timestamp: new Date().toISOString(),
+            });
+
             dtlsParameters.role = "client";
+            
+            console.log(`[TransportManager] 📡 Emitting sfu:connect-transport for ${transportType}`, {
+                transportId: transport.id,
+            });
+
             this.context.refs.socketRef.current?.emit("sfu:connect-transport", {
                 transportId: transport.id,
                 dtlsParameters,
@@ -190,7 +203,29 @@ export class TransportManager {
      * Setup send transport with event handlers
      */
     private setupSendTransport = (transport: mediasoupTypes.Transport) => {
+        console.log('[TransportManager] 📤 Setting up SEND transport', {
+            transportId: transport.id,
+            connectionState: transport.connectionState,
+            iceGatheringState: transport.iceGatheringState,
+            hasLocalStream: !!this.context.refs.localStreamRef.current,
+            producersCount: this.context.refs.producersRef.current.size,
+        });
+
         this.context.refs.sendTransportRef.current = transport;
+
+        // If local stream already exists and no producers yet, publish tracks
+        if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
+            console.log('[TransportManager] 🎬 Local stream exists, will publish tracks in 500ms');
+            setTimeout(async () => {
+                console.log('[TransportManager] 📢 Calling publishTracks() now...');
+                await this.producerManager?.publishTracks();
+            }, 500);
+        } else {
+            console.log('[TransportManager] ⏳ Waiting for local stream or already have producers', {
+                hasLocalStream: !!this.context.refs.localStreamRef.current,
+                producersCount: this.context.refs.producersRef.current.size,
+            });
+        }
 
         transport.on(
             "connect",
@@ -288,7 +323,15 @@ export class TransportManager {
 
         // Initialize local media when send transport is ready
         transport.on("connectionstatechange", (state) => {
+            console.log('[TransportManager] 📤 SEND transport connectionState changed', {
+                transportId: transport.id,
+                newState: state,
+                iceGatheringState: transport.iceGatheringState,
+                timestamp: new Date().toISOString(),
+            });
+
             if (state === "connected") {
+                console.log('[TransportManager] ✅ SEND transport CONNECTED!');
                 if (!this.context.refs.localStreamRef.current) {
                     setTimeout(async () => {
                         if (this.mediaManager) {
@@ -302,6 +345,13 @@ export class TransportManager {
                         }
                     }, 500);
                 }
+            } else if (state === "failed" || state === "disconnected") {
+                console.error(`[TransportManager] ❌ SEND transport ${state}!`, {
+                    transportId: transport.id,
+                    iceGatheringState: transport.iceGatheringState,
+                });
+            } else {
+                console.log(`[TransportManager] ℹ️ SEND transport state: ${state}`);
             }
         });
     };
@@ -310,6 +360,12 @@ export class TransportManager {
      * Setup receive transport with event handlers
      */
     private setupReceiveTransport = (transport: mediasoupTypes.Transport) => {
+        console.log('[TransportManager] 📥 Setting up RECEIVE transport', {
+            transportId: transport.id,
+            connectionState: transport.connectionState,
+            iceGatheringState: transport.iceGatheringState,
+        });
+
         this.context.refs.recvTransportRef.current = transport;
 
         transport.on(
@@ -318,7 +374,15 @@ export class TransportManager {
         );
 
         transport.on("connectionstatechange", (state) => {
+            console.log('[TransportManager] 📥 RECEIVE transport connectionState changed', {
+                transportId: transport.id,
+                newState: state,
+                iceGatheringState: transport.iceGatheringState,
+                timestamp: new Date().toISOString(),
+            });
+
             if (state === "connected") {
+                console.log('[TransportManager] ✅ RECEIVE transport CONNECTED!');
                 // Mark transport as ready
                 setTimeout(() => {
                     if (!this.context.refs.isInitializedRef.current) {
@@ -369,6 +433,13 @@ export class TransportManager {
                         }
                     }
                 }, 3000);
+            } else if (state === "failed" || state === "disconnected") {
+                console.error(`[TransportManager] ❌ RECEIVE transport ${state}!`, {
+                    transportId: transport.id,
+                    iceGatheringState: transport.iceGatheringState,
+                });
+            } else {
+                console.log(`[TransportManager] ℹ️ RECEIVE transport state: ${state}`);
             }
         });
     };

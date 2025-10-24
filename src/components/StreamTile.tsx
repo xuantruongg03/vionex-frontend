@@ -203,7 +203,7 @@ export const StreamTile = memo(
                         autoPlay
                         playsInline
                         muted
-                        className={`w-full h-full object-cover transition-all duration-300 ${isScreen ? "screen-share" : ""} ${isActuallySpeaking && !videoOff ? "filter brightness-110 contrast-105" : ""}`}
+                        className={`w-full h-full transition-all duration-300 ${isScreen ? "screen-share" : ""} ${isActuallySpeaking && !videoOff ? "filter brightness-110 contrast-105" : ""}`}
                         style={{ display: videoOff ? "none" : "block" }}
                         onError={(e) => {
                             console.error("Video error:", {

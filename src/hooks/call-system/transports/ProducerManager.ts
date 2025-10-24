@@ -53,19 +53,38 @@ export class ProducerManager {
      * Publish local media tracks
      */
     publishTracks = async (): Promise<boolean> => {
+        console.log('[ProducerManager] 📢 publishTracks() called', {
+            timestamp: new Date().toISOString(),
+            hasLocalStream: !!this.context.refs.localStreamRef.current,
+            hasSendTransport: !!this.context.refs.sendTransportRef.current,
+            sendTransportState: this.context.refs.sendTransportRef.current?.connectionState,
+            producersCount: this.context.refs.producersRef.current.size,
+            isPublishing: this.context.refs.isPublishingRef.current,
+        });
+
         if (!this.context.refs.localStreamRef.current || !this.context.refs.sendTransportRef.current) {
+            console.error('[ProducerManager] ❌ Cannot publish: missing localStream or sendTransport', {
+                hasLocalStream: !!this.context.refs.localStreamRef.current,
+                hasSendTransport: !!this.context.refs.sendTransportRef.current,
+            });
             return false;
         }
 
         // Check if we already have producers to avoid duplicates
         if (this.context.refs.producersRef.current.size > 0) {
+            console.log('[ProducerManager] ⏭️  Already have producers, skipping', {
+                producersCount: this.context.refs.producersRef.current.size,
+            });
             return true;
         }
 
         // Check if already publishing to avoid race conditions
         if (this.context.refs.isPublishingRef.current) {
+            console.warn('[ProducerManager] ⚠️ Already publishing, skipping to avoid race condition');
             return false;
         }
+
+        console.log('[ProducerManager] ✅ Starting to publish tracks...');
 
         try {
             this.context.refs.isPublishingRef.current = true;

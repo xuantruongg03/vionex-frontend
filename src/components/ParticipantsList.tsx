@@ -2,10 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useSocket } from "@/contexts/SocketContext";
 import { User } from "@/interfaces";
-import { FileSpreadsheet, Pin, PinOff, Users, UserX } from "lucide-react";
-import React, { useMemo } from "react";
+import { FileSpreadsheet, Pin, PinOff, Users, UserX, Search } from "lucide-react";
+import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export const ParticipantsList = React.memo(({ roomId, togglePinUser, handleKickUser, users }: { roomId: string; togglePinUser?: (peerId: string) => void; handleKickUser?: (peerId: string) => void; users: User[] }) => {
     const room = useSelector((state: any) => state.room);
@@ -13,16 +15,24 @@ export const ParticipantsList = React.memo(({ roomId, togglePinUser, handleKickU
     const log = useSelector((state: any) => state.log);
     const { socket: sfuSocket } = useSocket();
     const { isMonitorActive } = log;
+    const [searchQuery, setSearchQuery] = useState("");
+    const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
     const usersList = useMemo(() => {
         if (!users) return [];
-        return users.map((user) => ({
+        const allUsers = users.map((user) => ({
             ...user,
             isMe: user.peerId === myName,
             isPinned: pinnedUsers.includes(user.peerId),
             displayName: user.peerId === myName ? (user.isCreator ? `${user.peerId} - You (Creator)` : `${user.peerId} - You`) : user.isCreator ? `${user.peerId} - Creator` : user.peerId,
         }));
-    }, [users, myName, pinnedUsers]);
+
+        // Filter users based on debounced search query
+        if (!debouncedSearchQuery.trim()) return allUsers;
+
+        const query = debouncedSearchQuery.toLowerCase();
+        return allUsers.filter((user) => user.peerId.toLowerCase().includes(query) || user.userInfo?.email?.toLowerCase().includes(query));
+    }, [users, myName, pinnedUsers, debouncedSearchQuery]);
 
     const userCount = useMemo(() => {
         return usersList.length;
@@ -98,7 +108,11 @@ export const ParticipantsList = React.memo(({ roomId, togglePinUser, handleKickU
                 <SheetHeader>
                     <SheetTitle>Participants ({userCount})</SheetTitle>
                 </SheetHeader>
-                <div className='mt-4 flex flex-col h-[calc(100vh-120px)]'>
+                <div className='mt-4 relative'>
+                    <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+                    <Input type='text' placeholder='Search users...' value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className='pl-10' />
+                </div>
+                <div className='mt-4 flex flex-col h-[calc(100vh-180px)]'>
                     <div className='overflow-y-auto flex-1 pr-2'>
                         <div className='space-y-2'>
                             {usersList.map((user) => (
