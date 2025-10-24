@@ -192,19 +192,7 @@ export class TransportManager {
     private setupSendTransport = (transport: mediasoupTypes.Transport) => {
         this.context.refs.sendTransportRef.current = transport;
 
-        // If local stream already exists and no producers yet, publish tracks
-        if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
-            // setTimeout(async () => {
-            //     await this.producerManager?.publishTracks();
-            // }, 500);
-            // Bỏ setTimeout, gọi trực tiếp
-            (async () => {
-                await this.producerManager?.publishTracks();
-            })().catch(err => {
-                console.error('[TransportManager] Failed to publish:', err);
-            });
-        }
-
+        // ✅ SETUP EVENT LISTENERS TRƯỚC
         transport.on(
             "connect",
             this.createTransportConnectionHandler(transport)
@@ -324,6 +312,25 @@ export class TransportManager {
                 console.log(`[TransportManager] SEND transport state: ${state}`);
             }
         });
+
+        // ✅ SAU KHI setup xong ALL event listeners, mới publish
+        // If local stream already exists and no producers yet, publish tracks
+        if (this.context.refs.localStreamRef.current && 
+            this.context.refs.producersRef.current.size === 0 && 
+            this.producerManager) {
+            
+            console.log('[TransportManager] 🎬 Local stream exists, will publish tracks');
+            
+            // Use nextTick to ensure all event listeners are attached
+            setTimeout(async () => {
+                console.log('[TransportManager] 📢 Calling publishTracks() now...');
+                try {
+                    await this.producerManager?.publishTracks();
+                } catch (err) {
+                    console.error('[TransportManager] ❌ Failed to publish:', err);
+                }
+            }, 100); // Short delay to ensure event loop completion
+        }
     };
 
     /**
