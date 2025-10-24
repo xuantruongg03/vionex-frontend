@@ -1,6 +1,6 @@
 import ApiService from "@/services/signalService";
 import { Device, types as mediasoupTypes } from "mediasoup-client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Socket } from "socket.io-client";
 import { useSocket } from "@/contexts/SocketContext";
@@ -93,50 +93,32 @@ export function useCallRefactored(roomId: string, password?: string) {
         state: currentState,
     };
 
-    // Initialize managers - use useMemo to keep stable instances
-    const streamManager = useMemo(() => {
-        return new StreamManager(context);
-    }, [roomId]); // Only recreate when roomId changes
-
-    const transportManager = useMemo(() => {
-        return new TransportManager(context);
-    }, [roomId]);
-
-    const producerManager = useMemo(() => {
-        return new ProducerManager(context);
-    }, [roomId]);
-
-    const consumerManager = useMemo(() => {
-        return new ConsumerManager(context, streamManager);
-    }, [roomId]); // streamManager is already memoized
-
-    const mediaManager = useMemo(() => {
-        return new MediaManager(context, producerManager);
-    }, [roomId]); // producerManager is already memoized
-
-    const roomManager = useMemo(() => {
-        return new RoomManager(context);
-    }, [roomId]);
+    // Initialize managers
+    const streamManager = new StreamManager(context);
+    const transportManager = new TransportManager(context);
+    const producerManager = new ProducerManager(context);
+    const consumerManager = new ConsumerManager(context, streamManager);
+    const mediaManager = new MediaManager(context, producerManager);
+    const roomManager = new RoomManager(context);
 
     // Check for raw audio mode from URL parameter
     const useRawAudio = new URLSearchParams(window.location.search).get("rawAudio") === "true";
 
-    const vadManager = useMemo(() => {
-        return new VADManager(context, useRawAudio);
-    }, [roomId, useRawAudio]);
+    const vadManager = new VADManager(context, useRawAudio);
 
-    const eventHandlerManager = useMemo(() => {
-        return new SocketEventHandlerManager(context, streamManager, consumerManager, producerManager, transportManager);
-    }, [roomId]);
+    // Set manager references for cross-dependencies
+    transportManager.setManagers(producerManager, mediaManager);
+    roomManager.setMediaManager(mediaManager);
+    roomManager.setTransportManager(transportManager);
+    mediaManager.setVADManager(vadManager);
 
-    // Set manager references for cross-dependencies - only once per manager instance
-    useEffect(() => {
-        transportManager.setManagers(producerManager, mediaManager);
-        roomManager.setMediaManager(mediaManager);
-        roomManager.setTransportManager(transportManager);
-        mediaManager.setVADManager(vadManager);
-        roomManager.setSocketEventHandlers(eventHandlerManager);
-    }, [transportManager, producerManager, mediaManager, roomManager, vadManager, eventHandlerManager]);
+    const eventHandlerManager = new SocketEventHandlerManager(context, streamManager, consumerManager, producerManager, transportManager);
+
+    // Set socketEventHandlers reference for RoomManager to create consumers
+    roomManager.setSocketEventHandlers(eventHandlerManager);
+
+    // Set cross-references for auto-publishing
+    transportManager.setManagers(producerManager, mediaManager);
 
     // Initialize services
     useEffect(() => {
@@ -340,11 +322,8 @@ export function useCallRefactored(roomId: string, password?: string) {
                 throw new Error("Socket is not connected after connection attempt");
             }
 
-            const result = await roomManager.joinRoom(password);
-            
-            return result;
+            return await roomManager.joinRoom(password);
         } catch (error) {
-            console.error('[useCallRefactored] joinRoom failed', error);
             throw error;
         }
     }, [roomId, room.username, password, contextSocket, connectSocket]);

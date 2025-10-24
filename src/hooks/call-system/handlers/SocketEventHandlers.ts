@@ -52,20 +52,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
     // Stream handlers
     handleStreams = async (streams: any[]) => {
-        console.log('[SocketEventHandlers] 📺 handleStreams called', {
-            timestamp: new Date().toISOString(),
-            streamsCount: streams?.length || 0,
-            hasRecvTransport: !!this.context.refs.recvTransportRef.current,
-            recvTransportState: this.context.refs.recvTransportRef.current?.connectionState,
-            recvTransportId: this.context.refs.recvTransportRef.current?.id,
-            hasSendTransport: !!this.context.refs.sendTransportRef.current,
-            sendTransportState: this.context.refs.sendTransportRef.current?.connectionState,
-            sendTransportId: this.context.refs.sendTransportRef.current?.id,
-            myUsername: this.context.room.username,
-        });
-
         if (!streams || streams.length === 0) {
-            console.warn('[SocketEventHandlers] ⚠️ No streams to process');
             return;
         }
 
@@ -86,26 +73,17 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
             // Validate streamId
             if (!streamId || streamId === "undefined" || typeof streamId !== "string") {
-                console.warn('[SocketEventHandlers] ⚠️ Invalid streamId, skipping', { streamId });
                 continue;
             }
 
             // Check if already consuming this stream
             if (this.streamManager.isStreamBeingConsumed(streamId)) {
-                console.log('[SocketEventHandlers] ⏭️  Already consuming stream, skipping', { streamId });
                 continue;
             }
 
             // Use WebSocket consume instead of HTTP for consistency
             if (this.context.refs.recvTransportRef.current && this.context.refs.socketRef.current) {
                 try {
-                    console.log('[SocketEventHandlers] ✅ Emitting sfu:consume', {
-                        streamId,
-                        publisherId,
-                        transportId: this.context.refs.recvTransportRef.current.id,
-                        transportState: this.context.refs.recvTransportRef.current.connectionState,
-                    });
-
                     // Mark as consuming
                     this.streamManager.markStreamAsConsuming(streamId);
 
@@ -114,25 +92,9 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
                         transportId: this.context.refs.recvTransportRef.current.id,
                     });
                 } catch (error) {
-                    console.error('[SocketEventHandlers] ❌ Error emitting sfu:consume', { streamId, error });
                     // Remove from consuming list on error
                     this.streamManager.removeFromConsuming(streamId);
                 }
-            } else {
-                console.warn('[SocketEventHandlers] ⏳ RECEIVE transport not ready - adding to pending queue', {
-                    streamId,
-                    publisherId,
-                    hasRecvTransport: !!this.context.refs.recvTransportRef.current,
-                    hasSocket: !!this.context.refs.socketRef.current,
-                });
-
-                // Add to pending streams queue to be processed when transport is ready
-                this.streamManager.addToPendingStreams({
-                    streamId: streamId,
-                    publisherId: publisherId,
-                    metadata: metadata,
-                    rtpParameters: stream.rtpParameters,
-                });
             }
         }
     };

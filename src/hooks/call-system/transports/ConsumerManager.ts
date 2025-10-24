@@ -20,24 +20,8 @@ export class ConsumerManager {
      * @param data Consumer data from MediaSoup
      */
     createConsumer = async (data: any) => {
-        console.log('[ConsumerManager] 🎬 createConsumer called', {
-            timestamp: new Date().toISOString(),
-            streamId: data.streamId,
-            consumerId: data.consumerId,
-            producerId: data.producerId,
-            kind: data.kind,
-            hasRecvTransport: !!this.context.refs.recvTransportRef.current,
-            recvTransportState: this.context.refs.recvTransportRef.current?.connectionState,
-            recvTransportId: this.context.refs.recvTransportRef.current?.id,
-        });
-
         if (!this.context.refs.recvTransportRef.current) {
-            console.error("[ConsumerManager] ❌ CRITICAL: No receive transport available - CANNOT CREATE CONSUMER", {
-                streamId: data.streamId,
-                consumerId: data.consumerId,
-                sendTransportExists: !!this.context.refs.sendTransportRef.current,
-                deviceLoaded: this.context.refs.deviceRef.current?.loaded,
-            });
+            console.warn("[ConsumerManager] No receive transport available");
             return;
         }
 
