@@ -119,12 +119,19 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
                     this.streamManager.removeFromConsuming(streamId);
                 }
             } else {
-                console.error('[SocketEventHandlers] ❌ CRITICAL: Cannot consume stream - no RECEIVE transport', {
+                console.warn('[SocketEventHandlers] ⏳ RECEIVE transport not ready - adding to pending queue', {
                     streamId,
                     publisherId,
                     hasRecvTransport: !!this.context.refs.recvTransportRef.current,
                     hasSocket: !!this.context.refs.socketRef.current,
-                    recvTransportId: this.context.refs.recvTransportRef.current?.id,
+                });
+
+                // Add to pending streams queue to be processed when transport is ready
+                this.streamManager.addToPendingStreams({
+                    streamId: streamId,
+                    publisherId: publisherId,
+                    metadata: metadata,
+                    rtpParameters: stream.rtpParameters,
                 });
             }
         }

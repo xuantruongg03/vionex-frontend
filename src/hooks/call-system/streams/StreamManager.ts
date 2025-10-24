@@ -329,35 +329,69 @@ export class StreamManager {
     processPendingStreams = () => {
         const pendingStreams = this.context.refs.pendingStreamsRef.current;
 
+        console.log('[StreamManager] 🔄 Processing pending streams', {
+            timestamp: new Date().toISOString(),
+            pendingCount: pendingStreams.length,
+            hasRecvTransport: !!this.context.refs.recvTransportRef.current,
+            recvTransportState: this.context.refs.recvTransportRef.current?.connectionState,
+            pendingStreamIds: pendingStreams.map(s => s.streamId),
+        });
+
         if (pendingStreams.length > 0) {
+            let processedCount = 0;
+            let skippedCount = 0;
+
             for (const streamData of pendingStreams) {
                 // Validate streamId
                 if (!streamData.streamId || streamData.streamId === "undefined" || typeof streamData.streamId !== "string") {
+                    console.warn('[StreamManager] ⚠️ Invalid streamId in pending, skipping', { streamData });
+                    skippedCount++;
                     continue;
                 }
 
                 // Skip fallback streams
                 if (streamData.metadata?.type === "presence") {
+                    console.log('[StreamManager] ⏭️  Skipping presence stream', { streamId: streamData.streamId });
+                    skippedCount++;
                     continue;
                 }
 
                 // Check if already consuming
                 if (!this.context.refs.consumingStreamsRef.current.has(streamData.streamId)) {
                     try {
+                        console.log('[StreamManager] ✅ Processing pending stream', {
+                            streamId: streamData.streamId,
+                            publisherId: streamData.publisherId,
+                            transportId: this.context.refs.recvTransportRef.current?.id,
+                        });
+
                         this.context.refs.consumingStreamsRef.current.add(streamData.streamId);
                         this.context.refs.socketRef.current?.emit("sfu:consume", {
                             streamId: streamData.streamId,
                             transportId: this.context.refs.recvTransportRef.current!.id,
                         });
+                        processedCount++;
                     } catch (error) {
-                        console.error(`Failed to consume pending stream ${streamData.streamId}:`, error);
+                        console.error(`[StreamManager] ❌ Failed to consume pending stream ${streamData.streamId}:`, error);
                         this.context.refs.consumingStreamsRef.current.delete(streamData.streamId);
+                        skippedCount++;
                     }
+                } else {
+                    console.log('[StreamManager] ⏭️  Already consuming stream, skipping', { streamId: streamData.streamId });
+                    skippedCount++;
                 }
             }
 
             // Clear pending streams
             this.context.refs.pendingStreamsRef.current = [];
+            
+            console.log('[StreamManager] 🎉 Pending streams processing completed', {
+                processed: processedCount,
+                skipped: skippedCount,
+                total: pendingStreams.length,
+            });
+        } else {
+            console.log('[StreamManager] ℹ️  No pending streams to process');
         }
     };
 
@@ -365,7 +399,19 @@ export class StreamManager {
      * Add stream to pending queue
      */
     addToPendingStreams = (streamData: PendingStreamData) => {
+        console.log('[StreamManager] ➕ Adding stream to pending queue', {
+            timestamp: new Date().toISOString(),
+            streamId: streamData.streamId,
+            publisherId: streamData.publisherId,
+            currentPendingCount: this.context.refs.pendingStreamsRef.current.length,
+        });
+
         this.context.refs.pendingStreamsRef.current.push(streamData);
+        
+        console.log('[StreamManager] 📋 Pending queue updated', {
+            newPendingCount: this.context.refs.pendingStreamsRef.current.length,
+            allPendingStreamIds: this.context.refs.pendingStreamsRef.current.map(s => s.streamId),
+        });
     };
 
     /**

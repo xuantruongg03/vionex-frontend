@@ -13,11 +13,6 @@ export class TransportManager {
     private isCreatingTransports: boolean = false; // Guard flag
 
     constructor(context: CallSystemContext) {
-        console.log('[TransportManager] 🏗️ Constructor called', {
-            roomId: context.roomId,
-            username: context.room?.username,
-            timestamp: new Date().toISOString(),
-        });
         this.context = context;
     }
 
