@@ -194,11 +194,13 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Select User to Translate</label>
                                         <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} required disabled={isLoading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
                                             <option value=''>Choose a user...</option>
-                                            {availableUsers.map((availableUser) => (
-                                                <option key={availableUser.id} value={availableUser.id}>
-                                                    {availableUser.username}
-                                                </option>
-                                            ))}
+                                            {availableUsers
+                                                .filter((availableUser) => availableUser.id !== (user?.name || room.username)) // Prevent selecting yourself
+                                                .map((availableUser) => (
+                                                    <option key={availableUser.id} value={availableUser.id}>
+                                                        {availableUser.username}
+                                                    </option>
+                                                ))}
                                         </select>
                                     </div>
 
