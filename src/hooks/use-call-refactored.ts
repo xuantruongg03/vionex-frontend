@@ -1,6 +1,6 @@
 import ApiService from "@/services/signalService";
 import { Device, types as mediasoupTypes } from "mediasoup-client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Socket } from "socket.io-client";
 import { useSocket } from "@/contexts/SocketContext";
@@ -93,40 +93,62 @@ export function useCallRefactored(roomId: string, password?: string) {
         state: currentState,
     };
 
-    // Initialize managers
-    console.log('[useCallRefactored] 🚀 Initializing managers', {
-        roomId,
-        username: room.username,
-        timestamp: new Date().toISOString(),
-    });
+    // Initialize managers - use useMemo to keep stable instances
+    const streamManager = useMemo(() => {
+        console.log('[useCallRefactored] 🎨 Creating StreamManager');
+        return new StreamManager(context);
+    }, [roomId]); // Only recreate when roomId changes
 
-    const streamManager = new StreamManager(context);
-    const transportManager = new TransportManager(context);
-    const producerManager = new ProducerManager(context);
-    const consumerManager = new ConsumerManager(context, streamManager);
-    const mediaManager = new MediaManager(context, producerManager);
-    const roomManager = new RoomManager(context);
+    const transportManager = useMemo(() => {
+        console.log('[useCallRefactored] 🚚 Creating TransportManager');
+        return new TransportManager(context);
+    }, [roomId]);
 
-    console.log('[useCallRefactored] ✅ Managers initialized');
+    const producerManager = useMemo(() => {
+        console.log('[useCallRefactored] 🎬 Creating ProducerManager');
+        return new ProducerManager(context);
+    }, [roomId]);
+
+    const consumerManager = useMemo(() => {
+        console.log('[useCallRefactored] 🎧 Creating ConsumerManager');
+        return new ConsumerManager(context, streamManager);
+    }, [roomId]); // streamManager is already memoized
+
+    const mediaManager = useMemo(() => {
+        console.log('[useCallRefactored] 📹 Creating MediaManager');
+        return new MediaManager(context, producerManager);
+    }, [roomId]); // producerManager is already memoized
+
+    const roomManager = useMemo(() => {
+        console.log('[useCallRefactored] 🏠 Creating RoomManager');
+        return new RoomManager(context);
+    }, [roomId]);
+
+    console.log('[useCallRefactored] ✅ All managers ready');
 
     // Check for raw audio mode from URL parameter
     const useRawAudio = new URLSearchParams(window.location.search).get("rawAudio") === "true";
 
-    const vadManager = new VADManager(context, useRawAudio);
+    const vadManager = useMemo(() => {
+        console.log('[useCallRefactored] 🎤 Creating VADManager');
+        return new VADManager(context, useRawAudio);
+    }, [roomId, useRawAudio]);
 
-    // Set manager references for cross-dependencies
-    transportManager.setManagers(producerManager, mediaManager);
-    roomManager.setMediaManager(mediaManager);
-    roomManager.setTransportManager(transportManager);
-    mediaManager.setVADManager(vadManager);
+    const eventHandlerManager = useMemo(() => {
+        console.log('[useCallRefactored] 📡 Creating EventHandlerManager');
+        return new SocketEventHandlerManager(context, streamManager, consumerManager, producerManager, transportManager);
+    }, [roomId]);
 
-    const eventHandlerManager = new SocketEventHandlerManager(context, streamManager, consumerManager, producerManager, transportManager);
-
-    // Set socketEventHandlers reference for RoomManager to create consumers
-    roomManager.setSocketEventHandlers(eventHandlerManager);
-
-    // Set cross-references for auto-publishing
-    transportManager.setManagers(producerManager, mediaManager);
+    // Set manager references for cross-dependencies - only once per manager instance
+    useEffect(() => {
+        console.log('[useCallRefactored] 🔗 Setting up manager dependencies');
+        transportManager.setManagers(producerManager, mediaManager);
+        roomManager.setMediaManager(mediaManager);
+        roomManager.setTransportManager(transportManager);
+        mediaManager.setVADManager(vadManager);
+        roomManager.setSocketEventHandlers(eventHandlerManager);
+        console.log('[useCallRefactored] ✅ Manager dependencies set');
+    }, [transportManager, producerManager, mediaManager, roomManager, vadManager, eventHandlerManager]);
 
     // Initialize services
     useEffect(() => {

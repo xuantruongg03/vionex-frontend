@@ -77,6 +77,7 @@ export class TransportManager {
      * Create transports after RTP capabilities are set
      */
     createTransports = () => {
+        const stack = new Error().stack;
         console.log('[TransportManager] createTransports called', {
             timestamp: new Date().toISOString(),
             hasSendTransport: !!this.context.refs.sendTransportRef.current,
@@ -85,6 +86,7 @@ export class TransportManager {
             recvTransportId: this.context.refs.recvTransportRef.current?.id,
             socketConnected: this.context.refs.socketRef.current?.connected,
             roomId: this.context.roomId,
+            callStack: stack?.split('\n').slice(1, 4).join('\n'), // Show caller
         });
 
         // Prevent creating duplicate transports
