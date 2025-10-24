@@ -94,12 +94,12 @@ const Room = () => {
                         userInfo: user,
                     },
                 });
-                // const newRoomId = `${Math.random()
-                //     .toString(36)
-                //     .substring(2, CONSTANT.ROOM_ID_LENGTH)}`;
-                // navigate(`/room/${newRoomId}`);
-                const newRoomId = "test";
+                const newRoomId = `${Math.random()
+                    .toString(36)
+                    .substring(2, CONSTANT.ROOM_ID_LENGTH)}`;
                 navigate(`/room/${newRoomId}`);
+                // const newRoomId = "test";
+                // navigate(`/room/${newRoomId}`);
             })
             .catch((error) => {
                 console.error("API check failed:", error);
