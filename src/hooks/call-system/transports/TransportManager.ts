@@ -207,9 +207,25 @@ export class TransportManager {
             transportId: transport.id,
             connectionState: transport.connectionState,
             iceGatheringState: transport.iceGatheringState,
+            hasLocalStream: !!this.context.refs.localStreamRef.current,
+            producersCount: this.context.refs.producersRef.current.size,
         });
 
         this.context.refs.sendTransportRef.current = transport;
+
+        // If local stream already exists and no producers yet, publish tracks
+        if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
+            console.log('[TransportManager] 🎬 Local stream exists, will publish tracks in 500ms');
+            setTimeout(async () => {
+                console.log('[TransportManager] 📢 Calling publishTracks() now...');
+                await this.producerManager?.publishTracks();
+            }, 500);
+        } else {
+            console.log('[TransportManager] ⏳ Waiting for local stream or already have producers', {
+                hasLocalStream: !!this.context.refs.localStreamRef.current,
+                producersCount: this.context.refs.producersRef.current.size,
+            });
+        }
 
         transport.on(
             "connect",
