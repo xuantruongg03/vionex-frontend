@@ -31,12 +31,12 @@ export const TranslationCabinList: React.FC<TranslationCabinListProps> = ({ room
             sourceLanguage: cabin.sourceLanguage,
             targetLanguage: cabin.targetLanguage,
         };
-        if (window.confirm("Are you sure you want to destroy this translation cabin?")) {
+        if (window.confirm("Are you sure you want to stop this live translation?")) {
             try {
                 await destroyCabin(data);
                 onCabinDestroyed?.(); // Refresh list after destroy
             } catch (error) {
-                console.error("Failed to destroy cabin:", error);
+                console.error("Failed to stop translation:", error);
             }
         }
     };
@@ -51,14 +51,14 @@ export const TranslationCabinList: React.FC<TranslationCabinListProps> = ({ room
                         <path d='M2 12l10 5 10-5' />
                     </svg>
                 </div>
-                <p>No translation cabins created yet</p>
+                <p>No live translations yet</p>
             </div>
         );
     }
 
     return (
         <div className='mb-4'>
-            <h4 className='m-0 mb-4 text-gray-800 dark:text-gray-200 text-lg'>Translation Cabins</h4>
+            <h4 className='m-0 mb-4 text-gray-800 dark:text-gray-200 text-lg'>Active Translations</h4>
             <div className='space-y-3'>
                 {cabins.map((cabin, index) => (
                     <div key={index} className='bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm'>
@@ -68,7 +68,7 @@ export const TranslationCabinList: React.FC<TranslationCabinListProps> = ({ room
                                 <span className='text-sm font-medium capitalize text-gray-600 dark:text-gray-400'>Active</span>
                             </div>
                             <div className='flex gap-1'>
-                                <button onClick={() => handleDestroy(index)} disabled={loading} className='w-8 h-8 border-none rounded cursor-pointer text-sm flex items-center justify-center transition-all duration-200 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 disabled:opacity-50 disabled:cursor-not-allowed' title='Destroy cabin'>
+                                <button onClick={() => handleDestroy(index)} disabled={loading} className='w-8 h-8 border-none rounded cursor-pointer text-sm flex items-center justify-center transition-all duration-200 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 disabled:opacity-50 disabled:cursor-not-allowed' title='Stop translation'>
                                     🗑
                                 </button>
                             </div>

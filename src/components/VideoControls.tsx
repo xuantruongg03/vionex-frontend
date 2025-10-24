@@ -197,7 +197,7 @@ export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo
         },
         {
             key: "translation",
-            title: "Translation Cabin",
+            title: "Live Translate",
             onClick: onToggleTranslationCabin,
             icon: <Icon.Languages />,
             className: "",
