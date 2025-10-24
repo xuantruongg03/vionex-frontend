@@ -1,8 +1,6 @@
 import { Device, types as mediasoupTypes } from "mediasoup-client";
 import { CallSystemContext } from "../types";
 
-console.log('[TransportManager] 🎬 Module loaded at', new Date().toISOString());
-
 /**
  * Transport Manager Module
  * Handles MediaSoup transport creation and management
@@ -12,6 +10,7 @@ export class TransportManager {
     private context: CallSystemContext;
     private producerManager?: any;
     private mediaManager?: any;
+    private isCreatingTransports: boolean = false; // Guard flag
 
     constructor(context: CallSystemContext) {
         console.log('[TransportManager] 🏗️ Constructor called', {
@@ -86,8 +85,15 @@ export class TransportManager {
             recvTransportId: this.context.refs.recvTransportRef.current?.id,
             socketConnected: this.context.refs.socketRef.current?.connected,
             roomId: this.context.roomId,
+            isCreatingTransports: this.isCreatingTransports,
             callStack: stack?.split('\n').slice(1, 4).join('\n'), // Show caller
         });
+
+        // Guard: Skip if already creating transports (prevents duplicate calls)
+        if (this.isCreatingTransports) {
+            console.warn('[TransportManager] ⚠️ SKIPPING - Already creating transports (duplicate call detected)');
+            return;
+        }
 
         // Prevent creating duplicate transports
         if (this.context.refs.sendTransportRef.current || this.context.refs.recvTransportRef.current) {
@@ -98,6 +104,10 @@ export class TransportManager {
             return;
         }
         
+        // Set guard flag
+        this.isCreatingTransports = true;
+        console.log('[TransportManager] 🔒 Guard flag set: isCreatingTransports = true');
+
         // Create transports sequentially to avoid race conditions
         console.log('[TransportManager] 📤 Emitting sfu:create-transport for SEND (producer)');
         this.context.refs.socketRef.current?.emit("sfu:create-transport", {
@@ -184,6 +194,9 @@ export class TransportManager {
                 this.setupSendTransport(transport);
             } else {
                 this.setupReceiveTransport(transport);
+                // Reset guard flag after both transports are created
+                console.log('[TransportManager] 🔓 Resetting guard flag: isCreatingTransports = false');
+                this.isCreatingTransports = false;
             }
         } catch (error) {
             console.error("[TransportManager] ❌ Error creating transport:", error);
@@ -192,6 +205,8 @@ export class TransportManager {
                 stack: error.stack,
                 transportInfo: JSON.stringify(transportInfo, null, 2),
             });
+            // Reset guard flag on error
+            this.isCreatingTransports = false;
         }
     };
 
