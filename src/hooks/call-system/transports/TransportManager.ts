@@ -26,9 +26,7 @@ export class TransportManager {
     /**
      * Initialize device with router capabilities
      */
-    initializeDevice = async (
-        routerRtpCapabilities: mediasoupTypes.RtpCapabilities
-    ) => {
+    initializeDevice = async (routerRtpCapabilities: mediasoupTypes.RtpCapabilities) => {
         if (!this.context.refs.deviceRef.current) {
             this.context.refs.deviceRef.current = new Device();
         }
@@ -40,13 +38,9 @@ export class TransportManager {
                 });
 
                 // Now send device RTP capabilities to SFU
-                this.context.refs.socketRef.current?.emit(
-                    "sfu:set-rtp-capabilities",
-                    {
-                        rtpCapabilities:
-                            this.context.refs.deviceRef.current.rtpCapabilities,
-                    }
-                );
+                this.context.refs.socketRef.current?.emit("sfu:set-rtp-capabilities", {
+                    rtpCapabilities: this.context.refs.deviceRef.current.rtpCapabilities,
+                });
 
                 return true;
             } catch (error) {
@@ -55,13 +49,9 @@ export class TransportManager {
             }
         } else {
             // Now send device RTP capabilities to SFU
-            this.context.refs.socketRef.current?.emit(
-                "sfu:set-rtp-capabilities",
-                {
-                    rtpCapabilities:
-                        this.context.refs.deviceRef.current.rtpCapabilities,
-                }
-            );
+            this.context.refs.socketRef.current?.emit("sfu:set-rtp-capabilities", {
+                rtpCapabilities: this.context.refs.deviceRef.current.rtpCapabilities,
+            });
             return true;
         }
     };
@@ -74,7 +64,7 @@ export class TransportManager {
         if (this.context.refs.sendTransportRef.current || this.context.refs.recvTransportRef.current) {
             return;
         }
-        
+
         // Create transports sequentially to avoid race conditions
         this.context.refs.socketRef.current?.emit("sfu:create-transport", {
             roomId: this.context.roomId,
@@ -110,18 +100,12 @@ export class TransportManager {
             if (isProducer && this.context.refs.sendTransportRef.current) {
                 return;
             }
-            
+
             if (!isProducer && this.context.refs.recvTransportRef.current) {
                 return;
             }
 
-            const transport = isProducer
-                ? this.context.refs.deviceRef.current.createSendTransport(
-                      actualTransportInfo
-                  )
-                : this.context.refs.deviceRef.current.createRecvTransport(
-                      actualTransportInfo
-                  );
+            const transport = isProducer ? this.context.refs.deviceRef.current.createSendTransport(actualTransportInfo) : this.context.refs.deviceRef.current.createRecvTransport(actualTransportInfo);
 
             if (isProducer) {
                 this.setupSendTransport(transport);
@@ -136,52 +120,29 @@ export class TransportManager {
     /**
      * Common transport connection handler
      */
-    private createTransportConnectionHandler = (
-        transport: mediasoupTypes.Transport
-    ) => {
-        return (
-            { dtlsParameters }: any,
-            callback: () => void,
-            errback: (error: any) => void
-        ) => {
+    private createTransportConnectionHandler = (transport: mediasoupTypes.Transport) => {
+        return ({ dtlsParameters }: any, callback: () => void, errback: (error: any) => void) => {
             dtlsParameters.role = "client";
             this.context.refs.socketRef.current?.emit("sfu:connect-transport", {
                 transportId: transport.id,
                 dtlsParameters,
             });
 
-            const handleTransportConnected = (data: {
-                transportId: string;
-            }) => {
+            const handleTransportConnected = (data: { transportId: string }) => {
                 if (data.transportId === transport.id) {
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:transport-connected",
-                        handleTransportConnected
-                    );
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:error",
-                        handleError
-                    );
+                    this.context.refs.socketRef.current?.off("sfu:transport-connected", handleTransportConnected);
+                    this.context.refs.socketRef.current?.off("sfu:error", handleError);
                     callback();
                 }
             };
 
             const handleError = (error: any) => {
-                this.context.refs.socketRef.current?.off(
-                    "sfu:transport-connected",
-                    handleTransportConnected
-                );
-                this.context.refs.socketRef.current?.off(
-                    "sfu:error",
-                    handleError
-                );
+                this.context.refs.socketRef.current?.off("sfu:transport-connected", handleTransportConnected);
+                this.context.refs.socketRef.current?.off("sfu:error", handleError);
                 errback(error);
             };
 
-            this.context.refs.socketRef.current?.on(
-                "sfu:transport-connected",
-                handleTransportConnected
-            );
+            this.context.refs.socketRef.current?.on("sfu:transport-connected", handleTransportConnected);
             this.context.refs.socketRef.current?.on("sfu:error", handleError);
         };
     };
@@ -192,11 +153,8 @@ export class TransportManager {
     private setupSendTransport = (transport: mediasoupTypes.Transport) => {
         this.context.refs.sendTransportRef.current = transport;
 
-        // ✅ SETUP EVENT LISTENERS TRƯỚC
-        transport.on(
-            "connect",
-            this.createTransportConnectionHandler(transport)
-        );
+        // SETUP EVENT LISTENERS TRƯỚC
+        transport.on("connect", this.createTransportConnectionHandler(transport));
 
         transport.on("produce", async (parameters, callback, errback) => {
             try {
@@ -212,18 +170,12 @@ export class TransportManager {
 
                 const handleProducerCreated = (data: any) => {
                     // Handle different response formats from server
-                    const producerId =
-                        data.producerId || data.producer_id || data.id;
+                    const producerId = data.producerId || data.producer_id || data.id;
                     const streamId = data.streamId || data.stream_id;
 
                     if (!producerId) {
-                        console.error(
-                            "[WS] Producer ID is missing in response:",
-                            data
-                        );
-                        errback(
-                            new Error("Producer ID missing in server response")
-                        );
+                        console.error("[WS] Producer ID is missing in response:", data);
+                        errback(new Error("Producer ID missing in server response"));
                         return;
                     }
 
@@ -234,52 +186,26 @@ export class TransportManager {
                         appData: data.appData,
                     });
 
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:producer-created",
-                        handleProducerCreated
-                    );
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:error",
-                        handleProduceError
-                    );
+                    this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
+                    this.context.refs.socketRef.current?.off("sfu:error", handleProduceError);
 
                     callback({ id: producerId });
                 };
 
                 const handleProduceError = (error: any) => {
                     console.error("[WS] Producer creation error:", error);
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:producer-created",
-                        handleProducerCreated
-                    );
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:error",
-                        handleProduceError
-                    );
-                    errback(
-                        new Error(error.message || "Producer creation failed")
-                    );
+                    this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
+                    this.context.refs.socketRef.current?.off("sfu:error", handleProduceError);
+                    errback(new Error(error.message || "Producer creation failed"));
                 };
 
-                this.context.refs.socketRef.current?.on(
-                    "sfu:producer-created",
-                    handleProducerCreated
-                );
-                this.context.refs.socketRef.current?.on(
-                    "sfu:error",
-                    handleProduceError
-                );
+                this.context.refs.socketRef.current?.on("sfu:producer-created", handleProducerCreated);
+                this.context.refs.socketRef.current?.on("sfu:error", handleProduceError);
 
                 // Add timeout to prevent hanging
                 setTimeout(() => {
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:producer-created",
-                        handleProducerCreated
-                    );
-                    this.context.refs.socketRef.current?.off(
-                        "sfu:error",
-                        handleProduceError
-                    );
+                    this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
+                    this.context.refs.socketRef.current?.off("sfu:error", handleProduceError);
                     errback(new Error("Producer creation timeout"));
                 }, 10000); // 10 second timeout
             } catch (error) {
@@ -314,21 +240,17 @@ export class TransportManager {
         });
 
         // If local stream already exists and no producers yet, publish tracks
-        if (this.context.refs.localStreamRef.current && 
-            this.context.refs.producersRef.current.size === 0 && 
-            this.producerManager) {
-            
-            console.log('[TransportManager] 🎬 Local stream exists, will publish tracks');
-            
+        if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
+
             // Use queueMicrotask for immediate but async execution
             // This ensures all event listeners are attached in current call stack
             // but executes immediately in next microtask (faster than setTimeout)
             queueMicrotask(async () => {
-                console.log('[TransportManager] 📢 Calling publishTracks() now...');
+                console.log("[TransportManager] Calling publishTracks() now...");
                 try {
                     await this.producerManager?.publishTracks();
                 } catch (err) {
-                    console.error('[TransportManager] ❌ Failed to publish:', err);
+                    console.error("[TransportManager] Failed to publish:", err);
                 }
             });
         }
@@ -340,10 +262,7 @@ export class TransportManager {
     private setupReceiveTransport = (transport: mediasoupTypes.Transport) => {
         this.context.refs.recvTransportRef.current = transport;
 
-        transport.on(
-            "connect",
-            this.createTransportConnectionHandler(transport)
-        );
+        transport.on("connect", this.createTransportConnectionHandler(transport));
 
         transport.on("connectionstatechange", (state) => {
             if (state === "connected") {
@@ -356,43 +275,26 @@ export class TransportManager {
 
                 // Also request existing streams as fallback
                 setTimeout(() => {
-                    this.context.refs.socketRef.current?.emit(
-                        "sfu:get-streams",
-                        {
-                            roomId: this.context.roomId,
-                        }
-                    );
+                    this.context.refs.socketRef.current?.emit("sfu:get-streams", {
+                        roomId: this.context.roomId,
+                    });
                 }, 1500);
 
                 // Force connection if needed after timeout
                 setTimeout(() => {
                     if (transport.connectionState !== "connected") {
                         // Try to trigger the connection by consuming a pending stream
-                        const pendingStreams =
-                            this.context.refs.pendingStreamsRef.current;
+                        const pendingStreams = this.context.refs.pendingStreamsRef.current;
                         if (pendingStreams.length > 0) {
                             const firstStream = pendingStreams[0];
 
                             // Validate first stream
-                            if (
-                                firstStream.streamId &&
-                                firstStream.streamId !== "undefined" &&
-                                typeof firstStream.streamId === "string" &&
-                                firstStream.metadata?.type !== "presence" &&
-                                !this.context.refs.consumingStreamsRef.current.has(
-                                    firstStream.streamId
-                                )
-                            ) {
-                                this.context.refs.consumingStreamsRef.current.add(
-                                    firstStream.streamId
-                                );
-                                this.context.refs.socketRef.current?.emit(
-                                    "sfu:consume",
-                                    {
-                                        streamId: firstStream.streamId,
-                                        transportId: transport.id,
-                                    }
-                                );
+                            if (firstStream.streamId && firstStream.streamId !== "undefined" && typeof firstStream.streamId === "string" && firstStream.metadata?.type !== "presence" && !this.context.refs.consumingStreamsRef.current.has(firstStream.streamId)) {
+                                this.context.refs.consumingStreamsRef.current.add(firstStream.streamId);
+                                this.context.refs.socketRef.current?.emit("sfu:consume", {
+                                    streamId: firstStream.streamId,
+                                    transportId: transport.id,
+                                });
                             }
                         }
                     }
@@ -413,24 +315,14 @@ export class TransportManager {
      */
     handleTransportConnected = (data: { transportId: string }) => {
         // Check if this is our send transport and we have local media ready
-        if (
-            this.context.refs.sendTransportRef.current &&
-            this.context.refs.sendTransportRef.current.id ===
-                data.transportId &&
-            this.context.refs.localStreamRef.current
-        ) {
+        if (this.context.refs.sendTransportRef.current && this.context.refs.sendTransportRef.current.id === data.transportId && this.context.refs.localStreamRef.current) {
             // Transport is connected, we can now publish if we haven't already
             setTimeout(async () => {
-                if (
-                    this.context.refs.localStreamRef.current &&
-                    this.context.refs.producersRef.current.size === 0
-                ) {
+                if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0) {
                     if (this.producerManager) {
                         await this.producerManager.publishTracks();
                     } else {
-                        console.warn(
-                            "[TransportManager] ProducerManager not set!"
-                        );
+                        console.warn("[TransportManager] ProducerManager not set!");
                     }
                 }
             }, 500);
