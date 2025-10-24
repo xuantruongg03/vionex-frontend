@@ -94,12 +94,20 @@ export function useCallRefactored(roomId: string, password?: string) {
     };
 
     // Initialize managers
+    console.log('[useCallRefactored] 🚀 Initializing managers', {
+        roomId,
+        username: room.username,
+        timestamp: new Date().toISOString(),
+    });
+
     const streamManager = new StreamManager(context);
     const transportManager = new TransportManager(context);
     const producerManager = new ProducerManager(context);
     const consumerManager = new ConsumerManager(context, streamManager);
     const mediaManager = new MediaManager(context, producerManager);
     const roomManager = new RoomManager(context);
+
+    console.log('[useCallRefactored] ✅ Managers initialized');
 
     // Check for raw audio mode from URL parameter
     const useRawAudio = new URLSearchParams(window.location.search).get("rawAudio") === "true";
@@ -122,12 +130,20 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Initialize services
     useEffect(() => {
+        console.log('[useCallRefactored] 🔧 Initializing services', {
+            hasContextSocket: !!contextSocket,
+            socketConnected: contextSocket?.connected,
+        });
+
         refs.apiServiceRef.current = new ApiService();
 
         // Use socket from context instead of creating new one
         refs.socketRef.current = contextSocket;
 
+        console.log('[useCallRefactored] ✅ Services initialized');
+
         return () => {
+            console.log('[useCallRefactored] 🧹 Cleaning up services');
             // Don't disconnect context socket here, let context manage it
             refs.socketRef.current = null;
         };
@@ -135,14 +151,25 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Set up WebSocket event handlers using our event handler manager
     useEffect(() => {
+        console.log('[useCallRefactored] 🔌 Setting up WebSocket handlers', {
+            hasSocket: !!refs.socketRef.current,
+            socketId: refs.socketRef.current?.id,
+            connected: refs.socketRef.current?.connected,
+        });
+
         const socket = refs.socketRef.current;
-        if (!socket) return;
+        if (!socket) {
+            console.warn('[useCallRefactored] ⚠️ No socket available for handlers');
+            return;
+        }
 
         // Register all event handlers
+        console.log('[useCallRefactored] 📝 Registering event handlers');
         eventHandlerManager.registerHandlers(socket);
 
         // Cleanup function
         return () => {
+            console.log('[useCallRefactored] 🗑️ Unregistering event handlers');
             eventHandlerManager.unregisterHandlers(socket);
         };
     }, [contextSocket]); // Changed: depend on contextSocket to ensure handlers are registered when socket changes
@@ -304,26 +331,49 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Expose public interface
     const joinRoom = useCallback(async () => {
+        console.log('[useCallRefactored] 🚪 joinRoom called', {
+            roomId,
+            username: room.username,
+            hasPassword: !!password,
+            contextSocketConnected: contextSocket?.connected,
+            timestamp: new Date().toISOString(),
+        });
+
         try {
             // Connect socket first if not connected
             let currentSocket = contextSocket;
             if (!currentSocket || !currentSocket.connected) {
+                console.log('[useCallRefactored] 🔌 Connecting socket...');
                 currentSocket = await connectSocket();
+                console.log('[useCallRefactored] ✅ Socket connected', {
+                    socketId: currentSocket?.id,
+                });
+            } else {
+                console.log('[useCallRefactored] ✅ Using existing socket connection', {
+                    socketId: currentSocket?.id,
+                });
             }
 
             // Ensure socket is properly assigned to refs
             refs.socketRef.current = currentSocket;
 
             // Wait a bit to ensure event handlers are registered
+            console.log('[useCallRefactored] ⏳ Waiting 100ms for handlers...');
             await new Promise((resolve) => setTimeout(resolve, 100));
 
             // Verify socket is connected
             if (!currentSocket?.connected) {
+                console.error('[useCallRefactored] ❌ Socket not connected after waiting');
                 throw new Error("Socket is not connected after connection attempt");
             }
 
-            return await roomManager.joinRoom(password);
+            console.log('[useCallRefactored] 🎯 Calling roomManager.joinRoom()');
+            const result = await roomManager.joinRoom(password);
+            console.log('[useCallRefactored] ✅ joinRoom completed', result);
+            
+            return result;
         } catch (error) {
+            console.error('[useCallRefactored] ❌ joinRoom failed', error);
             throw error;
         }
     }, [roomId, room.username, password, contextSocket, connectSocket]);

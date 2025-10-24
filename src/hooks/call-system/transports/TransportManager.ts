@@ -1,6 +1,8 @@
 import { Device, types as mediasoupTypes } from "mediasoup-client";
 import { CallSystemContext } from "../types";
 
+console.log('[TransportManager] 🎬 Module loaded at', new Date().toISOString());
+
 /**
  * Transport Manager Module
  * Handles MediaSoup transport creation and management
@@ -12,6 +14,11 @@ export class TransportManager {
     private mediaManager?: any;
 
     constructor(context: CallSystemContext) {
+        console.log('[TransportManager] 🏗️ Constructor called', {
+            roomId: context.roomId,
+            username: context.room?.username,
+            timestamp: new Date().toISOString(),
+        });
         this.context = context;
     }
 
