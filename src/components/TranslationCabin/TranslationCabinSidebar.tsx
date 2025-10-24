@@ -106,8 +106,8 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
             // Switch to list tab to show the new cabin
             setActiveTab("list");
         } catch (err) {
-            console.error("Failed to create translation cabin:", err);
-            alert(err.message || "Failed to create translation cabin");
+            console.error("Failed to create live translation:", err);
+            alert(err.message || "Failed to create live translation");
         }
     };
 
@@ -138,7 +138,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                 <div className='p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center'>
                     <h2 className='text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2'>
                         <Globe className='h-5 w-5' />
-                        Translation Cabin
+                        Live Translate
                     </h2>
                     <Button variant='ghost' size='icon' onClick={() => setIsOpen(false)} className='h-8 w-8'>
                         <X className='h-4 w-4' />
@@ -150,7 +150,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                     <button onClick={() => setActiveTab("list")} className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "list" ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
                         <div className='flex items-center justify-center gap-2'>
                             <List className='h-4 w-4' />
-                            Cabins ({cabins.length})
+                            Active ({cabins.length})
                         </div>
                     </button>
                     <button onClick={() => setActiveTab("create")} className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "create" ? "border-b-2 border-blue-500 text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
@@ -172,7 +172,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                             {listLoading ? (
                                 <div className='flex items-center justify-center py-8'>
                                     <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600'></div>
-                                    <span className='ml-2 text-sm text-gray-600 dark:text-gray-400'>Loading cabins...</span>
+                                    <span className='ml-2 text-sm text-gray-600 dark:text-gray-400'>Loading translations...</span>
                                 </div>
                             ) : (
                                 <TranslationCabinList roomId={roomId} cabins={cabins} availableUsers={availableUsers} sourceUserId={user?.name || room.username} onCabinDestroyed={refetchCabins} onRevertTranslation={onRevertTranslation} />
@@ -186,7 +186,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                             <div className='bg-gray-50 dark:bg-gray-800 rounded-lg p-4'>
                                 <h3 className='text-md font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2'>
                                     <Users className='h-4 w-4' />
-                                    Request Translation
+                                    Start Live Translation
                                 </h3>
 
                                 <form onSubmit={handleCreateTranslation} className='space-y-4'>
@@ -194,11 +194,13 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                         <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>Select User to Translate</label>
                                         <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} required disabled={isLoading} className='w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white'>
                                             <option value=''>Choose a user...</option>
-                                            {availableUsers.map((availableUser) => (
-                                                <option key={availableUser.id} value={availableUser.id}>
-                                                    {availableUser.username}
-                                                </option>
-                                            ))}
+                                            {availableUsers
+                                                .filter((availableUser) => availableUser.id !== (user?.name || room.username)) // Prevent selecting yourself
+                                                .map((availableUser) => (
+                                                    <option key={availableUser.id} value={availableUser.id}>
+                                                        {availableUser.username}
+                                                    </option>
+                                                ))}
                                         </select>
                                     </div>
 
@@ -226,7 +228,7 @@ export const TranslationCabinSidebar: React.FC<TranslationCabinSidebarProps> = (
                                     </div>
 
                                     <Button type='submit' disabled={isLoading || !selectedUserId || sourceLanguage === targetLanguage} className='w-full' size='lg'>
-                                        {isLoading ? "Creating Translation..." : "Start Translation"}
+                                        {isLoading ? "Starting..." : "Start Live Translate"}
                                     </Button>
                                 </form>
                             </div>
