@@ -56,12 +56,7 @@ export class MediaManager {
 
             // Publish tracks if transports are ready - only if we don't have producers yet
             if (this.context.refs.sendTransportRef.current && this.context.refs.producersRef.current.size === 0) {
-                console.log('[MediaManager] ✅ Send transport ready, will publish tracks in 1s', {
-                    sendTransportId: this.context.refs.sendTransportRef.current.id,
-                    sendTransportState: this.context.refs.sendTransportRef.current.connectionState,
-                });
                 setTimeout(async () => {
-                    console.log('[MediaManager] 📢 Calling publishTracks() now...');
                     const publishResult = await this.producerManager.publishTracks();
                     if (publishResult) {
                         // FIXED: Sync metadata with actual track states after publishing
