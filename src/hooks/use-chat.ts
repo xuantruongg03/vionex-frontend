@@ -124,8 +124,8 @@ export function useChat(roomId: string, userName: string) {
                 senderName: userName,
                 text: text.trim(),
                 replyTo: tempMessage.replyTo,
-                orgId: organizationId,
             },
+            organizationId,
         });
 
         setReplyingTo(null);
