@@ -84,23 +84,10 @@ export const Chatbot = ({ isOpen, onClose, roomId, isEmbedded = false }: Chatbot
         }
     }, [messages, getStorageKey]);
 
-    // Cleanup chat history when leaving room or component unmounts
+    // Clear chat history ONLY when roomId changes (switching rooms)
     useEffect(() => {
-        return () => {
-            // Clear chat history when user leaves the room/meeting
-            try {
-                sessionStorage.removeItem(getStorageKey());
-                console.log("Chat history cleared on room leave");
-            } catch (error) {
-                console.warn("Failed to clear chat history:", error);
-            }
-        };
-    }, [getStorageKey]);
-
-    // Clear chat history when roomId changes (switching rooms)
-    useEffect(() => {
-        // Clear previous room's chat when switching to new room
         const currentKey = getStorageKey();
+        
         return () => {
             try {
                 sessionStorage.removeItem(currentKey);
