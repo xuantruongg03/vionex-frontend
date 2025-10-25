@@ -85,7 +85,7 @@ export function useChat(roomId: string, userName: string) {
                     if (pending.fileUrl && message.fileUrl) {
                         const match = pending.fileName === message.fileName && 
                                      pending.fileType === message.fileType && 
-                                     Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 10000;
+                                     Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 15000;  // 15s for files
                         console.log(`[Chat] File message match: ${match}`, { 
                             pendingFile: pending.fileName, 
                             messageFile: message.fileName 
@@ -96,7 +96,7 @@ export function useChat(roomId: string, userName: string) {
                     // For text messages - match by text content
                     const timeDiff = Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime());
                     const textMatch = pending.text.trim() === message.text.trim();
-                    const timeMatch = timeDiff < 10000;  // Increased to 10s
+                    const timeMatch = timeDiff < 15000;  // Increased to 15s to handle network delays
                     
                     console.log(`[Chat] Text message match attempt:`, {
                         textMatch,
