@@ -55,13 +55,30 @@ export function useChat(roomId: string, userName: string) {
             setPendingMessages((currentPending) => {
                 const tempId = Array.from(currentPending.keys()).find((id) => {
                     const pending = currentPending.get(id);
-                    if (!pending || pending.sender !== message.sender) return false;
-
-                    if (pending.fileUrl && message.fileUrl) {
-                        return pending.fileName === message.fileName && pending.fileType === message.fileType && Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 10000;
+                    if (!pending) {
+                        console.log(`[Chat] No pending message for id: ${id}`);
+                        return false;
                     }
 
-                    return pending.text === message.text && Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 5000;
+                    // Check sender match
+                    if (pending.sender !== message.sender && pending.senderName !== message.senderName) {
+                        console.log(`[Chat] Sender mismatch - pending: ${pending.sender}/${pending.senderName}, message: ${message.sender}/${message.senderName}`);
+                        return false;
+                    }
+
+                    // For file messages
+                    if (pending.fileUrl && message.fileUrl) {
+                        const match = pending.fileName === message.fileName && 
+                                     pending.fileType === message.fileType && 
+                                     Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 15000;  // 15s for files
+                        return match;
+                    }
+
+                    // For text messages - match by text content
+                    const timeDiff = Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime());
+                    const textMatch = pending.text.trim() === message.text.trim();
+                    const timeMatch = timeDiff < 15000;  // Increased to 15s to handle network delays
+                    return textMatch && timeMatch;
                 });
 
                 if (tempId) {
@@ -124,8 +141,8 @@ export function useChat(roomId: string, userName: string) {
                 senderName: userName,
                 text: text.trim(),
                 replyTo: tempMessage.replyTo,
-                orgId: organizationId,
             },
+            organizationId,
         });
 
         setReplyingTo(null);
