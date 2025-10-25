@@ -52,24 +52,71 @@ export function useChat(roomId: string, userName: string) {
         }, 100);
 
         const handleNewMessage = (message: Message) => {
+            console.log('[Chat] Received message from server:', {
+                id: message.id,
+                sender: message.sender,
+                senderName: message.senderName,
+                text: message.text,
+                timestamp: message.timestamp
+            });
+
             setPendingMessages((currentPending) => {
+                console.log('[Chat] Current pending messages:', Array.from(currentPending.entries()).map(([id, msg]) => ({
+                    id,
+                    sender: msg.sender,
+                    text: msg.text,
+                    timestamp: msg.timestamp
+                })));
+
                 const tempId = Array.from(currentPending.keys()).find((id) => {
                     const pending = currentPending.get(id);
-                    if (!pending || pending.sender !== message.sender) return false;
-
-                    if (pending.fileUrl && message.fileUrl) {
-                        return pending.fileName === message.fileName && pending.fileType === message.fileType && Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 10000;
+                    if (!pending) {
+                        console.log(`[Chat] No pending message for id: ${id}`);
+                        return false;
                     }
 
-                    return pending.text === message.text && Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 5000;
+                    // Check sender match
+                    if (pending.sender !== message.sender && pending.senderName !== message.senderName) {
+                        console.log(`[Chat] Sender mismatch - pending: ${pending.sender}/${pending.senderName}, message: ${message.sender}/${message.senderName}`);
+                        return false;
+                    }
+
+                    // For file messages
+                    if (pending.fileUrl && message.fileUrl) {
+                        const match = pending.fileName === message.fileName && 
+                                     pending.fileType === message.fileType && 
+                                     Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime()) < 10000;
+                        console.log(`[Chat] File message match: ${match}`, { 
+                            pendingFile: pending.fileName, 
+                            messageFile: message.fileName 
+                        });
+                        return match;
+                    }
+
+                    // For text messages - match by text content
+                    const timeDiff = Math.abs(new Date(pending.timestamp).getTime() - new Date(message.timestamp).getTime());
+                    const textMatch = pending.text.trim() === message.text.trim();
+                    const timeMatch = timeDiff < 10000;  // Increased to 10s
+                    
+                    console.log(`[Chat] Text message match attempt:`, {
+                        textMatch,
+                        timeMatch,
+                        timeDiff,
+                        pendingText: pending.text,
+                        messageText: message.text
+                    });
+
+                    return textMatch && timeMatch;
                 });
 
                 if (tempId) {
+                    console.log(`[Chat] ✅ Matched pending message ${tempId}, replacing with server message`);
                     setMessages((prev) => prev.map((msg) => (msg.id === tempId ? { ...message, isConfirmed: true } : msg)));
                     const newPending = new Map(currentPending);
                     newPending.delete(tempId);
                     return newPending;
                 } else {
+                    console.log('[Chat] ❌ No matching pending message, adding as new message');
                     setMessages((prev) => [...prev, { ...message, isConfirmed: true }]);
                     return currentPending;
                 }
