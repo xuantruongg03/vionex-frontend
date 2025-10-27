@@ -68,7 +68,6 @@ export function useRaiseHand({ roomId, username, isMonitorActive, isCreator }: U
      */
     useEffect(() => {
         if (!socket?.connected) {
-            console.log("[useRaiseHand] Socket not connected, skipping listeners setup");
             return;
         }
 
@@ -101,7 +100,6 @@ export function useRaiseHand({ roomId, username, isMonitorActive, isCreator }: U
         socket.on("interaction:raise-hand-error", handleError);
 
         return () => {
-            console.log("[useRaiseHand] Cleaning up socket listeners");
             socket.off("interaction:hand-raised", handleHandRaised);
             socket.off("interaction:hand-lowered", handleHandLowered);
             socket.off("interaction:raise-hand-error", handleError);

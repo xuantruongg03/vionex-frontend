@@ -190,11 +190,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Remove from consuming tracking since we won't get a consumer for this stream
         this.streamManager.removeFromConsuming(data.streamId);
-
-        // Optional: Show a subtle toast for debugging (can be removed in production)
-        // toast.info(`Stream ${data.streamId} skipped (not in priority)`);
-
-        // Stream will be consumed later if it becomes priority (e.g., when user starts speaking)
     };
 
     handleConsumerResumed = async (data: any) => {
@@ -332,69 +327,32 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         toast.error(`Failed to unpin user: ${data.message}`);
     };
 
-    // Room lock/unlock handlers
-    handleLockSuccess = (data: { roomId: string; message: string }) => {
-        toast.success("Room locked successfully");
-        this.context.dispatch({
-            type: ActionRoomType.LOCK_ROOM,
-            payload: {
-                isLocked: true,
-            },
-        });
-    };
-
-    handleLockError = (data: { message: string }) => {
-        toast.error(`Failed to lock room: ${data.message}`);
-    };
-
-    handleUnlockSuccess = (data: { roomId: string; message: string }) => {
-        toast.success("Room unlocked successfully");
-        this.context.dispatch({
-            type: ActionRoomType.UNLOCK_ROOM,
-            payload: {
-                isLocked: false,
-            },
-        });
-    };
-
-    handleUnlockError = (data: { message: string }) => {
-        toast.error(`Failed to unlock room: ${data.message}`);
-    };
-
+    // Room lock/unlock broadcast handlers (from server to all clients)
     handleRoomLocked = (data: { roomId: string; lockedBy: string; message: string }) => {
         toast.info(`Room locked by ${data.lockedBy}`);
+        this.context.dispatch({
+            type: ActionRoomType.LOCK_ROOM,
+        });
     };
 
     handleRoomUnlocked = (data: { roomId: string; unlockedBy: string; message: string }) => {
         toast.info(`Room unlocked by ${data.unlockedBy}`);
+        this.context.dispatch({
+            type: ActionRoomType.UNLOCK_ROOM,
+        });
     };
 
     // ENHANCED: Speaking activity handlers for visual indicators
     handleUserSpeaking = (data: { peerId: string }) => {
-        console.log(`[SocketEventHandlers] User ${data.peerId} started speaking`);
-
         // Add user to speaking peers set for visual indicators
         this.context.setters.setSpeakingPeers((prev) => {
             const newSet = new Set(prev);
             newSet.add(data.peerId);
             return newSet;
         });
-
-        // // ENHANCED: Auto-remove speaking indicator after 3 seconds
-        // // This handles cases where stop-speaking event is missed
-        // setTimeout(() => {
-        //     this.context.setters.setSpeakingPeers((prev) => {
-        //         const newSet = new Set(prev);
-        //         newSet.delete(data.peerId);
-        //         return newSet;
-        //     });
-        //     console.log(`[SocketEventHandlers] Auto-removed speaking indicator for ${data.peerId}`);
-        // }, 3000);
     };
 
     handleUserStoppedSpeaking = (data: { peerId: string }) => {
-        console.log(`[SocketEventHandlers] User ${data.peerId} stopped speaking`);
-
         // Remove user from speaking peers set
         this.context.setters.setSpeakingPeers((prev) => {
             const newSet = new Set(prev);
@@ -432,6 +390,32 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
                 toast.info(`Translation for ${data.targetUserId} started`);
             }
         }
+    };
+
+    // Voting handlers - Global listeners for notifications
+    handleVoteCreated = (data: { id: string; creatorId: string; question: string }) => {
+        // Show notification to all users (except creator, they already see it in the dialog)
+        if (data.creatorId !== this.context.room.username) {
+            toast.info(`${data.creatorId} created a new vote: "${data.question}"`);
+        }
+    };
+
+    handleVoteEnded = (data: { id: string; question: string }) => {
+        toast.info(`Vote ended: "${data.question}"`);
+    };
+
+    // Quiz handlers - Global listeners for notifications
+    handleQuizCreated = (data: { id?: string; title: string; creator_id?: string; creatorId?: string }) => {
+        const creatorId = data.creator_id || data.creatorId;
+        // Show notification to all users (except creator, they already see it in the sidebar)
+        if (creatorId !== this.context.room.username) {
+            toast.info(`${creatorId} created a new quiz: "${data.title}"`);
+        }
+    };
+
+    handleQuizEnded = (data: { quiz_session?: { title: string } }) => {
+        const title = data.quiz_session?.title || "Quiz";
+        toast.info(`Quiz ended: "${title}"`);
     };
 
     /**
@@ -488,11 +472,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.on("sfu:unpin-success", this.handleUnpinSuccess);
         socket.on("sfu:unpin-error", this.handleUnpinError);
 
-        // Room lock/unlock handlers
-        socket.on("sfu:lock-success", this.handleLockSuccess);
-        socket.on("sfu:lock-error", this.handleLockError);
-        socket.on("sfu:unlock-success", this.handleUnlockSuccess);
-        socket.on("sfu:unlock-error", this.handleUnlockError);
+        // Room lock/unlock broadcast handlers
         socket.on("sfu:room-locked", this.handleRoomLocked);
         socket.on("sfu:room-unlocked", this.handleRoomUnlocked);
 
@@ -506,6 +486,14 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Translation cabin handlers
         socket.on("translation:cabin-update", this.handleTranslationCabinUpdate);
+
+        // Voting handlers - Global listeners for notifications
+        socket.on("sfu:vote-created", this.handleVoteCreated);
+        socket.on("sfu:vote-ended", this.handleVoteEnded);
+
+        // Quiz handlers - Global listeners for notifications
+        socket.on("quiz:created", this.handleQuizCreated);
+        socket.on("quiz:ended", this.handleQuizEnded);
     };
 
     /**
@@ -552,11 +540,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         socket.off("sfu:unpin-success", this.handleUnpinSuccess);
         socket.off("sfu:unpin-error", this.handleUnpinError);
 
-        // Room lock/unlock handlers
-        socket.off("sfu:lock-success", this.handleLockSuccess);
-        socket.off("sfu:lock-error", this.handleLockError);
-        socket.off("sfu:unlock-success", this.handleUnlockSuccess);
-        socket.off("sfu:unlock-error", this.handleUnlockError);
+        // Room lock/unlock broadcast handlers
         socket.off("sfu:room-locked", this.handleRoomLocked);
         socket.off("sfu:room-unlocked", this.handleRoomUnlocked);
 
@@ -570,5 +554,13 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Translation cabin handlers
         socket.off("translation:cabin-update", this.handleTranslationCabinUpdate);
+
+        // Voting handlers
+        socket.off("sfu:vote-created", this.handleVoteCreated);
+        socket.off("sfu:vote-ended", this.handleVoteEnded);
+
+        // Quiz handlers
+        socket.off("quiz:created", this.handleQuizCreated);
+        socket.off("quiz:ended", this.handleQuizEnded);
     };
 }

@@ -194,10 +194,20 @@ export class RoomManager {
 
         if (this.context.room.isLocked) {
             // Unlock room
-            this.context.refs.socketRef.current.emit("sfu:unlock-room", {
-                roomId: this.context.roomId,
-                creatorId: this.context.room.username,
-            });
+            this.context.refs.socketRef.current.emit(
+                "sfu:unlock-room",
+                {
+                    roomId: this.context.roomId,
+                    creatorId: this.context.room.username,
+                },
+                (response: any) => {
+                    if (response.success) {
+                        toast.success(response.message || "Room unlocked successfully");
+                    } else {
+                        toast.error(response.message || "Failed to unlock room");
+                    }
+                }
+            );
         } else {
             // Lock room
             if (!password || password.trim() === "") {
@@ -205,11 +215,21 @@ export class RoomManager {
                 return;
             }
 
-            this.context.refs.socketRef.current.emit("sfu:lock-room", {
-                roomId: this.context.roomId,
-                password: password.trim(),
-                creatorId: this.context.room.username,
-            });
+            this.context.refs.socketRef.current.emit(
+                "sfu:lock-room",
+                {
+                    roomId: this.context.roomId,
+                    password: password.trim(),
+                    creatorId: this.context.room.username,
+                },
+                (response: any) => {
+                    if (response.success) {
+                        toast.success(response.message || "Room locked successfully");
+                    } else {
+                        toast.error(response.message || "Failed to lock room");
+                    }
+                }
+            );
         }
     };
 

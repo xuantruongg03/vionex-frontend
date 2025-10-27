@@ -122,10 +122,6 @@ export interface SocketEventHandlers {
         consumerId: string;
         reason: string;
     }) => void;
-    handleLockSuccess: (data: { roomId: string; message: string }) => void;
-    handleLockError: (data: { message: string }) => void;
-    handleUnlockSuccess: (data: { roomId: string; message: string }) => void;
-    handleUnlockError: (data: { message: string }) => void;
     handleRoomLocked: (data: {
         roomId: string;
         lockedBy: string;

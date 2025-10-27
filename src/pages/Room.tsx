@@ -72,6 +72,28 @@ const Room = () => {
         [checkUsernameMutation, roomId]
     );
 
+    // Generate random username with availability check
+    const generateAvailableUsername = useCallback(async (): Promise<string | null> => {
+        const maxAttempts = 20;
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            const randomName = nameDefault[Math.floor(Math.random() * nameDefault.length)];
+            try {
+                const res = await checkUsername(randomName);
+                if (res.data.success) {
+                    return randomName;
+                }
+            } catch (error) {
+                console.error("Error checking username:", error);
+                continue;
+            }
+        }
+
+        return null; // Couldn't find available name after max attempts
+    }, [checkUsername]);
+
     const handleCreateRoom = async () => {
         // Check if API is available
         await checkApi()
@@ -119,7 +141,17 @@ const Room = () => {
                 password: password,
             });
             if (res.data.valid) {
-                const finalUserName = user?.name || userName;
+                // Auto-generate random name if username is empty
+                let finalUserName = user?.name || userName.trim();
+                if (!finalUserName) {
+                    finalUserName = await generateAvailableUsername();
+                    if (!finalUserName) {
+                        toast.error("Unable to generate available username. Please enter a custom name.");
+                        setIsPasswordDialogOpen(false);
+                        return;
+                    }
+                }
+
                 dispatch({
                     type: "JOIN_ROOM",
                     payload: {
@@ -144,6 +176,7 @@ const Room = () => {
     const handleJoinRoom = async () => {
         try {
             let isUsernameValid = { success: false, message: "" };
+            let validatedUsername = ""; // Store the validated username
 
             // Handle organization room differently
             if (isOrgRoom) {
@@ -180,10 +213,10 @@ const Room = () => {
             if (user && user.name) {
                 // If username has characters "-" or "_", replace them with spaces
                 const formattedName = user.name.replace(/[-_]/g, " ");
-                
+
                 // Set new username for consistency
                 setUserName(formattedName);
-                
+
                 // If user has a name from authentication, use it directly
                 try {
                     const res = await checkUsername(formattedName);
@@ -196,30 +229,22 @@ const Room = () => {
                         return;
                     }
                     setUserName(user.name); // Update local state to match
+                    validatedUsername = user.name; // Store validated username
                 } catch (error) {
                     console.error("Error checking username:", error);
                     toast.error("Failed to validate username. Please try again.");
                     return;
                 }
             } else if (userName.trim() === "") {
-                // If no user name and no input, generate random name
-                do {
-                    const randomName = nameDefault[Math.floor(Math.random() * nameDefault.length)];
-                    try {
-                        const res = await checkUsername(randomName);
-                        isUsernameValid = {
-                            success: res.data.success,
-                            message: res.data.message,
-                        };
-                        if (isUsernameValid.success) {
-                            setUserName(randomName);
-                        }
-                    } catch (error) {
-                        console.error("Error checking username:", error);
-                        toast.error("Failed to validate username. Please try again.");
-                        return;
-                    }
-                } while (!isUsernameValid.success);
+                // If no user name and no input, generate random name with availability check
+                const randomName = await generateAvailableUsername();
+                if (!randomName) {
+                    toast.error("Unable to generate available username. Please enter a custom name.");
+                    return;
+                }
+                setUserName(randomName);
+                validatedUsername = randomName; // Store validated username
+                isUsernameValid = { success: true, message: "" };
             } else {
                 // Use the manually entered username
                 try {
@@ -232,6 +257,7 @@ const Room = () => {
                         toast.error(isUsernameValid.message || "Username already exists in this room! Please choose a different name.");
                         return;
                     }
+                    validatedUsername = userName; // Store validated username
                 } catch (error) {
                     console.error("Error checking username:", error);
                     toast.error("Failed to validate username. Please try again.");
@@ -245,7 +271,9 @@ const Room = () => {
                 if (res.data.locked) {
                     setIsPasswordDialogOpen(true);
                 } else {
-                    const finalUserName = user?.name || userName;
+                    // Use the validated username stored earlier
+                    const finalUserName = validatedUsername;
+
                     dispatch({
                         type: "JOIN_ROOM",
                         payload: {
