@@ -4,6 +4,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useScreenRecorder } from "@/hooks/use-screen-recorder";
 import useUser from "@/hooks/use-user";
 import { useChat } from "@/hooks/use-chat";
+import { useRaiseHand } from "@/hooks/use-raise-hand";
 import { User } from "@/interfaces";
 import { ActionLogType } from "@/interfaces/action";
 import { TypeUserEvent } from "@/interfaces/behavior";
@@ -54,18 +55,16 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [canToggleVideo, setCanToggleVideo] = useState(true);
     const [canToggleAudio, setCanToggleAudio] = useState(true);
-    const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
     // Track if we've already attempted to join to prevent multiple join attempts
     const hasAttemptedJoin = useRef(false);
-    const lastReadMessageId = useRef<string | null>(null);
 
     const { isRecording, isProcessing, toggleRecording } = useScreenRecorder();
     //Room state from redux store
     const room = useSelector((state: any) => state.room);
 
-    // Hook to track chat messages for unread count
-    const { messages } = useChat(roomId ?? "", room.username ?? "");
+    // This ensures unread count is updated in Redux
+    const chatHook = useChat(roomId ?? "", room.username ?? "", uiState.isChatOpen);
 
     const {
         streams,
@@ -100,7 +99,16 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
     const isMobile = useIsMobile();
     const dispatch = useDispatch();
 
-    // Auto-join room when component mounts and user is authenticated
+    const { sendLogsToServer, isMonitorActive, toggleBehaviorMonitoring } = useBehaviorMonitor({ roomId: roomId ?? "" });
+
+    // Raise hand functionality
+    const { isHandRaised, usersWithHandsRaised, toggleRaiseHand } = useRaiseHand({
+        roomId: roomId ?? "",
+        username: room.username ?? "",
+        isMonitorActive,
+        isCreator: room.isCreator,
+    });
+    
     useEffect(() => {
         const autoJoinRoom = async () => {
             // Only attempt to join once and if we have the required data
@@ -124,32 +132,13 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
         return () => clearTimeout(timeoutId);
     }, [roomId, room.username]); // Only depend on stable values
 
-    const { sendLogsToServer, isMonitorActive, toggleBehaviorMonitoring } = useBehaviorMonitor({ roomId: roomId ?? "" });
-
-    // Track unread messages when chat is closed
-    useEffect(() => {
-        if (!uiState.isChatOpen) {
-            // Count new messages when chat is closed
-            const lastReadIndex = messages.findIndex((msg) => msg.id === lastReadMessageId.current);
-            const newMessages = lastReadIndex >= 0 ? messages.slice(lastReadIndex + 1) : messages;
-
-            // Only count messages from others that are confirmed
-            const unreadCount = newMessages.filter((msg) => msg.sender !== room.username && msg.isConfirmed).length;
-
-            setUnreadMessageCount(unreadCount);
-        } else {
-            // Reset counter when chat is opened and save last message ID
-            setUnreadMessageCount(0);
-            if (messages.length > 0) {
-                lastReadMessageId.current = messages[messages.length - 1].id;
-            }
-        }
-    }, [messages, uiState.isChatOpen, room.username]);
-
     const users = useMemo((): User[] => {
         // If we have users from the hybrid hook, use them (preferred path)
         if (hybridUsers?.length > 0) {
-            return hybridUsers;
+            return hybridUsers.map((user) => ({
+                ...user,
+                isHandRaised: usersWithHandsRaised.includes(user.peerId),
+            }));
         }
 
         // Fallback: create users from streams (for backward compatibility)
@@ -161,6 +150,7 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                 peerId: room.username,
                 isCreator: room.isCreator || false,
                 timeArrive: new Date(),
+                isHandRaised: usersWithHandsRaised.includes(room.username),
             });
         }
 
@@ -175,6 +165,7 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                             peerId: publisherId,
                             isCreator: false,
                             timeArrive: new Date(),
+                            isHandRaised: usersWithHandsRaised.includes(publisherId),
                         });
                     }
                 }
@@ -182,7 +173,7 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
         });
 
         return Array.from(userMap.values());
-    }, [hybridUsers, streams, room.username, room.isCreator]);
+    }, [hybridUsers, streams, room.username, room.isCreator, usersWithHandsRaised]);
 
     // Handle user kick using the user hook
     const handleKickUser = useCallback(
@@ -515,7 +506,8 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                     isCreator={room.isCreator}
                     isMonitorActive={isMonitorActive}
                     onToggleLayout={handleToggleLayoutTemplate}
-                    unreadMessageCount={unreadMessageCount}
+                    isHandRaised={isHandRaised}
+                    onToggleRaiseHand={toggleRaiseHand}
                 />
             </div>{" "}
             {uiState.isTranslationCabinOpen && (
@@ -531,7 +523,21 @@ export const VideoCallHybrid = memo(({ roomId }: { roomId: string }) => {
                     onRevertTranslation={(targetUserId) => revertTranslationStream(targetUserId)}
                 />
             )}
-            {uiState.isChatOpen && <ChatSidebar isOpen={uiState.isChatOpen} setIsOpen={(isOpen) => updateUIState({ isChatOpen: isOpen })} roomId={roomId} />}
+            {uiState.isChatOpen && (
+                <ChatSidebar 
+                    isOpen={uiState.isChatOpen} 
+                    setIsOpen={(isOpen) => updateUIState({ isChatOpen: isOpen })} 
+                    roomId={roomId}
+                    messages={chatHook.messages}
+                    sendMessage={chatHook.sendMessage}
+                    sendFileMessage={chatHook.sendFileMessage}
+                    retryMessage={chatHook.retryMessage}
+                    deleteMessage={chatHook.deleteMessage}
+                    replyingTo={chatHook.replyingTo}
+                    setReplyingTo={chatHook.setReplyingTo}
+                    cancelReply={chatHook.cancelReply}
+                />
+            )}
             <QRCodeDialog isOpen={uiState.isQRCodeOpen} onClose={() => updateUIState({ isQRCodeOpen: false })} roomId={roomId || ""} />
             {uiState.isWhiteboardOpen && <Whiteboard roomId={roomId} isOpen={uiState.isWhiteboardOpen} onClose={() => updateUIState({ isWhiteboardOpen: false })} users={hybridUsers || []} />}
             {uiState.isQuizOpen && <QuizSidebar roomId={roomId || ""} isOpen={uiState.isQuizOpen} onClose={() => updateUIState({ isQuizOpen: false })} />}

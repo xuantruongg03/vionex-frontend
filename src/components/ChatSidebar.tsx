@@ -1,19 +1,8 @@
-import { useChat } from "@/hooks/use-chat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import CONSTANT from "@/lib/constant";
 import dayjs from "dayjs";
-import {
-    File,
-    Image,
-    Paperclip,
-    Send,
-    X,
-    MessageCircle,
-    Bot,
-    Clock,
-    RotateCcw,
-    Reply,
-} from "lucide-react";
+import type { Message } from "@/hooks/use-chat";
+import { File, Image, Paperclip, Send, X, MessageCircle, Bot, Clock, RotateCcw, Reply } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -25,31 +14,26 @@ interface ChatSidebarProps {
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
     roomId: string;
+    // Chat hook data passed from parent
+    messages: Message[];
+    sendMessage: (text: string) => void;
+    sendFileMessage: (file: File) => void;
+    retryMessage: (messageId: string) => void;
+    deleteMessage: (messageId: string) => void;
+    replyingTo: Message | null;
+    setReplyingTo: (message: Message | null) => void;
+    cancelReply: () => void;
 }
 
 type TabType = "normal" | "ai";
 
-export const ChatSidebar = ({
-    isOpen,
-    setIsOpen,
-    roomId,
-}: ChatSidebarProps) => {
+export const ChatSidebar = ({ isOpen, setIsOpen, roomId, messages, sendMessage, sendFileMessage, retryMessage, deleteMessage, replyingTo, setReplyingTo, cancelReply }: ChatSidebarProps) => {
     const [activeTab, setActiveTab] = useState<TabType>("normal");
     const [newMessage, setNewMessage] = useState("");
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [pastedFile, setPastedFile] = useState<File | null>(null);
 
     const room = useSelector((state: any) => state.room);
-    const {
-        messages,
-        sendMessage,
-        sendFileMessage,
-        retryMessage,
-        deleteMessage,
-        replyingTo,
-        setReplyingTo,
-        cancelReply,
-    } = useChat(roomId, room.username ?? "");
     const isMobile = useIsMobile();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -199,50 +183,25 @@ export const ChatSidebar = ({
                     opacity: 0,
                 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className={`${
-                    isMobile
-                        ? "fixed inset-0 z-50 bg-white dark:bg-gray-900"
-                        : "fixed right-0 top-0 h-screen w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700"
-                } flex flex-col`}
+                className={`${isMobile ? "fixed inset-0 z-50 bg-white dark:bg-gray-900" : "fixed right-0 top-0 h-screen w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700"} flex flex-col`}
             >
                 <div className='p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center'>
                     <div className='flex items-center gap-2'>
-                        <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                            Chat
-                        </h2>
+                        <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>Chat</h2>
                     </div>
-                    <Button
-                        variant='ghost'
-                        size='icon'
-                        onClick={() => setIsOpen(false)}
-                        className='hover:bg-gray-100 dark:hover:bg-gray-800'
-                    >
+                    <Button variant='ghost' size='icon' onClick={() => setIsOpen(false)} className='hover:bg-gray-100 dark:hover:bg-gray-800'>
                         <X className='h-5 w-5' />
                     </Button>
                 </div>
                 {/* Tab Navigation */}
                 <div className='flex border-b border-gray-200 dark:border-gray-700'>
-                    <button
-                        onClick={() => handleTabChange("normal")}
-                        className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                            activeTab === "normal"
-                                ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                        }`}
-                    >
+                    <button onClick={() => handleTabChange("normal")} className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "normal" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
                         <div className='flex items-center justify-center gap-2'>
                             <MessageCircle className='h-4 w-4' />
                             Group Chat
                         </div>
                     </button>
-                    <button
-                        onClick={() => handleTabChange("ai")}
-                        className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                            activeTab === "ai"
-                                ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                        }`}
-                    >
+                    <button onClick={() => handleTabChange("ai")} className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "ai" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"}`}>
                         <div className='flex items-center justify-center gap-2'>
                             <Bot className='h-4 w-4' />
                             AI Assistant
@@ -253,104 +212,43 @@ export const ChatSidebar = ({
                 {activeTab === "normal" ? (
                     <div className='flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent'>
                         {messages.map((message) => (
-                            <div
-                                key={message.id}
-                                className={`flex ${
-                                    message.sender === room.username
-                                        ? "justify-end"
-                                        : "justify-start"
-                                } items-center gap-2`}
-                            >
+                            <div key={message.id} className={`flex ${message.sender === room.username ? "justify-end" : "justify-start"} items-center gap-2`}>
                                 {/* Failed message controls - show on left */}
-                                {message.isFailed &&
-                                    message.sender === room.username && (
-                                        <div className='flex items-center gap-1'>
-                                            <button
-                                                onClick={() =>
-                                                    retryMessage(message.id)
-                                                }
-                                                className='p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors text-red-500'
-                                                title='Retry sending message'
-                                            >
-                                                <RotateCcw className='h-4 w-4' />
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    deleteMessage(message.id)
-                                                }
-                                                className='p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors text-red-500'
-                                                title='Delete message'
-                                            >
-                                                <X className='h-4 w-4' />
-                                            </button>
-                                        </div>
-                                    )}
+                                {message.isFailed && message.sender === room.username && (
+                                    <div className='flex items-center gap-1'>
+                                        <button onClick={() => retryMessage(message.id)} className='p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors text-red-500' title='Retry sending message'>
+                                            <RotateCcw className='h-4 w-4' />
+                                        </button>
+                                        <button onClick={() => deleteMessage(message.id)} className='p-1 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors text-red-500' title='Delete message'>
+                                            <X className='h-4 w-4' />
+                                        </button>
+                                    </div>
+                                )}
 
-                                <div
-                                    className={`min-w-[120px] max-w-[66%] rounded-xl shadow-sm relative group ${
-                                        message.sender === room.username
-                                            ? "bg-blue-500 text-white"
-                                            : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    } ${
-                                        message.isPending ? "opacity-70" : ""
-                                    } ${
-                                        message.isFailed
-                                            ? "border-2 border-red-500"
-                                            : ""
-                                    }`}
-                                >
+                                <div className={`min-w-[120px] max-w-[66%] rounded-xl shadow-sm relative group ${message.sender === room.username ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"} ${message.isPending ? "opacity-70" : ""} ${message.isFailed ? "border-2 border-red-500" : ""}`}>
                                     {/* Header with sender name only */}
                                     <div className='px-3 pt-2 pb-1 border-b border-black/10 dark:border-white/10'>
                                         <div className='flex items-center justify-between'>
                                             <p className='text-xs font-medium opacity-80'>
-                                                {message.sender} (
-                                                {message.sender ===
-                                                room.username
-                                                    ? "You"
-                                                    : message.sender}
-                                                )
+                                                {message.sender} {message.sender === room.username ? "(You)" : ""}
                                             </p>
                                             {/* Status Icons - only for pending */}
-                                            {message.sender === room.username &&
-                                                !message.isFailed && (
-                                                    <>
-                                                        {message.isPending && (
-                                                            <Clock className='h-3 w-3 animate-pulse opacity-60' />
-                                                        )}
-                                                    </>
-                                                )}
+                                            {message.sender === room.username && !message.isFailed && <>{message.isPending && <Clock className='h-3 w-3 animate-pulse opacity-60' />}</>}
                                         </div>
                                     </div>
 
                                     {/* Message content box */}
-                                    <div
-                                        className={`mx-2 my-2 p-3 rounded-lg ${
-                                            message.sender === room.username
-                                                ? "bg-blue-400/30 text-white"
-                                                : "bg-white/50 dark:bg-gray-600/50 text-gray-900 dark:text-gray-100"
-                                        }`}
-                                    >
+                                    <div className={`mx-2 my-2 p-3 rounded-lg ${message.sender === room.username ? "bg-blue-400/30 text-white" : "bg-white/50 dark:bg-gray-600/50 text-gray-900 dark:text-gray-100"}`}>
                                         {/* Reply Preview */}
                                         {message.replyTo && (
                                             <div className='mb-2 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-800'>
                                                 {/* Reply header */}
                                                 <div className='px-2 py-1 border-b border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700'>
-                                                    <p className='text-xs font-medium text-gray-600 dark:text-gray-300'>
-                                                        Replying to{" "}
-                                                        {
-                                                            message.replyTo
-                                                                .senderName
-                                                        }
-                                                    </p>
+                                                    <p className='text-xs font-medium text-gray-600 dark:text-gray-300'>Replying to {message.replyTo.senderName}</p>
                                                 </div>
                                                 {/* Reply content */}
                                                 <div className='px-2 py-1.5 bg-gray-50 dark:bg-gray-800'>
-                                                    <p className='text-xs truncate text-gray-700 dark:text-gray-400'>
-                                                        {message.replyTo.isFile
-                                                            ? `📎 ${message.replyTo.text}`
-                                                            : message.replyTo
-                                                                  .text}
-                                                    </p>
+                                                    <p className='text-xs truncate text-gray-700 dark:text-gray-400'>{message.replyTo.isFile ? `📎 ${message.replyTo.text}` : message.replyTo.text}</p>
                                                 </div>
                                             </div>
                                         )}
@@ -362,68 +260,35 @@ export const ChatSidebar = ({
                                                     <Image className='h-3 w-3 inline mr-1' />
                                                     {message.fileName}
                                                 </p>
-                                                <img
-                                                    src={message.fileUrl}
-                                                    alt={
-                                                        message.fileName ||
-                                                        "Image"
-                                                    }
-                                                    className='rounded-md max-w-full max-h-[200px] object-contain'
-                                                />
+                                                <img src={message.fileUrl} alt={message.fileName || "Image"} className='rounded-md max-w-full max-h-[200px] object-contain' />
                                             </div>
                                         ) : message.fileUrl ? (
                                             <div>
-                                                <a
-                                                    href={message.fileUrl}
-                                                    download={message.fileName}
-                                                    target='_blank'
-                                                    rel='noopener noreferrer'
-                                                    className='flex items-center gap-2 text-sm underline hover:no-underline'
-                                                >
+                                                <a href={message.fileUrl} download={message.fileName} target='_blank' rel='noopener noreferrer' className='flex items-center gap-2 text-sm underline hover:no-underline'>
                                                     <File className='h-4 w-4' />
                                                     <span>
                                                         {message.fileName}
-                                                        <span className='text-xs opacity-70 ml-1'>
-                                                            (
-                                                            {Math.round(
-                                                                message.fileSize! /
-                                                                    1024
-                                                            )}{" "}
-                                                            KB)
-                                                        </span>
+                                                        <span className='text-xs opacity-70 ml-1'>({Math.round(message.fileSize! / 1024)} KB)</span>
                                                     </span>
                                                 </a>
                                             </div>
                                         ) : (
-                                            <p className='text-sm leading-relaxed break-words'>
-                                                {message.text}
-                                            </p>
+                                            <p className='text-sm leading-relaxed break-words'>{message.text}</p>
                                         )}
                                     </div>
 
                                     {/* Footer with reply button and timestamp */}
                                     <div className='px-3 pb-2 flex items-center justify-between'>
                                         {/* Reply Button */}
-                                        {!message.isPending &&
-                                        !message.isFailed ? (
-                                            <button
-                                                onClick={() =>
-                                                    setReplyingTo(message)
-                                                }
-                                                className='opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded text-xs'
-                                                title='Reply to this message'
-                                            >
+                                        {!message.isPending && !message.isFailed ? (
+                                            <button onClick={() => setReplyingTo(message)} className='opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded text-xs' title='Reply to this message'>
                                                 <Reply className='h-3 w-3' />
                                             </button>
                                         ) : (
                                             <div></div>
                                         )}
 
-                                        <p className='text-xs opacity-60'>
-                                            {dayjs(message.timestamp).format(
-                                                CONSTANT.TIME_FORMAT
-                                            )}
-                                        </p>
+                                        <p className='text-xs opacity-60'>{dayjs(message.timestamp).format(CONSTANT.TIME_FORMAT)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -433,12 +298,7 @@ export const ChatSidebar = ({
                     </div>
                 ) : (
                     <div className='flex-1 flex flex-col relative overflow-hidden'>
-                        <Chatbot
-                            isOpen={true}
-                            onClose={() => {}}
-                            roomId={roomId}
-                            isEmbedded={true}
-                        />
+                        <Chatbot isOpen={true} onClose={() => {}} roomId={roomId} isEmbedded={true} />
                     </div>
                 )}{" "}
                 {/* Input Area - Only for normal chat */}
@@ -447,19 +307,10 @@ export const ChatSidebar = ({
                         {previewImage && (
                             <div className='mb-2 relative'>
                                 <div className='relative rounded border dark:border-gray-600 p-2'>
-                                    <Button
-                                        variant='destructive'
-                                        size='icon'
-                                        className='absolute -right-2 -top-2 h-5 w-5 rounded-full'
-                                        onClick={handleCancelPreview}
-                                    >
+                                    <Button variant='destructive' size='icon' className='absolute -right-2 -top-2 h-5 w-5 rounded-full' onClick={handleCancelPreview}>
                                         <X className='h-3 w-3' />
                                     </Button>
-                                    <img
-                                        src={previewImage}
-                                        alt='Preview'
-                                        className='max-h-[150px] mx-auto object-contain rounded'
-                                    />
+                                    <img src={previewImage} alt='Preview' className='max-h-[150px] mx-auto object-contain rounded' />
                                 </div>
                             </div>
                         )}
@@ -468,25 +319,13 @@ export const ChatSidebar = ({
                         {replyingTo && (
                             <div className='mb-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600'>
                                 <div className='flex items-center justify-between mb-1'>
-                                    <p className='text-sm font-medium text-gray-600 dark:text-gray-300'>
-                                        Replying to {replyingTo.senderName}
-                                    </p>
-                                    <button
-                                        onClick={cancelReply}
-                                        className='p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors'
-                                    >
+                                    <p className='text-sm font-medium text-gray-600 dark:text-gray-300'>Replying to {replyingTo.senderName}</p>
+                                    <button onClick={cancelReply} className='p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors'>
                                         <X className='h-4 w-4 text-gray-500' />
                                     </button>
                                 </div>
                                 <div className='p-2 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600'>
-                                    <p className='text-sm text-gray-700 dark:text-gray-400 truncate'>
-                                        {replyingTo.fileUrl
-                                            ? `📎 ${
-                                                  replyingTo.fileName ||
-                                                  replyingTo.text
-                                              }`
-                                            : replyingTo.text}
-                                    </p>
+                                    <p className='text-sm text-gray-700 dark:text-gray-400 truncate'>{replyingTo.fileUrl ? `📎 ${replyingTo.fileName || replyingTo.text}` : replyingTo.text}</p>
                                 </div>
                             </div>
                         )}
@@ -496,45 +335,21 @@ export const ChatSidebar = ({
                                 ref={inputRef}
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
-                                placeholder={
-                                    replyingTo
-                                        ? `Reply to ${replyingTo.senderName}...`
-                                        : pastedFile
-                                        ? "Send with description..."
-                                        : "Type a message..."
-                                }
+                                placeholder={replyingTo ? `Reply to ${replyingTo.senderName}...` : pastedFile ? "Send with description..." : "Type a message..."}
                                 onKeyPress={handleKeyPress}
                                 className='flex-1 focus-visible:outline-blue-400 focus-visible:ring-0 resize-none min-h-[40px] max-h-[84px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent'
                                 rows={1}
                                 onInput={(e) => {
-                                    const target =
-                                        e.target as HTMLTextAreaElement;
+                                    const target = e.target as HTMLTextAreaElement;
                                     target.style.height = "auto";
-                                    target.style.height =
-                                        Math.min(target.scrollHeight, 84) +
-                                        "px";
+                                    target.style.height = Math.min(target.scrollHeight, 84) + "px";
                                 }}
                             />
-                            <input
-                                type='file'
-                                ref={fileInputRef}
-                                onChange={handleFileUpload}
-                                className='hidden'
-                                accept='image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain'
-                            />
-                            <Button
-                                variant='outline'
-                                size='icon'
-                                onClick={handleFileButtonClick}
-                                title='Attach file'
-                            >
+                            <input type='file' ref={fileInputRef} onChange={handleFileUpload} className='hidden' accept='image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain' />
+                            <Button variant='outline' size='icon' onClick={handleFileButtonClick} title='Attach file'>
                                 <Paperclip className='h-4 w-4' />
                             </Button>
-                            <Button
-                                size='icon'
-                                onClick={handleSend}
-                                disabled={!newMessage.trim() && !pastedFile}
-                            >
+                            <Button size='icon' onClick={handleSend} disabled={!newMessage.trim() && !pastedFile}>
                                 <Send className='h-4 w-4' />
                             </Button>
                         </div>

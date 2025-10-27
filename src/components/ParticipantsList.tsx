@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useSocket } from "@/contexts/SocketContext";
 import { User } from "@/interfaces";
-import { FileSpreadsheet, Pin, PinOff, Users, UserX, Search } from "lucide-react";
+import { FileSpreadsheet, Hand, Pin, PinOff, Users, UserX, Search } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
@@ -28,10 +28,19 @@ export const ParticipantsList = React.memo(({ roomId, togglePinUser, handleKickU
         }));
 
         // Filter users based on debounced search query
-        if (!debouncedSearchQuery.trim()) return allUsers;
+        let filteredUsers = allUsers;
+        if (debouncedSearchQuery.trim()) {
+            const query = debouncedSearchQuery.toLowerCase();
+            filteredUsers = allUsers.filter((user) => user.peerId.toLowerCase().includes(query) || user.userInfo?.email?.toLowerCase().includes(query));
+        }
 
-        const query = debouncedSearchQuery.toLowerCase();
-        return allUsers.filter((user) => user.peerId.toLowerCase().includes(query) || user.userInfo?.email?.toLowerCase().includes(query));
+        // Sort: Users with raised hands first (stable sort - maintains relative order)
+        return filteredUsers.sort((a, b) => {
+            // If both have raised hands or both don't, maintain original order
+            if (a.isHandRaised === b.isHandRaised) return 0;
+            // Users with raised hands come first
+            return a.isHandRaised ? -1 : 1;
+        });
     }, [users, myName, pinnedUsers, debouncedSearchQuery]);
 
     const userCount = useMemo(() => {
@@ -141,11 +150,14 @@ export const ParticipantsList = React.memo(({ roomId, togglePinUser, handleKickU
 
                                         {/* User info */}
                                         <div className='min-w-0 flex-1'>
-                                            <div className='text-sm truncate font-medium'>{user.displayName}</div>
+                                            <div className='text-sm truncate font-medium flex items-center gap-2'>
+                                                {user.displayName}
+                                            </div>
                                             {/* Email display with smaller font */}
                                             {user.userInfo?.email && <div className='text-xs text-muted-foreground truncate mt-0.5'>{user.userInfo.email}</div>}
                                         </div>
                                     </div>
+                                    {user.isHandRaised && <Hand className='h-4 w-4 text-yellow-500 animate-bounce flex-shrink-0' fill='currentColor' />}
                                     {!user.isMe && (
                                         <div className='flex gap-2 flex-shrink-0'>
                                             {togglePinUser && (

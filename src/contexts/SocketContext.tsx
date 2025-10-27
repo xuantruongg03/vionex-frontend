@@ -64,13 +64,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({
             });
 
             newSocket.on("disconnect", () => {
-                console.log("Socket disconnected");
                 setIsConnected(false);
                 setIsConnecting(false);
             });
 
             newSocket.on("reconnect", () => {
-                console.log("Socket reconnected");
                 setIsConnected(true);
                 setIsConnecting(false);
             });

@@ -6,6 +6,8 @@ export enum TypeUserEvent {
     FOCUS = "focus",
     EYE_CLOSED = "eye_closed",
     EYE_OPEN = "eye_open",
+    RAISE_HAND = "raise_hand",
+    LOWER_HAND = "lower_hand",
 }
 
 export interface UserEvent {

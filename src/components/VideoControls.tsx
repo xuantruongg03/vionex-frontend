@@ -13,7 +13,7 @@ interface VideoControlsProps {
     isProcessing: boolean;
     isCreator?: boolean;
     isMonitorActive?: boolean;
-    unreadMessageCount?: number;
+    isHandRaised?: boolean;
     onToggleMute: () => void;
     onToggleVideo: () => void;
     onToggleChat: () => void;
@@ -28,10 +28,13 @@ interface VideoControlsProps {
     onToggleTranslationCabin: () => void;
     onToggleBehaviorMonitoring: () => void;
     onToggleLayout: () => void;
+    onToggleRaiseHand: () => void;
 }
 
-export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo, onToggleChat, onToggleWhiteboard, onToggleScreenShare, onToggleLockRoom, onToggleNetworkMonitor, onToggleVoting, onToggleQuiz, onToggleRecording, onLeaveRoom, onToggleBehaviorMonitoring, onToggleTranslationCabin, onToggleLayout, isScreenSharing, isRecording, isProcessing, isCreator = false, isMonitorActive = false, unreadMessageCount = 0 }: VideoControlsProps) => {
+export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo, onToggleChat, onToggleWhiteboard, onToggleScreenShare, onToggleLockRoom, onToggleNetworkMonitor, onToggleVoting, onToggleQuiz, onToggleRecording, onLeaveRoom, onToggleBehaviorMonitoring, onToggleTranslationCabin, onToggleLayout, onToggleRaiseHand, isScreenSharing, isRecording, isProcessing, isCreator = false, isMonitorActive = false, isHandRaised = false }: VideoControlsProps) => {
     const room = useSelector((state: any) => state.room);
+    const unreadMessageCount = useSelector((state: any) => state.chat.unreadCount);
+    
     const isMobile = useIsMobile();
     const [showControls, setShowControls] = useState(true);
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -76,6 +79,13 @@ export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo
             onClick: onToggleScreenShare,
             icon: isScreenSharing ? <Icon.ScreenShareOff /> : <Icon.ScreenShare />,
             className: isScreenSharing ? "bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-800/50 dark:text-gray-200" : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
+        },
+        {
+            key: "raise-hand",
+            title: isHandRaised ? "Lower Hand" : "Raise Hand",
+            onClick: onToggleRaiseHand,
+            icon: <Icon.Hand />,
+            className: isHandRaised ? "bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:hover:bg-yellow-800/60 dark:text-yellow-700 dark:hover:text-yellow-600" : "dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700",
         },
         ...(isMobile
             ? []

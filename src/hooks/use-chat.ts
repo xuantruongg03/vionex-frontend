@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSocket } from "@/contexts/SocketContext";
 import { toast } from "sonner";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { incrementUnreadCount, resetUnreadCount } from "@/redux/actions/chat";
 
 export interface Message {
     id: string;
@@ -28,10 +29,12 @@ export interface Message {
     isFailed?: boolean; // Message sending failed
 }
 
-export function useChat(roomId: string, userName: string) {
+export function useChat(roomId: string, userName: string, isChatOpen: boolean = false) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [pendingMessages, setPendingMessages] = useState<Map<string, Message>>(new Map());
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+
+    const dispatch = useDispatch();
 
     const orgId = useMemo(() => {
         return (state: any) => state.room.organizationId;
@@ -87,7 +90,15 @@ export function useChat(roomId: string, userName: string) {
                     newPending.delete(tempId);
                     return newPending;
                 } else {
+                    // New message from another user
                     setMessages((prev) => [...prev, { ...message, isConfirmed: true }]);
+                    
+                    // If chat is closed and message is from someone else, increment unread count
+                    if (!isChatOpen && message.sender !== userName) {
+                        console.log("[Chat] New message while chat closed, incrementing unread count");
+                        dispatch(incrementUnreadCount() as any);
+                    }
+                    
                     return currentPending;
                 }
             });
@@ -106,7 +117,15 @@ export function useChat(roomId: string, userName: string) {
             socket.off("chat:message", handleNewMessage);
             socket.off("chat:history", handleChatHistory);
         };
-    }, [roomId, userName, socket]);
+    }, [roomId, userName, socket?.connected, isChatOpen, dispatch]);
+
+    // Reset unread count when chat is opened
+    useEffect(() => {
+        if (isChatOpen) {
+            console.log("[Chat] Chat opened, resetting unread count");
+            dispatch(resetUnreadCount() as any);
+        }
+    }, [isChatOpen, dispatch]);
 
     const sendMessage = (text: string) => {
         if (!text.trim() || !socket?.connected) return;

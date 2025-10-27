@@ -96,3 +96,16 @@ export interface ActionLayout {
         };
     };
 }
+
+export enum ActionChatType {
+    INCREMENT_UNREAD = "INCREMENT_UNREAD",
+    RESET_UNREAD = "RESET_UNREAD",
+    SET_UNREAD = "SET_UNREAD",
+}
+
+export interface ActionChat {
+    type: ActionChatType;
+    payload?: {
+        count?: number;
+    };
+}

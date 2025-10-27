@@ -443,7 +443,6 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
             };
 
             setActiveQuiz(quizSession);
-            toast.success("Quiz created successfully");
             setActiveTab("results"); // Creator should see results after creating
             socket.off("quiz:created", handleQuizCreated);
             socket.off("quiz:error", handleQuizError);
@@ -497,16 +496,13 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                 setHasSubmittedQuiz(true);
                 setActiveTab("results");
                 toast.info(
-                    `The quiz: ${quizSession.title} - You have already submitted this quiz`
+                    `You have already submitted this quiz: "${quizSession.title}"`
                 );
                 return;
             }
 
-            // Show notification for non-quiz-creators
+            // Set appropriate tab for non-quiz-creators
             if (!isQuizCreator) {
-                toast.info(
-                    `The quiz: ${quizSession.title} - A new quiz has been created`
-                );
                 setActiveTab("take");
             } else {
                 // Quiz creator should see results tab after creating
@@ -515,8 +511,6 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
         };
 
         const onQuizEnded = (data: { quiz_session: any }) => {
-            toast.info("The quiz has ended");
-
             // Use functional updates to avoid stale closure issues
             setActiveQuiz((currentActiveQuiz) => {
                 if (
@@ -686,7 +680,6 @@ export const QuizSidebar = ({ isOpen, onClose, roomId }: QuizSidebarProps) => {
                     if (isDifferentQuiz) {
                         setHasSubmittedQuiz(false);
                         setActiveTab("take");
-                        toast.info(`Quiz in progress: ${quizSession.title}`);
                     } else {
                         if (!hasSubmittedQuiz) {
                             setActiveTab("take");

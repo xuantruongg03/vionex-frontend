@@ -4,6 +4,7 @@ import videoReducer from "./video";
 import logReducer from "./log";
 import authReducer from "./auth";
 import layoutReducer from "./layout";
+import chatReducer from "./chat";
 
 const rootReducer = combineReducers({
     room: roomReducer,
@@ -11,6 +12,7 @@ const rootReducer = combineReducers({
     log: logReducer,
     auth: authReducer,
     layout: layoutReducer,
+    chat: chatReducer,
 });
 
 export default rootReducer;
