@@ -229,24 +229,12 @@ export class TransportManager {
                         }
                     }, 500);
                 }
-            } else if (state === "failed" || state === "disconnected") {
-                console.error(`[TransportManager] SEND transport ${state}!`, {
-                    transportId: transport.id,
-                    iceGatheringState: transport.iceGatheringState,
-                });
-            } else {
-                console.log(`[TransportManager] SEND transport state: ${state}`);
-            }
+            } 
         });
 
         // If local stream already exists and no producers yet, publish tracks
         if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
-
-            // Use queueMicrotask for immediate but async execution
-            // This ensures all event listeners are attached in current call stack
-            // but executes immediately in next microtask (faster than setTimeout)
             queueMicrotask(async () => {
-                console.log("[TransportManager] Calling publishTracks() now...");
                 try {
                     await this.producerManager?.publishTracks();
                 } catch (err) {
@@ -299,13 +287,6 @@ export class TransportManager {
                         }
                     }
                 }, 3000);
-            } else if (state === "failed" || state === "disconnected") {
-                console.error(`[TransportManager] RECEIVE transport ${state}!`, {
-                    transportId: transport.id,
-                    iceGatheringState: transport.iceGatheringState,
-                });
-            } else {
-                console.log(`[TransportManager] RECEIVE transport state: ${state}`);
             }
         });
     };
