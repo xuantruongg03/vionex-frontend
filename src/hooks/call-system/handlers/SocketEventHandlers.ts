@@ -516,7 +516,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Consumer handlers
         socket.off("sfu:consumer-created", this.handleConsumerCreated);
-        socket.off("sfu:consumer-skipped", this.handleConsumerSkipped); // FIX: Cleanup skipped consumer handler
+        socket.off("sfu:consumer-skipped", this.handleConsumerSkipped); 
         socket.off("sfu:consumer-resumed", this.handleConsumerResumed);
         socket.off("sfu:consumer-removed", this.handleConsumerRemoved);
 

@@ -29,7 +29,6 @@ class MediaStreamService {
 
         // If already initialized, return existing stream
         if (this._localStream) {
-            console.log("[MediaService] Using existing local stream");
             return this._localStream;
         }
 

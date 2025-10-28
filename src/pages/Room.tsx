@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import nameDefault from "../lib/name";
 import { isOrganizationRoomToken, generateRoomDisplayId } from "@/utils/roomSecurity";
 import { useVerifyOrgRoomAccess } from "@/hooks/org";
+import roomService from "@/services/room";
 
 const Room = () => {
     const navigate = useNavigate();
@@ -95,38 +96,46 @@ const Room = () => {
     }, [checkUsername]);
 
     const handleCreateRoom = async () => {
-        // Check if API is available
-        await checkApi()
-            .then(() => {
-                // Prioritize user?.name first, then userName, then random name
-                let finalUserName = user?.name;
-                if (!finalUserName) {
-                    if (userName.trim() === "") {
-                        finalUserName = nameDefault[Math.floor(Math.random() * nameDefault.length)];
-                    } else {
-                        finalUserName = userName;
-                    }
-                }
+        try {
+            // 1. Check if API is available
+            await checkApi();
 
-                dispatch({
-                    type: "JOIN_ROOM",
-                    payload: {
-                        username: finalUserName,
-                        isCreator: true,
-                        userInfo: user,
-                    },
-                });
-                const newRoomId = `${Math.random()
-                    .toString(36)
-                    .substring(2, CONSTANT.ROOM_ID_LENGTH)}`;
-                navigate(`/room/${newRoomId}`);
-                // const newRoomId = "test";
-                // navigate(`/room/${newRoomId}`);
-            })
-            .catch((error) => {
-                console.error("API check failed:", error);
-                toast.error("Server is not available. Please try again later.");
+            // 2. Call server to create room (server generates unique ID)
+            const response = await roomService.createRoom();
+
+            if (!response.data?.success) {
+                toast.error(response.data?.message || "Failed to create room");
+                return;
+            }
+
+            const newRoomId = response.data.roomId;
+
+            // 3. Prepare username
+            let finalUserName = user?.name;
+            if (!finalUserName) {
+                if (userName.trim() === "") {
+                    finalUserName = nameDefault[Math.floor(Math.random() * nameDefault.length)];
+                } else {
+                    finalUserName = userName;
+                }
+            }
+
+            // 4. Dispatch Redux action
+            dispatch({
+                type: "JOIN_ROOM",
+                payload: {
+                    username: finalUserName,
+                    isCreator: true,
+                    userInfo: user,
+                },
             });
+
+            // 5. Navigate to the newly created room
+            navigate(`/room/${newRoomId}`);
+        } catch (error) {
+            console.error("Failed to create room:", error);
+            toast.error("Server is not available. Please try again later.");
+        }
     };
 
     const handlePasswordSubmit = (password: string) => {

@@ -5,6 +5,11 @@ const checkUsername = async (params: { username: string, roomId: string }) => {
     return response;
 };
 
+const createRoom = async () => {
+    const response = await axiosClient.post(`/create-room`);
+    return response;
+};
+
 const roomCheckStatus = async (params: { roomId: string }) => {
     const response = await axiosClient.post(`/check-room-status`, params);
     return response;
@@ -27,6 +32,7 @@ const lockRoom = async (params: { roomId: string, creatorId: string, password: s
 
 const roomService = {
     checkUsername,
+    createRoom,
     verifyRoom,
     roomCheckStatus,
     unlockRoom,
