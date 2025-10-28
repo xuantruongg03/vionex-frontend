@@ -19,6 +19,8 @@ export interface ActionRoom {
             name: string;
             avatar?: string;
         };
+        // NEW: Room key for semantic context isolation
+        roomKey?: string;
     };
 }
 
