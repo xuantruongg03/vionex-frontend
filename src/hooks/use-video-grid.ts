@@ -1,11 +1,14 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { User } from "@/interfaces";
 import { RootState } from "@/redux/store";
+import { setSelectedLayout } from "@/redux/actions/layout";
 
 export const useVideoGrid = (streams: any[], screenStreams: any[], users: User[], speakingPeers: string[], myPeerId: string, room: any) => {
+    const dispatch = useDispatch();
     const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
     const streamMapRef = useRef<Map<string, MediaStream>>(new Map());
+    const isAutoSwitchedRef = useRef<boolean>(false); // Track if layout was auto-switched
 
     // Get layout state from Redux instead of local state
     const selectedLayoutTemplate = useSelector((state: RootState) => state.layout.selectedLayoutTemplate);
@@ -63,6 +66,23 @@ export const useVideoGrid = (streams: any[], screenStreams: any[], users: User[]
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Auto-switch layout when screen sharing is detected
+    useEffect(() => {
+        if (screenStreams.length > 0) {
+            // Screen share detected - switch to top-hero-bar if not already
+            if (selectedLayoutTemplate !== "top-hero-bar") {
+                isAutoSwitchedRef.current = true; // Mark as auto-switched
+                dispatch(setSelectedLayout("top-hero-bar", false) as any);
+            }
+        } else {
+            // No screen share - return to auto layout ONLY if it was auto-switched
+            if (selectedLayoutTemplate === "top-hero-bar" && isAutoSwitchedRef.current) {
+                isAutoSwitchedRef.current = false; // Reset flag
+                dispatch(setSelectedLayout("auto", false) as any);
+            }
+        }
+    }, [screenStreams.length, selectedLayoutTemplate, dispatch]);
 
     useEffect(() => {
         streams.forEach(({ id, stream }) => {
@@ -236,8 +256,19 @@ export const useVideoGrid = (streams: any[], screenStreams: any[], users: User[]
                 screenUsers.push(screenUser);
             }
         }
+
+        // Sort screen share users: pinned users first, then others
+        screenUsers.sort((a, b) => {
+            const aPinned = room.pinnedUsers?.includes(a.originalPeerId) || false;
+            const bPinned = room.pinnedUsers?.includes(b.originalPeerId) || false;
+            
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+            return 0;
+        });
+
         return screenUsers;
-    }, [screenStreams, myPeerId]);
+    }, [screenStreams, myPeerId, room.pinnedUsers]);
 
     // Sorted users logic with priority: screen share → pinned → speaking → others
     // Additional priority (handled in processUsersForDisplay): user with camera (1 person) → local (You) → others

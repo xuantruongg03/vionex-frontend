@@ -12,6 +12,8 @@ const initialState = {
     roomId: null,
     // User info for sharing with other participants
     userInfo: null,
+    // NEW: Room key for semantic context isolation
+    roomKey: null,
 };
 
 const roomReducer = (state = initialState, action: ActionRoom) => {
@@ -21,24 +23,16 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                 ...state,
                 username: action.payload?.username || state.username,
                 password: action.payload?.password || state.password,
-                isLocked:
-                    action.payload?.isLocked !== undefined
-                        ? action.payload?.isLocked
-                        : state.isLocked,
-                isCreator:
-                    action.payload?.isCreator !== undefined
-                        ? action.payload?.isCreator
-                        : state.isCreator,
+                isLocked: action.payload?.isLocked !== undefined ? action.payload?.isLocked : state.isLocked,
+                isCreator: action.payload?.isCreator !== undefined ? action.payload?.isCreator : state.isCreator,
                 // Organization room context
-                isOrganizationRoom:
-                    action.payload?.isOrganizationRoom !== undefined
-                        ? action.payload?.isOrganizationRoom
-                        : state.isOrganizationRoom,
-                organizationId:
-                    action.payload?.organizationId || state.organizationId,
+                isOrganizationRoom: action.payload?.isOrganizationRoom !== undefined ? action.payload?.isOrganizationRoom : state.isOrganizationRoom,
+                organizationId: action.payload?.organizationId || state.organizationId,
                 roomId: action.payload?.roomId || state.roomId,
                 // User info for sharing with other participants
                 userInfo: action.payload?.userInfo || state.userInfo,
+                // NEW: Store room_key from server
+                roomKey: action.payload?.roomKey || state.roomKey,
             };
             return state;
         case ActionRoomType.LEAVE_ROOM:
@@ -54,13 +48,12 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
                 roomId: null,
                 // Reset user info
                 userInfo: null,
+                // Reset room_key
+                roomKey: null,
             };
             return state;
         case ActionRoomType.SET_CREATOR:
-            const newIsCreator =
-                action.payload?.isCreator !== undefined
-                    ? action.payload.isCreator
-                    : state.isCreator;
+            const newIsCreator = action.payload?.isCreator !== undefined ? action.payload.isCreator : state.isCreator;
 
             state = {
                 ...state,
@@ -71,9 +64,7 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
         case ActionRoomType.SET_PINNED_USERS:
             const pinnedUser = action.payload?.pinnedUsers || action.payload;
             // Ensure we don't add duplicate pins
-            const existingPins = Array.isArray(state.pinnedUsers)
-                ? state.pinnedUsers
-                : [];
+            const existingPins = Array.isArray(state.pinnedUsers) ? state.pinnedUsers : [];
             if (!existingPins.includes(pinnedUser)) {
                 return {
                     ...state,
@@ -85,9 +76,7 @@ const roomReducer = (state = initialState, action: ActionRoom) => {
         case ActionRoomType.REMOVE_PINNED_USER:
             return {
                 ...state,
-                pinnedUsers: state.pinnedUsers.filter(
-                    (user) => user !== action.payload
-                ),
+                pinnedUsers: state.pinnedUsers.filter((user) => user !== action.payload),
             };
 
         case ActionRoomType.RESET_PINNED_USER:
