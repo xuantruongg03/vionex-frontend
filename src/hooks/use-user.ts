@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import ApiService from "../services/signalService";
 import { useSocket } from "@/contexts/SocketContext";
+import { ActionRoomType } from "@/interfaces/action";
 
 interface User {
     peerId: string;
@@ -78,22 +79,15 @@ function useUser(roomId: string) {
 
                 // Wait for response
                 return new Promise<boolean>((resolve) => {
-                    const handleResponse = (response: {
-                        success: boolean;
-                        message: string;
-                    }) => {
+                    const handleResponse = (response: { success: boolean; message: string }) => {
                         socket.off("sfu:kick-user-response", handleResponse);
 
                         if (response.success) {
-                            toast.success(
-                                `User ${participantId} kicked successfully`
-                            );
+                            toast.success(`User ${participantId} kicked successfully`);
                             // Note: Don't update local users list here - it will be handled by sfu:user-removed event
                             resolve(true);
                         } else {
-                            toast.error(
-                                response.message || "Failed to kick user"
-                            );
+                            toast.error(response.message || "Failed to kick user");
                             resolve(false);
                         }
                     };
@@ -130,21 +124,37 @@ function useUser(roomId: string) {
                 // Handle format from backend: { users: User[] }
                 const users = Array.isArray(data) ? data : data.users || [];
                 setUsers(users);
+
+                // Check if current user's creator status changed
+                const myName = room.username;
+                if (myName) {
+                    const currentUser = users.find((u) => u.peerId === myName);
+                    if (currentUser) {
+                        // If creator status changed, update Redux state
+                        if (currentUser.isCreator !== room.isCreator) {
+                            dispatch({
+                                type: ActionRoomType.SET_CREATOR,
+                                payload: { isCreator: currentUser.isCreator },
+                            });
+
+                            // Show notification if became creator
+                            if (currentUser.isCreator && !room.isCreator) {
+                                toast.success("You are now the room creator");
+                            }
+                        }
+                    }
+                }
             } catch (err) {
                 console.error("Error in onReceiveUsers:", err);
             }
         };
 
         // Listen for join success to get authoritative isCreator info
-        const onJoinSuccess = (data: {
-            peerId: string;
-            isCreator: boolean;
-            roomId: string;
-        }) => {
+        const onJoinSuccess = (data: { peerId: string; isCreator: boolean; roomId: string }) => {
             try {
                 if (data.peerId === room.username) {
                     dispatch({
-                        type: "SET_CREATOR",
+                        type: ActionRoomType.SET_CREATOR,
                         payload: { isCreator: data.isCreator },
                     });
                 }
@@ -153,13 +163,7 @@ function useUser(roomId: string) {
             }
         };
 
-        const onUserRemoved = ({
-            peerId,
-            reason,
-        }: {
-            peerId: string;
-            reason?: string;
-        }) => {
+        const onUserRemoved = ({ peerId, reason }: { peerId: string; reason?: string }) => {
             try {
                 const myName = room.username;
                 if (peerId === myName) {
@@ -169,15 +173,11 @@ function useUser(roomId: string) {
                 } else {
                     // Only show toast for actual kicks, not voluntary disconnects
                     if (reason === "kicked") {
-                        toast.success(
-                            `${peerId} has been removed from the room`
-                        );
+                        toast.success(`${peerId} has been removed from the room`);
                     }
                     setUsers((prevUsers) => {
                         if (!prevUsers) return null;
-                        const filtered = prevUsers.filter(
-                            (user) => user.peerId !== peerId
-                        );
+                        const filtered = prevUsers.filter((user) => user.peerId !== peerId);
                         return filtered;
                     });
                 }
@@ -197,48 +197,11 @@ function useUser(roomId: string) {
             }
         };
 
-        const onCreatorChanged = (data: {
-            peerId: string;
-            isCreator: boolean;
-        }) => {
-            try {
-                const myName = room.username;
-                if (data.peerId === myName) {
-                    if (!room.isCreator) {
-                        dispatch({
-                            type: "SET_CREATOR",
-                            payload: { isCreator: true },
-                        });
-                        toast.success("You have become the room creator");
-                    }
-                } else {
-                    toast.info(`${data.peerId} has become the room creator`);
-                }
-                setUsers((prevUsers) => {
-                    if (!prevUsers) return null;
-
-                    return prevUsers.map((user) => {
-                        const updatedUser = { ...user, isCreator: false };
-
-                        if (updatedUser.peerId === data.peerId) {
-                            updatedUser.isCreator = true;
-                        }
-
-                        return updatedUser;
-                    });
-                });
-            } catch (err) {
-                console.error("Error in onCreatorChanged:", err);
-            }
-        };
-
         const onPeerLeft = (data: { peerId: string }) => {
             try {
                 setUsers((prevUsers) => {
                     if (!prevUsers) return null;
-                    const filtered = prevUsers.filter(
-                        (user) => user.peerId !== data.peerId
-                    );
+                    const filtered = prevUsers.filter((user) => user.peerId !== data.peerId);
                     return filtered;
                 });
             } catch (err) {
@@ -253,7 +216,6 @@ function useUser(roomId: string) {
                 socket.on("sfu:users-updated", onReceiveUsers);
                 socket.on("sfu:user-removed", onUserRemoved);
                 socket.on("sfu:new-peer-join", onUserJoined);
-                socket.on("sfu:creator-changed", onCreatorChanged);
                 socket.on("sfu:peer-left", onPeerLeft);
                 socket.on("sfu:join-success", onJoinSuccess);
             } catch (err) {
@@ -278,21 +240,12 @@ function useUser(roomId: string) {
                 socket.off("sfu:users-updated", onReceiveUsers);
                 socket.off("sfu:user-removed", onUserRemoved);
                 socket.off("sfu:new-peer-join", onUserJoined);
-                socket.off("sfu:creator-changed", onCreatorChanged);
                 socket.off("sfu:peer-left", onPeerLeft);
                 socket.off("sfu:join-success", onJoinSuccess);
                 socket.off("connect", handleSocketConnect);
             }
         };
-    }, [
-        roomId,
-        room.username,
-        dispatch,
-        navigate,
-        fetchUsers,
-        socket,
-        isConnected,
-    ]);
+    }, [roomId, room.username, dispatch, navigate, fetchUsers, socket?.connected, isConnected]);
 
     return {
         users,

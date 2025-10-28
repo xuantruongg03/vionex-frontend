@@ -89,9 +89,6 @@ export class RoomManager {
                                 roomKey: data.roomKey,
                             },
                         });
-                        console.log(`[RoomManager] Dispatched roomKey to Redux: ${data.roomKey}`);
-                    } else {
-                        console.warn(`[RoomManager] No roomKey received from server`);
                     }
 
                     this.context.setters.setIsConnected(true);
