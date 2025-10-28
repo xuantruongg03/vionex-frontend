@@ -78,8 +78,22 @@ export class RoomManager {
                     reject(new Error("Join timeout"));
                 }, 10000);
 
-                const handleJoinSuccess = () => {
+                const handleJoinSuccess = (data: { peerId: string; isCreator: boolean; roomId: string; roomKey?: string }) => {
                     clearTimeout(timeout);
+
+                    // Dispatch roomKey to Redux
+                    if (data.roomKey) {
+                        this.context.dispatch({
+                            type: ActionRoomType.JOIN_ROOM,
+                            payload: {
+                                roomKey: data.roomKey,
+                            },
+                        });
+                        console.log(`[RoomManager] Dispatched roomKey to Redux: ${data.roomKey}`);
+                    } else {
+                        console.warn(`[RoomManager] No roomKey received from server`);
+                    }
+
                     this.context.setters.setIsConnected(true);
                     this.context.setters.setIsJoined(true);
                     resolve(true);
