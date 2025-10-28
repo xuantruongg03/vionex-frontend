@@ -322,6 +322,7 @@ export class VADManager {
         const audioData = {
             userId: room.username,
             roomId,
+            roomKey: room.roomKey || null, // NEW: Send roomKey for semantic context isolation
             timestamp: Date.now(),
             buffer: audioBuffer, // Send Uint8Array directly - socket.io can handle it
             duration,

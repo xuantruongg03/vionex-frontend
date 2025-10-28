@@ -41,6 +41,9 @@ export function useChat(roomId: string, userName: string, isChatOpen: boolean = 
     }, []);
     const organizationId = useSelector(orgId);
 
+    // Get roomKey from Redux state
+    const roomKey = useSelector((state: any) => state.room.roomKey);
+
     // Use Socket Context
     const { socket } = useSocket();
 
@@ -155,6 +158,7 @@ export function useChat(roomId: string, userName: string, isChatOpen: boolean = 
 
         socket.emit("chat:message", {
             roomId,
+            roomKey, // NEW: Send roomKey for semantic context isolation
             message: {
                 sender: userName,
                 senderName: userName,
@@ -215,6 +219,7 @@ export function useChat(roomId: string, userName: string, isChatOpen: boolean = 
 
             socket.emit("chat:file", {
                 roomId,
+                roomKey, // NEW: Send roomKey for semantic context isolation
                 message: {
                     sender: userName,
                     senderName: userName,
