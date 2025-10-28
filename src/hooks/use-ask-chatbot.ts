@@ -13,6 +13,7 @@ type Handlers = {
 interface RootState {
     room: {
         organizationId: string | null;
+        roomKey: string | null; // NEW: Add roomKey to state interface
     };
 }
 
@@ -23,6 +24,7 @@ function genId() {
 export default function useAskChatBot(roomId: string, handlers: Handlers) {
     const { socket } = useSocket();
     const organizationId = useSelector((state: RootState) => state.room.organizationId);
+    const roomKey = useSelector((state: RootState) => state.room.roomKey); // NEW: Get roomKey from Redux
 
     useEffect(() => {
         if (!socket) return;
@@ -45,12 +47,13 @@ export default function useAskChatBot(roomId: string, handlers: Handlers) {
             socket.emit("chatbot:ask", {
                 id: requestId,
                 roomId,
+                roomKey, // NEW: Send roomKey for semantic context isolation
                 text: question,
                 organizationId,
             });
             return Promise.resolve({ requestId });
         },
-        [socket, roomId, organizationId]
+        [socket, roomId, roomKey, organizationId]
     );
 
     return { sendQuestion };
