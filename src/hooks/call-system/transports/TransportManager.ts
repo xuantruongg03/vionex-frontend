@@ -366,19 +366,8 @@ export class TransportManager {
      * Handle transport connection confirmation
      */
     handleTransportConnected = (data: { transportId: string }) => {
-        // Check if this is our send transport and we have local media ready
-        if (this.context.refs.sendTransportRef.current && this.context.refs.sendTransportRef.current.id === data.transportId && this.context.refs.localStreamRef.current) {
-            // Transport is connected, we can now publish if we haven't already
-            setTimeout(async () => {
-                if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0) {
-                    if (this.producerManager) {
-                        await this.producerManager.publishTracks();
-                    } else {
-                        console.warn("[TransportManager] ProducerManager not set!");
-                    }
-                }
-            }, 500);
-        }
+        // Just log, no publishing here - let queueMicrotask handle it
+        console.log("[TransportManager] Transport connected confirmed:", data.transportId);
     };
 
     /**
