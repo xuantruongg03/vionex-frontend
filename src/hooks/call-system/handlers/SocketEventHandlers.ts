@@ -237,12 +237,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             this.streamManager.processPendingStreams();
         }
 
-        // Also trigger auto-publish if we have media ready
-        if (this.context.refs.sendTransportRef.current && this.context.refs.sendTransportRef.current.id === data.transportId && this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0) {
-            setTimeout(async () => {
-                await this.producerManager.publishTracks();
-            }, 500);
-        }
+        // Don't publish here - TransportManager handles all publishing
     };
 
     // Producer handlers
