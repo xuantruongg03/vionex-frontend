@@ -158,6 +158,12 @@ export class TransportManager {
 
         transport.on("produce", async (parameters, callback, errback) => {
             try {
+                console.log("[TransportManager] Producer event triggered:", {
+                    kind: parameters.kind,
+                    appData: parameters.appData,
+                    transportId: transport.id,
+                });
+
                 this.context.refs.socketRef.current?.emit("sfu:produce", {
                     transportId: transport.id,
                     kind: parameters.kind,
@@ -169,6 +175,8 @@ export class TransportManager {
                 });
 
                 const handleProducerCreated = (data: any) => {
+                    console.log("[TransportManager] sfu:producer-created received:", data);
+                    
                     // Handle different response formats from server
                     const producerId = data.producerId || data.producer_id || data.id;
                     const streamId = data.streamId || data.stream_id;
@@ -184,6 +192,13 @@ export class TransportManager {
                         streamId: streamId,
                         kind: data.kind,
                         appData: data.appData,
+                    });
+
+                    console.log("[TransportManager] Producer registered:", {
+                        producerId,
+                        streamId,
+                        kind: data.kind,
+                        totalProducers: this.context.refs.producersRef.current.size,
                     });
 
                     this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
@@ -204,32 +219,48 @@ export class TransportManager {
 
                 // Add timeout to prevent hanging
                 setTimeout(() => {
-                    this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
-                    this.context.refs.socketRef.current?.off("sfu:error", handleProduceError);
-                    errback(new Error("Producer creation timeout"));
+                    const stillWaiting = this.context.refs.socketRef.current?.listeners("sfu:producer-created").includes(handleProducerCreated);
+                    if (stillWaiting) {
+                        console.error("[TransportManager] Producer creation timeout - no response after 10s");
+                        this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
+                        this.context.refs.socketRef.current?.off("sfu:error", handleProduceError);
+                        errback(new Error("Producer creation timeout"));
+                    }
                 }, 10000); // 10 second timeout
             } catch (error) {
+                console.error("[TransportManager] Error in produce handler:", error);
                 errback(error);
             }
         });
 
         // Initialize local media when send transport is ready
         transport.on("connectionstatechange", (state) => {
+            console.log("[TransportManager] Send transport state changed:", state);
+            
             if (state === "connected") {
+                console.log("[TransportManager] Send transport CONNECTED!", {
+                    hasLocalStream: !!this.context.refs.localStreamRef.current,
+                    producersCount: this.context.refs.producersRef.current.size,
+                });
+
                 if (!this.context.refs.localStreamRef.current) {
                     setTimeout(async () => {
                         if (this.mediaManager) {
+                            console.log("[TransportManager] Initializing local media after transport connected");
                             await this.mediaManager.initializeLocalMedia();
                         }
                     }, 1000);
                 } else if (this.context.refs.producersRef.current.size === 0) {
                     setTimeout(async () => {
                         if (this.producerManager) {
+                            console.log("[TransportManager] Publishing tracks after transport connected");
                             await this.producerManager.publishTracks();
                         }
                     }, 500);
                 }
-            } 
+            } else if (state === "failed" || state === "disconnected") {
+                console.error("[TransportManager] Send transport state:", state);
+            }
         });
 
         // If local stream already exists and no producers yet, publish tracks
@@ -253,16 +284,22 @@ export class TransportManager {
         transport.on("connect", this.createTransportConnectionHandler(transport));
 
         transport.on("connectionstatechange", (state) => {
+            console.log("[TransportManager] Receive transport state changed:", state);
+            
             if (state === "connected") {
+                console.log("[TransportManager] Receive transport CONNECTED!");
+                
                 // Mark transport as ready
                 setTimeout(() => {
                     if (!this.context.refs.isInitializedRef.current) {
                         this.context.refs.isInitializedRef.current = true;
+                        console.log("[TransportManager] System marked as initialized");
                     }
                 }, 500);
 
                 // Also request existing streams as fallback
                 setTimeout(() => {
+                    console.log("[TransportManager] Requesting existing streams...");
                     this.context.refs.socketRef.current?.emit("sfu:get-streams", {
                         roomId: this.context.roomId,
                     });
@@ -271,6 +308,7 @@ export class TransportManager {
                 // Force connection if needed after timeout
                 setTimeout(() => {
                     if (transport.connectionState !== "connected") {
+                        console.warn("[TransportManager] Receive transport still not connected, trying to trigger connection");
                         // Try to trigger the connection by consuming a pending stream
                         const pendingStreams = this.context.refs.pendingStreamsRef.current;
                         if (pendingStreams.length > 0) {
@@ -287,6 +325,8 @@ export class TransportManager {
                         }
                     }
                 }, 3000);
+            } else if (state === "failed" || state === "disconnected") {
+                console.error("[TransportManager] Receive transport state:", state);
             }
         });
     };
