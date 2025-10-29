@@ -202,7 +202,7 @@ export function useCallRefactored(roomId: string, password?: string) {
     useEffect(() => {
         if (isJoined && !refs.localStreamRef.current && !mediaInitializedRef.current) {
             mediaInitializedRef.current = true; // Set flag BEFORE async call
-            
+
             const timer = setTimeout(async () => {
                 try {
                     await mediaManager.initializeLocalMedia();
@@ -221,7 +221,7 @@ export function useCallRefactored(roomId: string, password?: string) {
         const autoInitializeMedia = async () => {
             if (!refs.localStreamRef.current && !mediaInitializedRef.current) {
                 mediaInitializedRef.current = true; // Set flag BEFORE async call
-                
+
                 try {
                     await mediaManager.initializeLocalMedia();
                 } catch (error) {

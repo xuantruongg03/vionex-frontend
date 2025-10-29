@@ -52,16 +52,16 @@ export class MediaManager {
         // Guard: If already initializing, wait for existing initialization
         if (this.isInitializing) {
             console.log("[MediaManager] Already initializing, waiting for existing call...");
-            
+
             // Wait for existing initialization to complete (check every 100ms, max 5s)
             for (let i = 0; i < 50; i++) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise((resolve) => setTimeout(resolve, 100));
                 if (!this.isInitializing && this.context.refs.localStreamRef.current) {
                     console.log("[MediaManager] Existing initialization completed, returning stream");
                     return this.context.refs.localStreamRef.current;
                 }
             }
-            
+
             console.warn("[MediaManager] Initialization timeout, proceeding anyway");
         }
 
@@ -72,7 +72,7 @@ export class MediaManager {
         }
 
         this.isInitializing = true;
-        
+
         try {
             const stream = await mediaStreamService.initializeLocalMedia();
 
@@ -97,9 +97,6 @@ export class MediaManager {
                 },
                 ...prev.filter((s) => s.id !== "local"),
             ]);
-
-            // Don't publish here - let TransportManager handle publishing when transport is connected
-            console.log("[MediaManager] Local media initialized, waiting for TransportManager to publish...");
 
             // Notify TransportManager that media is ready
             this.notifyMediaReady();

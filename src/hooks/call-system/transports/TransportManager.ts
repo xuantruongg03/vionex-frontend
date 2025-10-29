@@ -21,7 +21,7 @@ export class TransportManager {
     setManagers(producerManager: any, mediaManager: any) {
         this.producerManager = producerManager;
         this.mediaManager = mediaManager;
-        
+
         // Set callback to try publishing when media is ready
         if (mediaManager?.setOnMediaReady) {
             mediaManager.setOnMediaReady(() => {
@@ -168,11 +168,6 @@ export class TransportManager {
 
         transport.on("produce", async (parameters, callback, errback) => {
             try {
-                // console.log("[TransportManager] Producer event triggered:", {
-                //     kind: parameters.kind,
-                //     appData: parameters.appData,
-                //     transportId: transport.id,
-                // });
 
                 this.context.refs.socketRef.current?.emit("sfu:produce", {
                     transportId: transport.id,
@@ -185,7 +180,6 @@ export class TransportManager {
                 });
 
                 const handleProducerCreated = (data: any) => {
-                    // console.log("[TransportManager] sfu:producer-created received:", data);
 
                     // Handle different response formats from server
                     const producerId = data.producerId || data.producer_id || data.id;
@@ -203,13 +197,6 @@ export class TransportManager {
                         kind: data.kind,
                         appData: data.appData,
                     });
-
-                    // console.log("[TransportManager] Producer registered:", {
-                    //     producerId,
-                    //     streamId,
-                    //     kind: data.kind,
-                    //     totalProducers: this.context.refs.producersRef.current.size,
-                    // });
 
                     this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
                     this.context.refs.socketRef.current?.off("sfu:error", handleProduceError);
@@ -246,9 +233,9 @@ export class TransportManager {
         // Listen for connection state changes
         transport.on("connectionstatechange", (state) => {
             console.log("[TransportManager] Send transport state changed:", state);
-            
+
             if (state === "connected") {
-                console.log("[TransportManager] ✅ Send transport fully connected!");
+                console.log("[TransportManager] Send transport fully connected!");
             } else if (state === "failed" || state === "disconnected") {
                 console.error("[TransportManager] Send transport state:", state);
             }
@@ -267,7 +254,7 @@ export class TransportManager {
      */
     private async tryPublishTracks(source: string, maxRetries: number = 3): Promise<void> {
         console.log(`[TransportManager] tryPublishTracks called from: ${source}`);
-        
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 // Check all conditions (but NOT transport connected - that happens AFTER we publish)
@@ -288,10 +275,10 @@ export class TransportManager {
                         notPublishing,
                         source,
                     });
-                    
+
                     // Shorter wait time since we also have event-driven trigger
                     if (attempt < maxRetries) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise((resolve) => setTimeout(resolve, 500));
                         continue;
                     } else {
                         console.warn(`[TransportManager] Conditions not met after retries (source: ${source})`);
@@ -300,26 +287,25 @@ export class TransportManager {
                 }
 
                 // Try to publish - this will trigger WebRTC connection!
-                console.log(`[TransportManager] ✅ Attempt ${attempt}/${maxRetries} - Publishing tracks (will trigger connection)...`);
+                console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Publishing tracks (will trigger connection)...`);
                 await this.producerManager?.publishTracks();
-                console.log("[TransportManager] ✅ Tracks published successfully!");
-                
+                console.log("[TransportManager] Tracks published successfully!");
+
                 // Sync metadata after successful publish
                 if (this.mediaManager?.syncMetadataWithTrackStates) {
                     await this.mediaManager.syncMetadataWithTrackStates();
-                    console.log("[TransportManager] ✅ Metadata synced with track states");
+                    console.log("[TransportManager] Metadata synced with track states");
                 }
-                
+
                 return;
-                
             } catch (err) {
                 console.error(`[TransportManager] Attempt ${attempt}/${maxRetries} failed:`, err);
-                
+
                 if (attempt < maxRetries) {
                     console.log(`[TransportManager] Retrying in 500ms...`);
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise((resolve) => setTimeout(resolve, 500));
                 } else {
-                    console.error("[TransportManager] ❌ Failed to publish tracks after all retries");
+                    console.error("[TransportManager] Failed to publish tracks after all retries");
                 }
             }
         }
@@ -334,10 +320,8 @@ export class TransportManager {
         transport.on("connect", this.createTransportConnectionHandler(transport));
 
         transport.on("connectionstatechange", (state) => {
-            // console.log("[TransportManager] Receive transport state changed:", state);
 
             if (state === "connected") {
-                // console.log("[TransportManager] Receive transport CONNECTED!");
 
                 // Mark transport as ready
                 setTimeout(() => {
@@ -384,10 +368,10 @@ export class TransportManager {
     /**
      * Handle transport connection confirmation
      */
-    handleTransportConnected = (data: { transportId: string }) => {
-        // Just log, no publishing here - let queueMicrotask handle it
-        console.log("[TransportManager] Transport connected confirmed:", data.transportId);
-    };
+    // handleTransportConnected = (data: { transportId: string }) => {
+    //     // Just log, no publishing here - let queueMicrotask handle it
+    //     console.log("[TransportManager] Transport connected confirmed:", data.transportId);
+    // };
 
     /**
      * Close and cleanup transports
