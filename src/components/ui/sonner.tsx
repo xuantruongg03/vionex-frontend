@@ -1,31 +1,20 @@
 import { useTheme } from "next-themes";
+import { useEffect } from "react";
 import { Toaster as Sonner, toast } from "sonner";
-import { useEffect, useState } from "react";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
     const { theme = "system" } = useTheme();
-    const [toastCount, setToastCount] = useState(0);
 
     useEffect(() => {
-        // Listen for toast changes
-        const interval = setInterval(() => {
-            const toasts = document.querySelectorAll("[data-sonner-toast]");
-            setToastCount(toasts.length);
-        }, 100);
-
-        return () => clearInterval(interval);
-    }, []);
-
-    useEffect(() => {
-        // Add click listener to close buttons to dismiss all when multiple toasts
+        // Click any close button to dismiss all toasts
         const handleCloseClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const closeButton = target.closest("[data-close-button]");
 
-            if (closeButton && toastCount > 1) {
-                // Small delay to allow the animation to start
+            if (closeButton) {
+                // Dismiss all toasts
                 setTimeout(() => {
                     toast.dismiss();
                 }, 50);
@@ -34,7 +23,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
 
         document.addEventListener("click", handleCloseClick, true);
         return () => document.removeEventListener("click", handleCloseClick, true);
-    }, [toastCount]);
+    }, []);
 
     return (
         <>
