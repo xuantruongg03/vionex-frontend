@@ -12,6 +12,8 @@ export class MediaManager {
     private context: CallSystemContext;
     private producerManager: ProducerManager;
     private vadManager: any = null; // Will be set later
+    private isInitializing: boolean = false; // Guard flag for concurrent calls
+    private onMediaReadyCallback?: () => void; // Callback when media is ready
 
     constructor(context: CallSystemContext, producerManager: ProducerManager) {
         this.context = context;
@@ -26,9 +28,51 @@ export class MediaManager {
     }
 
     /**
+     * Set callback to be called when media is ready
+     */
+    setOnMediaReady(callback: () => void): void {
+        this.onMediaReadyCallback = callback;
+    }
+
+    /**
+     * Notify that media is ready
+     */
+    private notifyMediaReady(): void {
+        if (this.onMediaReadyCallback) {
+            queueMicrotask(() => {
+                this.onMediaReadyCallback?.();
+            });
+        }
+    }
+
+    /**
      * Initialize local media stream
      */
     initializeLocalMedia = async (): Promise<MediaStream> => {
+        // Guard: If already initializing, wait for existing initialization
+        if (this.isInitializing) {
+            console.log("[MediaManager] Already initializing, waiting for existing call...");
+
+            // Wait for existing initialization to complete (check every 100ms, max 5s)
+            for (let i = 0; i < 50; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                if (!this.isInitializing && this.context.refs.localStreamRef.current) {
+                    console.log("[MediaManager] Existing initialization completed, returning stream");
+                    return this.context.refs.localStreamRef.current;
+                }
+            }
+
+            console.warn("[MediaManager] Initialization timeout, proceeding anyway");
+        }
+
+        // Guard: If already initialized, return existing stream
+        if (this.context.refs.localStreamRef.current) {
+            console.log("[MediaManager] Local media already initialized, returning existing stream");
+            return this.context.refs.localStreamRef.current;
+        }
+
+        this.isInitializing = true;
+
         try {
             const stream = await mediaStreamService.initializeLocalMedia();
 
@@ -54,49 +98,8 @@ export class MediaManager {
                 ...prev.filter((s) => s.id !== "local"),
             ]);
 
-            // Publish tracks if transports are ready - only if we don't have producers yet
-            if (this.context.refs.sendTransportRef.current && this.context.refs.producersRef.current.size === 0) {
-                setTimeout(async () => {
-                    try {
-                        const publishResult = await this.producerManager.publishTracks();
-                        if (publishResult) {
-                            console.log("[MediaManager] Tracks published successfully, syncing metadata...");
-                            
-                            // FIXED: Sync metadata with actual track states after publishing
-                            await this.syncMetadataWithTrackStates();
-
-                            // Update local UI based on actual producer states
-                            const producers = Array.from(this.context.refs.producersRef.current.values());
-                            const videoProducer = producers.find((p) => p.kind === "video" && !p.appData?.isScreenShare);
-                            const audioProducer = producers.find((p) => p.kind === "audio" && !p.appData?.isScreenShare);
-
-                            const hasVideo = videoProducer?.producer && !videoProducer.producer.closed && !videoProducer.producer.paused;
-                            const hasAudio = audioProducer?.producer && !audioProducer.producer.closed && !audioProducer.producer.paused;
-
-                            console.log("[MediaManager] Producer states:", { hasVideo, hasAudio });
-
-                            this.context.setters.setStreams((prev) =>
-                                prev.map((s) =>
-                                    s.id === "local"
-                                        ? {
-                                              ...s,
-                                              metadata: {
-                                                  ...s.metadata,
-                                                  video: hasVideo,
-                                                  audio: hasAudio,
-                                              },
-                                          }
-                                        : s
-                                )
-                            );
-                        } else {
-                            console.error("[MediaManager] Failed to publish tracks");
-                        }
-                    } catch (error) {
-                        console.error("[MediaManager] Error in publish/sync flow:", error);
-                    }
-                }, 1000);
-            }
+            // Notify TransportManager that media is ready
+            this.notifyMediaReady();
 
             return stream;
         } catch (error) {
@@ -121,6 +124,8 @@ export class MediaManager {
 
             toast.error("Failed to access camera/microphone");
             return emptyStream;
+        } finally {
+            this.isInitializing = false;
         }
     };
 

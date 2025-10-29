@@ -230,18 +230,11 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     };
 
     handleTransportConnected = (data: { transportId: string }) => {
-        this.transportManager.handleTransportConnected(data);
+        // this.transportManager.handleTransportConnected(data);
 
         // Process pending streams when receive transport is connected
         if (this.context.refs.recvTransportRef.current && this.context.refs.recvTransportRef.current.id === data.transportId) {
             this.streamManager.processPendingStreams();
-        }
-
-        // Also trigger auto-publish if we have media ready
-        if (this.context.refs.sendTransportRef.current && this.context.refs.sendTransportRef.current.id === data.transportId && this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0) {
-            setTimeout(async () => {
-                await this.producerManager.publishTracks();
-            }, 500);
         }
     };
 
@@ -514,7 +507,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
         // Consumer handlers
         socket.off("sfu:consumer-created", this.handleConsumerCreated);
-        socket.off("sfu:consumer-skipped", this.handleConsumerSkipped); 
+        socket.off("sfu:consumer-skipped", this.handleConsumerSkipped);
         socket.off("sfu:consumer-resumed", this.handleConsumerResumed);
         socket.off("sfu:consumer-removed", this.handleConsumerRemoved);
 

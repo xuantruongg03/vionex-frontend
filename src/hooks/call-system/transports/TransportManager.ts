@@ -21,6 +21,16 @@ export class TransportManager {
     setManagers(producerManager: any, mediaManager: any) {
         this.producerManager = producerManager;
         this.mediaManager = mediaManager;
+
+        // Set callback to try publishing when media is ready
+        // if (mediaManager?.setOnMediaReady) {
+        //     mediaManager.setOnMediaReady(() => {
+        //         console.log("[TransportManager] Media ready event received, trying to publish...");
+        //         queueMicrotask(async () => {
+        //             await this.tryPublishTracks("media-ready");
+        //         });
+        //     });
+        // }
     }
 
     /**
@@ -158,11 +168,6 @@ export class TransportManager {
 
         transport.on("produce", async (parameters, callback, errback) => {
             try {
-                console.log("[TransportManager] Producer event triggered:", {
-                    kind: parameters.kind,
-                    appData: parameters.appData,
-                    transportId: transport.id,
-                });
 
                 this.context.refs.socketRef.current?.emit("sfu:produce", {
                     transportId: transport.id,
@@ -175,8 +180,7 @@ export class TransportManager {
                 });
 
                 const handleProducerCreated = (data: any) => {
-                    console.log("[TransportManager] sfu:producer-created received:", data);
-                    
+
                     // Handle different response formats from server
                     const producerId = data.producerId || data.producer_id || data.id;
                     const streamId = data.streamId || data.stream_id;
@@ -192,13 +196,6 @@ export class TransportManager {
                         streamId: streamId,
                         kind: data.kind,
                         appData: data.appData,
-                    });
-
-                    console.log("[TransportManager] Producer registered:", {
-                        producerId,
-                        streamId,
-                        kind: data.kind,
-                        totalProducers: this.context.refs.producersRef.current.size,
                     });
 
                     this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
@@ -233,47 +230,86 @@ export class TransportManager {
             }
         });
 
-        // Initialize local media when send transport is ready
+        // Listen for connection state changes
         transport.on("connectionstatechange", (state) => {
             console.log("[TransportManager] Send transport state changed:", state);
-            
-            if (state === "connected") {
-                console.log("[TransportManager] Send transport CONNECTED!", {
-                    hasLocalStream: !!this.context.refs.localStreamRef.current,
-                    producersCount: this.context.refs.producersRef.current.size,
-                });
 
-                if (!this.context.refs.localStreamRef.current) {
-                    setTimeout(async () => {
-                        if (this.mediaManager) {
-                            console.log("[TransportManager] Initializing local media after transport connected");
-                            await this.mediaManager.initializeLocalMedia();
-                        }
-                    }, 1000);
-                } else if (this.context.refs.producersRef.current.size === 0) {
-                    setTimeout(async () => {
-                        if (this.producerManager) {
-                            console.log("[TransportManager] Publishing tracks after transport connected");
-                            await this.producerManager.publishTracks();
-                        }
-                    }, 500);
-                }
+            if (state === "connected") {
+                console.log("[TransportManager] Send transport fully connected!");
             } else if (state === "failed" || state === "disconnected") {
                 console.error("[TransportManager] Send transport state:", state);
             }
         });
 
-        // If local stream already exists and no producers yet, publish tracks
-        if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
-            queueMicrotask(async () => {
-                try {
-                    await this.producerManager?.publishTracks();
-                } catch (err) {
-                    console.error("[TransportManager] Failed to publish:", err);
-                }
-            });
-        }
+        // CRITICAL: Trigger initial publish attempt to start WebRTC connection
+        // This will trigger the 'produce' event which initiates DTLS handshake
+        queueMicrotask(async () => {
+            await this.tryPublishTracks("transport-setup");
+        });
     };
+
+    /**
+     * Try to publish tracks with retry logic
+     * This is designed to be idempotent and can be safely called multiple times
+     */
+    private async tryPublishTracks(source: string, maxRetries: number = 3): Promise<void> {
+        console.log(`[TransportManager] tryPublishTracks called from: ${source}`);
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Check all conditions (but NOT transport connected - that happens AFTER we publish)
+                const transportExists = !!this.context.refs.sendTransportRef.current;
+                const deviceLoaded = this.context.refs.deviceRef.current?.loaded;
+                const hasLocalStream = !!this.context.refs.localStreamRef.current;
+                const noProducers = this.context.refs.producersRef.current.size === 0;
+                const notPublishing = !this.context.refs.isPublishingRef.current;
+
+                const canPublish = transportExists && deviceLoaded && hasLocalStream && noProducers && notPublishing;
+
+                if (!canPublish) {
+                    console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Waiting for conditions...`, {
+                        transportExists,
+                        deviceLoaded,
+                        hasLocalStream,
+                        noProducers,
+                        notPublishing,
+                        source,
+                    });
+
+                    // Shorter wait time since we also have event-driven trigger
+                    if (attempt < maxRetries) {
+                        await new Promise((resolve) => setTimeout(resolve, 500));
+                        continue;
+                    } else {
+                        console.warn(`[TransportManager] Conditions not met after retries (source: ${source})`);
+                        return;
+                    }
+                }
+
+                // Try to publish - this will trigger WebRTC connection!
+                console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Publishing tracks (will trigger connection)...`);
+                await this.producerManager?.publishTracks();
+                console.log("[TransportManager] Tracks published successfully!");
+
+                // Sync metadata after successful publish
+                if (this.mediaManager?.syncMetadataWithTrackStates) {
+                    await this.mediaManager.syncMetadataWithTrackStates();
+                    console.log("[TransportManager] Metadata synced with track states");
+                }
+
+                return;
+            } catch (err) {
+                console.error(`[TransportManager] Attempt ${attempt}/${maxRetries} failed:`, err);
+
+                if (attempt < maxRetries) {
+                    console.log(`[TransportManager] Retrying in 500ms...`);
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                } else {
+                    console.error("[TransportManager] Failed to publish tracks after all retries");
+                }
+            }
+        }
+    }
 
     /**
      * Setup receive transport with event handlers
@@ -284,11 +320,9 @@ export class TransportManager {
         transport.on("connect", this.createTransportConnectionHandler(transport));
 
         transport.on("connectionstatechange", (state) => {
-            console.log("[TransportManager] Receive transport state changed:", state);
-            
+
             if (state === "connected") {
-                console.log("[TransportManager] Receive transport CONNECTED!");
-                
+
                 // Mark transport as ready
                 setTimeout(() => {
                     if (!this.context.refs.isInitializedRef.current) {
@@ -334,21 +368,10 @@ export class TransportManager {
     /**
      * Handle transport connection confirmation
      */
-    handleTransportConnected = (data: { transportId: string }) => {
-        // Check if this is our send transport and we have local media ready
-        if (this.context.refs.sendTransportRef.current && this.context.refs.sendTransportRef.current.id === data.transportId && this.context.refs.localStreamRef.current) {
-            // Transport is connected, we can now publish if we haven't already
-            setTimeout(async () => {
-                if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0) {
-                    if (this.producerManager) {
-                        await this.producerManager.publishTracks();
-                    } else {
-                        console.warn("[TransportManager] ProducerManager not set!");
-                    }
-                }
-            }, 500);
-        }
-    };
+    // handleTransportConnected = (data: { transportId: string }) => {
+    //     // Just log, no publishing here - let queueMicrotask handle it
+    //     console.log("[TransportManager] Transport connected confirmed:", data.transportId);
+    // };
 
     /**
      * Close and cleanup transports
