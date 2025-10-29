@@ -41,18 +41,27 @@ const Toaster = ({ ...props }: ToasterProps) => {
             <style>{`
                 [data-sonner-toast] {
                     display: flex !important;
+                    flex-direction: row !important;
                     align-items: center !important;
-                    gap: 0.5rem !important;
+                    gap: 0.75rem !important;
+                }
+                [data-sonner-toast] [data-icon] {
+                    order: 1 !important;
+                    flex-shrink: 0 !important;
                 }
                 [data-sonner-toast] [data-content] {
+                    order: 2 !important;
                     flex: 1 !important;
                 }
                 [data-sonner-toast] [data-close-button] {
+                    order: 3 !important;
                     position: relative !important;
-                    right: 0 !important;
-                    top: 0 !important;
+                    right: auto !important;
+                    top: auto !important;
+                    left: auto !important;
                     transform: none !important;
-                    margin-left: auto !important;
+                    margin: 0 !important;
+                    flex-shrink: 0 !important;
                 }
             `}</style>
             <Sonner
