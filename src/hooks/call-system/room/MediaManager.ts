@@ -12,6 +12,7 @@ export class MediaManager {
     private context: CallSystemContext;
     private producerManager: ProducerManager;
     private vadManager: any = null; // Will be set later
+    private isInitializing: boolean = false; // Guard flag for concurrent calls
 
     constructor(context: CallSystemContext, producerManager: ProducerManager) {
         this.context = context;
@@ -29,6 +30,30 @@ export class MediaManager {
      * Initialize local media stream
      */
     initializeLocalMedia = async (): Promise<MediaStream> => {
+        // Guard: If already initializing, wait for existing initialization
+        if (this.isInitializing) {
+            console.log("[MediaManager] Already initializing, waiting for existing call...");
+            
+            // Wait for existing initialization to complete (check every 100ms, max 5s)
+            for (let i = 0; i < 50; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                if (!this.isInitializing && this.context.refs.localStreamRef.current) {
+                    console.log("[MediaManager] Existing initialization completed, returning stream");
+                    return this.context.refs.localStreamRef.current;
+                }
+            }
+            
+            console.warn("[MediaManager] Initialization timeout, proceeding anyway");
+        }
+
+        // Guard: If already initialized, return existing stream
+        if (this.context.refs.localStreamRef.current) {
+            console.log("[MediaManager] Local media already initialized, returning existing stream");
+            return this.context.refs.localStreamRef.current;
+        }
+
+        this.isInitializing = true;
+        
         try {
             const stream = await mediaStreamService.initializeLocalMedia();
 
@@ -80,6 +105,8 @@ export class MediaManager {
 
             toast.error("Failed to access camera/microphone");
             return emptyStream;
+        } finally {
+            this.isInitializing = false;
         }
     };
 

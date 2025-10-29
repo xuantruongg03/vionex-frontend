@@ -53,6 +53,9 @@ export function useCallRefactored(roomId: string, password?: string) {
         isJoiningRef: useRef(false),
     };
 
+    // Guard flag to prevent multiple initializeLocalMedia calls
+    const mediaInitializedRef = useRef(false);
+
     // Setters - organize all state setters
     const setters: CallSystemSetters = {
         setStreams,
@@ -197,9 +200,16 @@ export function useCallRefactored(roomId: string, password?: string) {
 
     // Force initialize local media if not done after join
     useEffect(() => {
-        if (isJoined && !refs.localStreamRef.current) {
+        if (isJoined && !refs.localStreamRef.current && !mediaInitializedRef.current) {
+            mediaInitializedRef.current = true; // Set flag BEFORE async call
+            
             const timer = setTimeout(async () => {
-                await mediaManager.initializeLocalMedia();
+                try {
+                    await mediaManager.initializeLocalMedia();
+                } catch (error) {
+                    console.error("[useCallRefactored] Force initialize failed:", error);
+                    mediaInitializedRef.current = false; // Reset on error
+                }
             }, 3000);
 
             return () => clearTimeout(timer);
@@ -209,11 +219,14 @@ export function useCallRefactored(roomId: string, password?: string) {
     // Auto-initialize local media when hook is first loaded (like old logic)
     useEffect(() => {
         const autoInitializeMedia = async () => {
-            if (!refs.localStreamRef.current) {
+            if (!refs.localStreamRef.current && !mediaInitializedRef.current) {
+                mediaInitializedRef.current = true; // Set flag BEFORE async call
+                
                 try {
                     await mediaManager.initializeLocalMedia();
                 } catch (error) {
                     console.error("[useCallRefactored] Auto-initialize media failed:", error);
+                    mediaInitializedRef.current = false; // Reset on error to allow retry
                 }
             }
         };
