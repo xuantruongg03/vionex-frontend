@@ -158,11 +158,11 @@ export class TransportManager {
 
         transport.on("produce", async (parameters, callback, errback) => {
             try {
-                console.log("[TransportManager] Producer event triggered:", {
-                    kind: parameters.kind,
-                    appData: parameters.appData,
-                    transportId: transport.id,
-                });
+                // console.log("[TransportManager] Producer event triggered:", {
+                //     kind: parameters.kind,
+                //     appData: parameters.appData,
+                //     transportId: transport.id,
+                // });
 
                 this.context.refs.socketRef.current?.emit("sfu:produce", {
                     transportId: transport.id,
@@ -175,8 +175,8 @@ export class TransportManager {
                 });
 
                 const handleProducerCreated = (data: any) => {
-                    console.log("[TransportManager] sfu:producer-created received:", data);
-                    
+                    // console.log("[TransportManager] sfu:producer-created received:", data);
+
                     // Handle different response formats from server
                     const producerId = data.producerId || data.producer_id || data.id;
                     const streamId = data.streamId || data.stream_id;
@@ -194,12 +194,12 @@ export class TransportManager {
                         appData: data.appData,
                     });
 
-                    console.log("[TransportManager] Producer registered:", {
-                        producerId,
-                        streamId,
-                        kind: data.kind,
-                        totalProducers: this.context.refs.producersRef.current.size,
-                    });
+                    // console.log("[TransportManager] Producer registered:", {
+                    //     producerId,
+                    //     streamId,
+                    //     kind: data.kind,
+                    //     totalProducers: this.context.refs.producersRef.current.size,
+                    // });
 
                     this.context.refs.socketRef.current?.off("sfu:producer-created", handleProducerCreated);
                     this.context.refs.socketRef.current?.off("sfu:error", handleProduceError);
@@ -237,43 +237,74 @@ export class TransportManager {
         transport.on("connectionstatechange", (state) => {
             console.log("[TransportManager] Send transport state changed:", state);
             
-            if (state === "connected") {
-                console.log("[TransportManager] Send transport CONNECTED!", {
-                    hasLocalStream: !!this.context.refs.localStreamRef.current,
-                    producersCount: this.context.refs.producersRef.current.size,
-                });
-
-                if (!this.context.refs.localStreamRef.current) {
-                    setTimeout(async () => {
-                        if (this.mediaManager) {
-                            console.log("[TransportManager] Initializing local media after transport connected");
-                            await this.mediaManager.initializeLocalMedia();
-                        }
-                    }, 1000);
-                } else if (this.context.refs.producersRef.current.size === 0) {
-                    setTimeout(async () => {
-                        if (this.producerManager) {
-                            console.log("[TransportManager] Publishing tracks after transport connected");
-                            await this.producerManager.publishTracks();
-                        }
-                    }, 500);
-                }
-            } else if (state === "failed" || state === "disconnected") {
+            if (state === "failed" || state === "disconnected") {
                 console.error("[TransportManager] Send transport state:", state);
             }
         });
 
-        // If local stream already exists and no producers yet, publish tracks
+        // ONLY publish attempt: Use queueMicrotask with retry logic
         if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
             queueMicrotask(async () => {
-                try {
-                    await this.producerManager?.publishTracks();
-                } catch (err) {
-                    console.error("[TransportManager] Failed to publish:", err);
-                }
+                await this.publishTracksWithRetry();
             });
         }
     };
+
+    /**
+     * Publish tracks with retry logic
+     */
+    private async publishTracksWithRetry(maxRetries: number = 3, retryDelay: number = 1000): Promise<void> {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Check conditions
+                const canPublish = 
+                    this.context.refs.sendTransportRef.current?.connectionState === "connected" &&
+                    this.context.refs.deviceRef.current?.loaded &&
+                    this.context.refs.localStreamRef.current &&
+                    this.context.refs.producersRef.current.size === 0 &&
+                    !this.context.refs.isPublishingRef.current;
+
+                if (!canPublish) {
+                    console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Conditions not met yet, retrying...`, {
+                        transportState: this.context.refs.sendTransportRef.current?.connectionState,
+                        deviceLoaded: this.context.refs.deviceRef.current?.loaded,
+                        hasLocalStream: !!this.context.refs.localStreamRef.current,
+                        producersCount: this.context.refs.producersRef.current.size,
+                        isPublishing: this.context.refs.isPublishingRef.current,
+                    });
+                    
+                    // Wait before retry
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        continue;
+                    } else {
+                        console.error("[TransportManager] Failed to publish after all retries - conditions not met");
+                        return;
+                    }
+                }
+
+                // Try to publish
+                console.log(`[TransportManager] ✅ Attempt ${attempt}/${maxRetries} - Publishing tracks...`);
+                const success = await this.producerManager?.publishTracks();
+                
+                if (success) {
+                    console.log("[TransportManager] ✅ Tracks published successfully!");
+                    return;
+                } else {
+                    throw new Error("publishTracks returned false");
+                }
+            } catch (err) {
+                console.error(`[TransportManager] Attempt ${attempt}/${maxRetries} failed:`, err);
+                
+                if (attempt < maxRetries) {
+                    console.log(`[TransportManager] Retrying in ${retryDelay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                } else {
+                    console.error("[TransportManager] ❌ Failed to publish tracks after all retries");
+                }
+            }
+        }
+    }
 
     /**
      * Setup receive transport with event handlers
@@ -284,11 +315,11 @@ export class TransportManager {
         transport.on("connect", this.createTransportConnectionHandler(transport));
 
         transport.on("connectionstatechange", (state) => {
-            console.log("[TransportManager] Receive transport state changed:", state);
-            
+            // console.log("[TransportManager] Receive transport state changed:", state);
+
             if (state === "connected") {
-                console.log("[TransportManager] Receive transport CONNECTED!");
-                
+                // console.log("[TransportManager] Receive transport CONNECTED!");
+
                 // Mark transport as ready
                 setTimeout(() => {
                     if (!this.context.refs.isInitializedRef.current) {

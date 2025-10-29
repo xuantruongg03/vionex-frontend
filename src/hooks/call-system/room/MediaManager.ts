@@ -61,7 +61,7 @@ export class MediaManager {
                         const publishResult = await this.producerManager.publishTracks();
                         if (publishResult) {
                             console.log("[MediaManager] Tracks published successfully, syncing metadata...");
-                            
+
                             // FIXED: Sync metadata with actual track states after publishing
                             await this.syncMetadataWithTrackStates();
 
