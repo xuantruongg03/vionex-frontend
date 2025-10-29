@@ -233,72 +233,69 @@ export class TransportManager {
             }
         });
 
-        // Initialize local media when send transport is ready
+        // Listen for connection state changes and publish when ready
         transport.on("connectionstatechange", (state) => {
             console.log("[TransportManager] Send transport state changed:", state);
             
-            if (state === "failed" || state === "disconnected") {
+            if (state === "connected") {
+                // Transport is ready, try to publish
+                queueMicrotask(async () => {
+                    await this.tryPublishTracks("transport-connected");
+                });
+            } else if (state === "failed" || state === "disconnected") {
                 console.error("[TransportManager] Send transport state:", state);
             }
         });
-
-        // ONLY publish attempt: Use queueMicrotask with retry logic
-        if (this.context.refs.localStreamRef.current && this.context.refs.producersRef.current.size === 0 && this.producerManager) {
-            queueMicrotask(async () => {
-                await this.publishTracksWithRetry();
-            });
-        }
     };
 
     /**
-     * Publish tracks with retry logic
+     * Try to publish tracks with retry logic (event-driven)
      */
-    private async publishTracksWithRetry(maxRetries: number = 3, retryDelay: number = 1000): Promise<void> {
+    private async tryPublishTracks(source: string, maxRetries: number = 3): Promise<void> {
+        console.log(`[TransportManager] tryPublishTracks called from: ${source}`);
+        
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                // Check conditions
-                const canPublish = 
-                    this.context.refs.sendTransportRef.current?.connectionState === "connected" &&
-                    this.context.refs.deviceRef.current?.loaded &&
-                    this.context.refs.localStreamRef.current &&
-                    this.context.refs.producersRef.current.size === 0 &&
-                    !this.context.refs.isPublishingRef.current;
+                // Check all conditions
+                const transportConnected = this.context.refs.sendTransportRef.current?.connectionState === "connected";
+                const deviceLoaded = this.context.refs.deviceRef.current?.loaded;
+                const hasLocalStream = !!this.context.refs.localStreamRef.current;
+                const noProducers = this.context.refs.producersRef.current.size === 0;
+                const notPublishing = !this.context.refs.isPublishingRef.current;
+
+                const canPublish = transportConnected && deviceLoaded && hasLocalStream && noProducers && notPublishing;
 
                 if (!canPublish) {
-                    console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Conditions not met yet, retrying...`, {
-                        transportState: this.context.refs.sendTransportRef.current?.connectionState,
-                        deviceLoaded: this.context.refs.deviceRef.current?.loaded,
-                        hasLocalStream: !!this.context.refs.localStreamRef.current,
-                        producersCount: this.context.refs.producersRef.current.size,
-                        isPublishing: this.context.refs.isPublishingRef.current,
+                    console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Waiting for conditions...`, {
+                        transportConnected,
+                        deviceLoaded,
+                        hasLocalStream,
+                        noProducers,
+                        notPublishing,
                     });
                     
-                    // Wait before retry
+                    // Wait 500ms before retry
                     if (attempt < maxRetries) {
-                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         continue;
                     } else {
-                        console.error("[TransportManager] Failed to publish after all retries - conditions not met");
+                        console.warn("[TransportManager] Conditions not met after retries - will try again on next event");
                         return;
                     }
                 }
 
                 // Try to publish
                 console.log(`[TransportManager] ✅ Attempt ${attempt}/${maxRetries} - Publishing tracks...`);
-                const success = await this.producerManager?.publishTracks();
+                await this.producerManager?.publishTracks();
+                console.log("[TransportManager] ✅ Tracks published successfully!");
+                return;
                 
-                if (success) {
-                    console.log("[TransportManager] ✅ Tracks published successfully!");
-                    return;
-                } else {
-                    throw new Error("publishTracks returned false");
-                }
             } catch (err) {
                 console.error(`[TransportManager] Attempt ${attempt}/${maxRetries} failed:`, err);
                 
                 if (attempt < maxRetries) {
-                    console.log(`[TransportManager] Retrying in ${retryDelay}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    console.log(`[TransportManager] Retrying in 500ms...`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 } else {
                     console.error("[TransportManager] ❌ Failed to publish tracks after all retries");
                 }
