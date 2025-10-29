@@ -27,17 +27,17 @@ const Toaster = ({ ...props }: ToasterProps) => {
     return (
         <>
             {toastCount > 1 && (
-                <div className='fixed top-4 right-4 z-[100]'>
-                    <Button variant='secondary' size='sm' onClick={clearAllToasts} className='shadow-lg'>
-                        <X className='h-4 w-4 mr-1' />
+                <div className='fixed bottom-[calc(100vh-100vh+8rem)] right-4 z-[9999] w-[280px]'>
+                    <button onClick={clearAllToasts} className='w-full h-8 mb-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md shadow-md flex items-center justify-center text-xs font-medium transition-colors'>
+                        <X className='h-3 w-3 mr-1.5' />
                         Clear All ({toastCount})
-                    </Button>
+                    </button>
                 </div>
             )}
             <Sonner
                 theme={theme as ToasterProps["theme"]}
                 className='toaster group'
-                position='top-right'
+                position='bottom-right'
                 duration={5000}
                 visibleToasts={4}
                 toastOptions={{
