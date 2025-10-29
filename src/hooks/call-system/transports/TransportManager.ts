@@ -288,6 +288,13 @@ export class TransportManager {
                 console.log(`[TransportManager] ✅ Attempt ${attempt}/${maxRetries} - Publishing tracks...`);
                 await this.producerManager?.publishTracks();
                 console.log("[TransportManager] ✅ Tracks published successfully!");
+                
+                // Sync metadata after successful publish
+                if (this.mediaManager?.syncMetadataWithTrackStates) {
+                    await this.mediaManager.syncMetadataWithTrackStates();
+                    console.log("[TransportManager] ✅ Metadata synced with track states");
+                }
+                
                 return;
                 
             } catch (err) {

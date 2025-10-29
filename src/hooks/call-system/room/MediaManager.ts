@@ -54,49 +54,8 @@ export class MediaManager {
                 ...prev.filter((s) => s.id !== "local"),
             ]);
 
-            // Publish tracks if transports are ready - only if we don't have producers yet
-            if (this.context.refs.sendTransportRef.current && this.context.refs.producersRef.current.size === 0) {
-                setTimeout(async () => {
-                    try {
-                        const publishResult = await this.producerManager.publishTracks();
-                        if (publishResult) {
-                            console.log("[MediaManager] Tracks published successfully, syncing metadata...");
-
-                            // FIXED: Sync metadata with actual track states after publishing
-                            await this.syncMetadataWithTrackStates();
-
-                            // Update local UI based on actual producer states
-                            const producers = Array.from(this.context.refs.producersRef.current.values());
-                            const videoProducer = producers.find((p) => p.kind === "video" && !p.appData?.isScreenShare);
-                            const audioProducer = producers.find((p) => p.kind === "audio" && !p.appData?.isScreenShare);
-
-                            const hasVideo = videoProducer?.producer && !videoProducer.producer.closed && !videoProducer.producer.paused;
-                            const hasAudio = audioProducer?.producer && !audioProducer.producer.closed && !audioProducer.producer.paused;
-
-                            console.log("[MediaManager] Producer states:", { hasVideo, hasAudio });
-
-                            this.context.setters.setStreams((prev) =>
-                                prev.map((s) =>
-                                    s.id === "local"
-                                        ? {
-                                              ...s,
-                                              metadata: {
-                                                  ...s.metadata,
-                                                  video: hasVideo,
-                                                  audio: hasAudio,
-                                              },
-                                          }
-                                        : s
-                                )
-                            );
-                        } else {
-                            console.error("[MediaManager] Failed to publish tracks");
-                        }
-                    } catch (error) {
-                        console.error("[MediaManager] Error in publish/sync flow:", error);
-                    }
-                }, 1000);
-            }
+            // Don't publish here - let TransportManager handle publishing when transport is connected
+            console.log("[MediaManager] Local media initialized, waiting for TransportManager to publish...");
 
             return stream;
         } catch (error) {
