@@ -21,6 +21,16 @@ export class TransportManager {
     setManagers(producerManager: any, mediaManager: any) {
         this.producerManager = producerManager;
         this.mediaManager = mediaManager;
+        
+        // Set callback to try publishing when media is ready
+        if (mediaManager?.setOnMediaReady) {
+            mediaManager.setOnMediaReady(() => {
+                console.log("[TransportManager] Media ready event received, trying to publish...");
+                queueMicrotask(async () => {
+                    await this.tryPublishTracks("media-ready");
+                });
+            });
+        }
     }
 
     /**
@@ -255,7 +265,7 @@ export class TransportManager {
      * Try to publish tracks with retry logic
      * This is designed to be idempotent and can be safely called multiple times
      */
-    private async tryPublishTracks(source: string, maxRetries: number = 5): Promise<void> {
+    private async tryPublishTracks(source: string, maxRetries: number = 3): Promise<void> {
         console.log(`[TransportManager] tryPublishTracks called from: ${source}`);
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -276,14 +286,15 @@ export class TransportManager {
                         hasLocalStream,
                         noProducers,
                         notPublishing,
+                        source,
                     });
                     
-                    // Wait 800ms before retry (give time for local media to initialize)
+                    // Shorter wait time since we also have event-driven trigger
                     if (attempt < maxRetries) {
-                        await new Promise(resolve => setTimeout(resolve, 800));
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         continue;
                     } else {
-                        console.warn("[TransportManager] Conditions not met after retries");
+                        console.warn(`[TransportManager] Conditions not met after retries (source: ${source})`);
                         return;
                     }
                 }

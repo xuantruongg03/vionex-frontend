@@ -13,6 +13,7 @@ export class MediaManager {
     private producerManager: ProducerManager;
     private vadManager: any = null; // Will be set later
     private isInitializing: boolean = false; // Guard flag for concurrent calls
+    private onMediaReadyCallback?: () => void; // Callback when media is ready
 
     constructor(context: CallSystemContext, producerManager: ProducerManager) {
         this.context = context;
@@ -24,6 +25,24 @@ export class MediaManager {
      */
     setVADManager(vadManager: any): void {
         this.vadManager = vadManager;
+    }
+
+    /**
+     * Set callback to be called when media is ready
+     */
+    setOnMediaReady(callback: () => void): void {
+        this.onMediaReadyCallback = callback;
+    }
+
+    /**
+     * Notify that media is ready
+     */
+    private notifyMediaReady(): void {
+        if (this.onMediaReadyCallback) {
+            queueMicrotask(() => {
+                this.onMediaReadyCallback?.();
+            });
+        }
     }
 
     /**
@@ -81,6 +100,9 @@ export class MediaManager {
 
             // Don't publish here - let TransportManager handle publishing when transport is connected
             console.log("[MediaManager] Local media initialized, waiting for TransportManager to publish...");
+
+            // Notify TransportManager that media is ready
+            this.notifyMediaReady();
 
             return stream;
         } catch (error) {
