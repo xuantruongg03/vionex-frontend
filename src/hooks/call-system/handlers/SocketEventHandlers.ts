@@ -186,8 +186,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
     // FIX: Handle consumer-skipped event to prevent timeout
     // This is emitted when stream is not in priority list (e.g., user not in top N)
     handleConsumerSkipped = (data: { streamId: string; message?: string }) => {
-        console.log(`[SocketEventHandlers] ⏭️  Consumer skipped for stream ${data.streamId}: ${data.message || "not in priority"}`);
-
         // Remove from consuming tracking since we won't get a consumer for this stream
         this.streamManager.removeFromConsuming(data.streamId);
     };
