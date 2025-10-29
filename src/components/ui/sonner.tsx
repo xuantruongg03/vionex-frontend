@@ -22,8 +22,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
         // Add click listener to close buttons to dismiss all when multiple toasts
         const handleCloseClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
-            const closeButton = target.closest('[data-close-button]');
-            
+            const closeButton = target.closest("[data-close-button]");
+
             if (closeButton && toastCount > 1) {
                 // Small delay to allow the animation to start
                 setTimeout(() => {
@@ -32,29 +32,48 @@ const Toaster = ({ ...props }: ToasterProps) => {
             }
         };
 
-        document.addEventListener('click', handleCloseClick, true);
-        return () => document.removeEventListener('click', handleCloseClick, true);
+        document.addEventListener("click", handleCloseClick, true);
+        return () => document.removeEventListener("click", handleCloseClick, true);
     }, [toastCount]);
 
     return (
-        <Sonner
-            theme={theme as ToasterProps["theme"]}
-            className='toaster group'
-            position='bottom-right'
-            duration={5000}
-            visibleToasts={4}
-            toastOptions={{
-                classNames: {
-                    toast: "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-                    description: "group-[.toast]:text-muted-foreground",
-                    actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-                    cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
-                    closeButton: "group-[.toast]:hover:bg-muted",
-                },
-            }}
-            {...props}
-            closeButton={true}
-        />
+        <>
+            <style>{`
+                [data-sonner-toast] {
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 0.5rem !important;
+                }
+                [data-sonner-toast] [data-content] {
+                    flex: 1 !important;
+                }
+                [data-sonner-toast] [data-close-button] {
+                    position: relative !important;
+                    right: 0 !important;
+                    top: 0 !important;
+                    transform: none !important;
+                    margin-left: auto !important;
+                }
+            `}</style>
+            <Sonner
+                theme={theme as ToasterProps["theme"]}
+                className='toaster group'
+                position='bottom-right'
+                duration={5000}
+                visibleToasts={4}
+                toastOptions={{
+                    classNames: {
+                        toast: "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
+                        description: "group-[.toast]:text-muted-foreground",
+                        actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+                        cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+                        closeButton: "group-[.toast]:hover:bg-muted",
+                    },
+                }}
+                {...props}
+                closeButton={true}
+            />
+        </>
     );
 };
 
