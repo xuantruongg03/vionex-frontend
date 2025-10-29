@@ -9,12 +9,21 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
 const Toaster = ({ ...props }: ToasterProps) => {
     const { theme = "system" } = useTheme();
     const [toastCount, setToastCount] = useState(0);
+    const [buttonPosition, setButtonPosition] = useState({ bottom: 0 });
 
     useEffect(() => {
-        // Listen for toast changes
+        // Listen for toast changes and position
         const interval = setInterval(() => {
             const toasts = document.querySelectorAll("[data-sonner-toast]");
             setToastCount(toasts.length);
+
+            // Get the top-most toast position
+            if (toasts.length > 0) {
+                const firstToast = toasts[0] as HTMLElement;
+                const rect = firstToast.getBoundingClientRect();
+                const bottomOffset = window.innerHeight - rect.top;
+                setButtonPosition({ bottom: bottomOffset + 8 }); // 8px gap
+            }
         }, 100);
 
         return () => clearInterval(interval);
@@ -27,7 +36,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     return (
         <>
             {toastCount > 1 && (
-                <div className='fixed bottom-[calc(100vh-100vh+8rem)] right-4 z-[9999] w-[280px]'>
+                <div className='fixed right-4 z-[9999] w-[280px] transition-all duration-200' style={{ bottom: `${buttonPosition.bottom}px` }}>
                     <button onClick={clearAllToasts} className='w-full h-8 mb-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-md shadow-md flex items-center justify-center text-xs font-medium transition-colors'>
                         <X className='h-3 w-3 mr-1.5' />
                         Clear All ({toastCount})
