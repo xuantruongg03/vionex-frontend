@@ -156,47 +156,48 @@ export function useCallRefactored(roomId: string, password?: string) {
             streamManager.processPendingStreams();
         }
     }, [refs.recvTransportRef.current?.id, refs.socketRef.current?.connected, isJoined]);
-    useEffect(() => {
-        const checkPendingStreams = () => {
-            const pendingCount = refs.pendingStreamsRef.current.length;
-            if (pendingCount > 0 && refs.recvTransportRef.current && refs.socketRef.current) {
-                const pendingStreams = [...refs.pendingStreamsRef.current];
-                for (const streamData of pendingStreams) {
-                    // Validate streamId
-                    if (!streamData.streamId || streamData.streamId === "undefined" || typeof streamData.streamId !== "string") {
-                        continue;
-                    }
 
-                    // Skip presence streams
-                    if (streamData.metadata?.type === "presence") {
-                        continue;
-                    }
+    // useEffect(() => {
+    //     const checkPendingStreams = () => {
+    //         const pendingCount = refs.pendingStreamsRef.current.length;
+    //         if (pendingCount > 0 && refs.recvTransportRef.current && refs.socketRef.current) {
+    //             const pendingStreams = [...refs.pendingStreamsRef.current];
+    //             for (const streamData of pendingStreams) {
+    //                 // Validate streamId
+    //                 if (!streamData.streamId || streamData.streamId === "undefined" || typeof streamData.streamId !== "string") {
+    //                     continue;
+    //                 }
 
-                    if (!streamManager.isStreamBeingConsumed(streamData.streamId)) {
-                        try {
-                            streamManager.markStreamAsConsuming(streamData.streamId);
-                            refs.socketRef.current?.emit("sfu:consume", {
-                                streamId: streamData.streamId,
-                                transportId: refs.recvTransportRef.current!.id,
-                            });
+    //                 // Skip presence streams
+    //                 if (streamData.metadata?.type === "presence") {
+    //                     continue;
+    //                 }
 
-                            // Remove from pending after attempting
-                            const index = refs.pendingStreamsRef.current.findIndex((p) => p.streamId === streamData.streamId);
-                            if (index >= 0) {
-                                refs.pendingStreamsRef.current.splice(index, 1);
-                            }
-                        } catch (error) {
-                            console.error(`Periodic consume failed for ${streamData.streamId}:`, error);
-                            streamManager.removeFromConsuming(streamData.streamId);
-                        }
-                    }
-                }
-            }
-        };
+    //                 if (!streamManager.isStreamBeingConsumed(streamData.streamId)) {
+    //                     try {
+    //                         streamManager.markStreamAsConsuming(streamData.streamId);
+    //                         refs.socketRef.current?.emit("sfu:consume", {
+    //                             streamId: streamData.streamId,
+    //                             transportId: refs.recvTransportRef.current!.id,
+    //                         });
 
-        // const interval = setInterval(checkPendingStreams, 2000);
-        // return () => clearInterval(interval);
-    }, []);
+    //                         // Remove from pending after attempting
+    //                         const index = refs.pendingStreamsRef.current.findIndex((p) => p.streamId === streamData.streamId);
+    //                         if (index >= 0) {
+    //                             refs.pendingStreamsRef.current.splice(index, 1);
+    //                         }
+    //                     } catch (error) {
+    //                         console.error(`Periodic consume failed for ${streamData.streamId}:`, error);
+    //                         streamManager.removeFromConsuming(streamData.streamId);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     };
+
+    //     // const interval = setInterval(checkPendingStreams, 2000);
+    //     // return () => clearInterval(interval);
+    // }, []);
 
     // Force initialize local media if not done after join
     useEffect(() => {

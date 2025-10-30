@@ -57,7 +57,7 @@ export class MediaManager {
             for (let i = 0; i < 50; i++) {
                 await new Promise((resolve) => setTimeout(resolve, 100));
                 if (!this.isInitializing && this.context.refs.localStreamRef.current) {
-                    console.log("[MediaManager] Existing initialization completed, returning stream");
+                    // console.log("[MediaManager] Existing initialization completed, returning stream");
                     return this.context.refs.localStreamRef.current;
                 }
             }
