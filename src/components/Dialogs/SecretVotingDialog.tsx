@@ -551,7 +551,7 @@ export const SecretVotingDialog = ({ isOpen, onClose, roomId }: SecretVotingDial
                             ) : (
                                 <motion.div className='space-y-2' variants={staggerContainer}>
                                     {activeVote.options.map((option) => (
-                                        <motion.div key={option.id} className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors ${selectedOption === option.id ? "border-blue-500 bg-blue-50" : ""}`} onClick={() => setSelectedOption(option.id)} variants={listItem} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                                        <motion.div key={option.id} className={`p-3 border rounded-md cursor-pointer dark:hover:text-blue-500 hover:bg-gray-50 transition-colors ${selectedOption === option.id ? "border-blue-500 bg-blue-50" : ""}`} onClick={() => setSelectedOption(option.id)} variants={listItem} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                                             {option.text}
                                             {selectedOption === option.id && (
                                                 <motion.span
