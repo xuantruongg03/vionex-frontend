@@ -232,7 +232,7 @@ export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo
     const otherPrimaryControls = primaryControls.filter((btn) => btn.key !== "leave");
 
     return (
-        <div className='absolute bottom-6 right-6 bg-white p-3 md:p-3.5 rounded-full shadow-xl z-50 dark:bg-gray-900 dark:border dark:border-gray-700 transition-all duration-300'>
+        <div className='absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white p-3 md:p-3.5 rounded-full shadow-xl z-50 dark:bg-gray-900 dark:border dark:border-gray-700 transition-all duration-300'>
             <div ref={scrollContainerRef} className='flex items-center justify-between gap-1 overflow-x-auto snap-x snap-mandatory no-scrollbar'>
                 {/* Left side: Primary controls except Leave Room */}
                 <div className='flex items-center gap-2 md:gap-3'>

@@ -60,7 +60,8 @@ export class VADManager {
             // VAD events
             const vadEvents = {
                 onSpeechStart: () => {
-                    console.log("[VADManager] Speech started");
+                    console.log("[VADManager] ===== SPEECH START DETECTED =====");
+                    console.log("[VADManager] Timestamp:", new Date().toISOString());
                     
                     // Check microphone state
                     const micEnabled = this.isMicrophoneEnabled();
@@ -68,10 +69,22 @@ export class VADManager {
                         enabled: micEnabled,
                         localStream: !!this.context.refs.localStreamRef.current,
                         audioTracks: this.context.refs.localStreamRef.current?.getAudioTracks().length || 0,
+                        audioTrackEnabled: this.context.refs.localStreamRef.current?.getAudioTracks()[0]?.enabled,
+                    });
+                    
+                    // Check socket state
+                    const socket = this.context.refs.socketRef.current;
+                    console.log("[VADManager] Socket state:", {
+                        hasSocket: !!socket,
+                        socketId: socket?.id,
+                        isConnected: socket?.connected,
+                        roomId: this.context.roomId,
+                        username: this.context.room.username,
                     });
                     
                     // Only set speaking to true if microphone is enabled
                     if (micEnabled) {
+                        console.log("[VADManager] ✓ Microphone enabled - proceeding with speech start");
                         console.log("[VADManager] Setting isSpeaking to true");
                         this.context.setters.setIsSpeaking(true);
                         
@@ -81,14 +94,18 @@ export class VADManager {
                         console.log("[VADManager] Starting periodic sending");
                         this.startPeriodicSending();
                     } else {
-                        console.log("[VADManager] Mic disabled, ignoring speech start");
+                        console.warn("[VADManager] ✗ Mic disabled, ignoring speech start");
                     }
+                    console.log("[VADManager] ===== SPEECH START PROCESSING COMPLETE =====");
                 },
 
                 onSpeechEnd: (audioBuffer: Uint8Array, duration: number) => {
+                    console.log("[VADManager] ===== SPEECH END DETECTED =====");
                     console.log(
                         `[VADManager] Speech ended - Duration: ${duration}ms, Buffer: ${audioBuffer.length} bytes`
                     );
+                    console.log("[VADManager] Timestamp:", new Date().toISOString());
+                    
                     this.context.setters.setIsSpeaking(false);
 
                     // Store recording for debugging
@@ -98,9 +115,16 @@ export class VADManager {
                     this.stopPeriodicSending();
                     
                     // Only send to server if mic was enabled during recording
-                    if (this.isMicrophoneEnabled()) {
+                    const micEnabled = this.isMicrophoneEnabled();
+                    console.log("[VADManager] Microphone state on speech end:", micEnabled);
+                    
+                    if (micEnabled) {
+                        console.log("[VADManager] ✓ Mic enabled - sending final audio buffer");
                         this.handleSpeechEnd(audioBuffer, duration);
+                    } else {
+                        console.warn("[VADManager] ✗ Mic disabled - not sending audio buffer");
                     }
+                    console.log("[VADManager] ===== SPEECH END PROCESSING COMPLETE =====");
                 },
 
                 // Placeholder for future periodic chunk support
@@ -164,8 +188,13 @@ export class VADManager {
      * Start VAD listening based on microphone state
      */
     startListening(): void {
+        console.log("[VADManager] ===== START LISTENING CALLED =====");
+        
         if (!this.vadInstance || !this.isInitialized) {
-            console.warn("[VADManager] VAD not initialized");
+            console.warn("[VADManager] ✗ VAD not initialized", {
+                hasVadInstance: !!this.vadInstance,
+                isInitialized: this.isInitialized,
+            });
             return;
         }
 
@@ -173,13 +202,22 @@ export class VADManager {
         const localStream = this.context.refs.localStreamRef.current;
         const microphoneEnabled = this.isMicrophoneEnabled();
 
+        console.log("[VADManager] Microphone check:", {
+            hasLocalStream: !!localStream,
+            microphoneEnabled,
+            audioTracks: localStream?.getAudioTracks().length || 0,
+            audioTrackEnabled: localStream?.getAudioTracks()[0]?.enabled,
+        });
+
         if (!this.isMicrophoneEnabled()) {
-            console.log("[VADManager] Microphone disabled, not starting VAD");
+            console.log("[VADManager] ✗ Microphone disabled, not starting VAD");
             return;
         }
 
+        console.log("[VADManager] ✓ Starting VAD listening");
         this.vadInstance.setMicrophoneEnabled(true);
         this.vadInstance.startListening();
+        console.log("[VADManager] ✓ VAD listening started successfully");
     }
 
     /**
@@ -195,6 +233,13 @@ export class VADManager {
      * Update microphone state for VAD
      */
     updateMicrophoneState(enabled: boolean): void {
+        console.log("[VADManager] ===== UPDATE MICROPHONE STATE =====", {
+            enabled,
+            hasVadInstance: !!this.vadInstance,
+            currentListeningState: this.vadInstance?.getState().isListening,
+            currentRecordingState: this.vadInstance?.getState().isRecording,
+        });
+        
         if (this.vadInstance) {
             // Update VAD's internal microphone state
             this.vadInstance.setMicrophoneEnabled(enabled);
@@ -202,8 +247,10 @@ export class VADManager {
             // If microphone is disabled, stop listening entirely
             // If enabled, start listening again
             if (enabled) {
+                console.log("[VADManager] ✓ Microphone enabled - starting VAD listening");
                 this.vadInstance.startListening();
             } else {
+                console.log("[VADManager] ✗ Microphone disabled - stopping VAD listening");
                 this.vadInstance.stopListening();
                 // Also stop any periodic sending
                 this.stopPeriodicSending();
@@ -211,6 +258,8 @@ export class VADManager {
                 this.context.setters.setIsSpeaking(false);
             }
         }
+        
+        console.log("[VADManager] Microphone state updated successfully");
     }
 
     /**
