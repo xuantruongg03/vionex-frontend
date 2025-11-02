@@ -23,14 +23,14 @@ export class TransportManager {
         this.mediaManager = mediaManager;
 
         // Set callback to try publishing when media is ready
-        // if (mediaManager?.setOnMediaReady) {
-        //     mediaManager.setOnMediaReady(() => {
-        //         console.log("[TransportManager] Media ready event received, trying to publish...");
-        //         queueMicrotask(async () => {
-        //             await this.tryPublishTracks("media-ready");
-        //         });
-        //     });
-        // }
+        if (mediaManager?.setOnMediaReady) {
+            mediaManager.setOnMediaReady(() => {
+                console.log("[TransportManager] Media ready event received, trying to publish...");
+                queueMicrotask(async () => {
+                    await this.tryPublishTracks("media-ready");
+                });
+            });
+        }
     }
 
     /**
