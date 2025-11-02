@@ -61,10 +61,24 @@ export class VADManager {
             const vadEvents = {
                 onSpeechStart: () => {
                     console.log("[VADManager] Speech started");
+                    
+                    // Check microphone state
+                    const micEnabled = this.isMicrophoneEnabled();
+                    console.log("[VADManager] Microphone state:", {
+                        enabled: micEnabled,
+                        localStream: !!this.context.refs.localStreamRef.current,
+                        audioTracks: this.context.refs.localStreamRef.current?.getAudioTracks().length || 0,
+                    });
+                    
                     // Only set speaking to true if microphone is enabled
-                    if (this.isMicrophoneEnabled()) {
+                    if (micEnabled) {
+                        console.log("[VADManager] Setting isSpeaking to true");
                         this.context.setters.setIsSpeaking(true);
+                        
+                        console.log("[VADManager] Calling handleSpeechStart");
                         this.handleSpeechStart();
+                        
+                        console.log("[VADManager] Starting periodic sending");
                         this.startPeriodicSending();
                     } else {
                         console.log("[VADManager] Mic disabled, ignoring speech start");
@@ -255,10 +269,29 @@ export class VADManager {
         const socket = this.context.refs.socketRef.current;
         const { roomId, room } = this.context;
 
+        console.log("[VADManager] handleSpeechStart called", {
+            hasSocket: !!socket,
+            isConnected: socket?.connected,
+            roomId,
+            peerId: room.username,
+        });
+
         if (socket && socket.connected) {
+            console.log("[VADManager] Emitting sfu:my-speaking event", {
+                roomId,
+                peerId: room.username,
+            });
+            
             socket.emit("sfu:my-speaking", {
                 roomId,
                 peerId: room.username,
+            });
+            
+            console.log("[VADManager] sfu:my-speaking event emitted successfully");
+        } else {
+            console.warn("[VADManager] Cannot emit sfu:my-speaking - socket not available or not connected", {
+                hasSocket: !!socket,
+                isConnected: socket?.connected,
             });
         }
     }
@@ -345,10 +378,17 @@ export class VADManager {
 
         // Only send stop speaking signal for final chunks
         if (isFinal) {
+            console.log("[VADManager] Emitting sfu:my-stop-speaking event", {
+                roomId,
+                peerId: room.username,
+            });
+            
             socket.emit("sfu:my-stop-speaking", {
                 roomId,
                 peerId: room.username,
             });
+            
+            console.log("[VADManager] sfu:my-stop-speaking event emitted successfully");
         }
     }
 

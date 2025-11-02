@@ -335,19 +335,41 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
 
     // ENHANCED: Speaking activity handlers for visual indicators
     handleUserSpeaking = (data: { peerId: string }) => {
+        console.log("[SocketEventHandlers] Received sfu:user-speaking event", {
+            peerId: data.peerId,
+            currentUser: this.context.room.username,
+            timestamp: new Date().toISOString(),
+        });
+        
         // Add user to speaking peers set for visual indicators
         this.context.setters.setSpeakingPeers((prev) => {
             const newSet = new Set(prev);
             newSet.add(data.peerId);
+            console.log("[SocketEventHandlers] Updated speaking peers", {
+                previousSize: prev.size,
+                newSize: newSet.size,
+                speakingPeers: Array.from(newSet),
+            });
             return newSet;
         });
     };
 
     handleUserStoppedSpeaking = (data: { peerId: string }) => {
+        console.log("[SocketEventHandlers] Received sfu:user-stopped-speaking event", {
+            peerId: data.peerId,
+            currentUser: this.context.room.username,
+            timestamp: new Date().toISOString(),
+        });
+        
         // Remove user from speaking peers set
         this.context.setters.setSpeakingPeers((prev) => {
             const newSet = new Set(prev);
             newSet.delete(data.peerId);
+            console.log("[SocketEventHandlers] Updated speaking peers after stop", {
+                previousSize: prev.size,
+                newSize: newSet.size,
+                speakingPeers: Array.from(newSet),
+            });
             return newSet;
         });
     };
@@ -470,6 +492,12 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // ENHANCED: Speaking activity handlers for visual indicators
         socket.on("sfu:user-speaking", this.handleUserSpeaking);
         socket.on("sfu:user-stopped-speaking", this.handleUserStoppedSpeaking);
+        
+        console.log("[SocketEventHandlers] Speaking event handlers registered", {
+            socketId: socket.id,
+            roomId: this.context.roomId,
+            username: this.context.room.username,
+        });
 
         // Screen share handlers
         socket.on("sfu:screen-share-started", this.handleScreenShareStarted);
