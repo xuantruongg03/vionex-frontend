@@ -340,7 +340,6 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             currentUser: this.context.room.username,
             timestamp: new Date().toISOString(),
         });
-        
         // Add user to speaking peers set for visual indicators
         this.context.setters.setSpeakingPeers((prev) => {
             const newSet = new Set(prev);
@@ -360,7 +359,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
             currentUser: this.context.room.username,
             timestamp: new Date().toISOString(),
         });
-        
+
         // Remove user from speaking peers set
         this.context.setters.setSpeakingPeers((prev) => {
             const newSet = new Set(prev);
@@ -492,7 +491,7 @@ export class SocketEventHandlerManager implements SocketEventHandlers {
         // ENHANCED: Speaking activity handlers for visual indicators
         socket.on("sfu:user-speaking", this.handleUserSpeaking);
         socket.on("sfu:user-stopped-speaking", this.handleUserStoppedSpeaking);
-        
+
         console.log("[SocketEventHandlers] Speaking event handlers registered", {
             socketId: socket.id,
             roomId: this.context.roomId,

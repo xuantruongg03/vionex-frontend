@@ -373,7 +373,6 @@ export class MediaManager {
                         console.error("[MediaManager] Failed to initialize VAD:", error);
                     }
                 }
-                
                 this.vadManager.updateMicrophoneState(enabled);
                 console.log(`[MediaManager] VAD microphone updated immediately: ${enabled ? "enabled" : "disabled"}`);
             }
