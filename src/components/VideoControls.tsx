@@ -34,7 +34,7 @@ interface VideoControlsProps {
 export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo, onToggleChat, onToggleWhiteboard, onToggleScreenShare, onToggleLockRoom, onToggleNetworkMonitor, onToggleVoting, onToggleQuiz, onToggleRecording, onLeaveRoom, onToggleBehaviorMonitoring, onToggleTranslationCabin, onToggleLayout, onToggleRaiseHand, isScreenSharing, isRecording, isProcessing, isCreator = false, isMonitorActive = false, isHandRaised = false }: VideoControlsProps) => {
     const room = useSelector((state: any) => state.room);
     const unreadMessageCount = useSelector((state: any) => state.chat.unreadCount);
-    
+
     const isMobile = useIsMobile();
     const [showControls, setShowControls] = useState(true);
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -42,7 +42,7 @@ export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo
 
     if (!showControls) {
         return (
-            <Button variant='outline' size='icon' onClick={() => setShowControls(true)} className='absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-xl z-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 h-10 w-10'>
+            <Button variant='outline' size='icon' onClick={() => setShowControls(true)} className='absolute bottom-6 right-6 bg-white rounded-full shadow-xl z-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 h-10 w-10'>
                 <div className='flex items-center justify-center w-5 h-5'>
                     <Icon.ChevronUp className='dark:text-gray-300' />
                 </div>
@@ -232,7 +232,7 @@ export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo
     const otherPrimaryControls = primaryControls.filter((btn) => btn.key !== "leave");
 
     return (
-        <div className='absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white p-3 md:p-3.5 rounded-full shadow-xl z-50 dark:bg-gray-900 dark:border dark:border-gray-700 transition-all duration-300'>
+        <div className='absolute bottom-6 right-6 bg-white p-3 md:p-3.5 rounded-full shadow-xl z-50 dark:bg-gray-900 dark:border dark:border-gray-700 transition-all duration-300'>
             <div ref={scrollContainerRef} className='flex items-center justify-between gap-1 overflow-x-auto snap-x snap-mandatory no-scrollbar'>
                 {/* Left side: Primary controls except Leave Room */}
                 <div className='flex items-center gap-2 md:gap-3'>
