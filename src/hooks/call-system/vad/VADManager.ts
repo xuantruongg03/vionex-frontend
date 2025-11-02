@@ -44,8 +44,15 @@ export class VADManager {
      * Initialize VAD with current local stream
      */
     async initialize(): Promise<void> {
+        console.log("[VADManager] ===== INITIALIZE VAD =====");
+        
         try {
             const localStream = this.context.refs.localStreamRef.current;
+
+            console.log("[VADManager] Checking preconditions:", {
+                hasLocalStream: !!localStream,
+                audioTracks: localStream?.getAudioTracks().length || 0,
+            });
 
             if (!localStream) {
                 throw new Error("No local audio stream available for VAD");
@@ -56,6 +63,12 @@ export class VADManager {
             if (audioTracks.length === 0) {
                 throw new Error("Local stream has no audio tracks");
             }
+
+            console.log("[VADManager] Audio tracks info:", {
+                count: audioTracks.length,
+                enabled: audioTracks.map(t => t.enabled),
+                labels: audioTracks.map(t => t.label),
+            });
 
             // VAD events
             const vadEvents = {
@@ -169,13 +182,25 @@ export class VADManager {
             await this.vadInstance.initialize(streamForVAD);
 
             this.isInitialized = true;
-            console.log("[VADManager] VAD initialized successfully");
+            console.log("[VADManager] ✓✓✓ VAD initialized successfully ✓✓✓");
 
             // Auto-start listening if microphone is enabled
-            if (this.isMicrophoneEnabled()) {
+            const micEnabled = this.isMicrophoneEnabled();
+            console.log("[VADManager] Checking if should auto-start listening:", {
+                micEnabled,
+                willAutoStart: micEnabled,
+            });
+            
+            if (micEnabled) {
+                console.log("[VADManager] Auto-starting VAD listening...");
                 this.startListening();
+            } else {
+                console.log("[VADManager] Microphone disabled, not auto-starting");
             }
+            
+            console.log("[VADManager] ===== INITIALIZE COMPLETE =====");
         } catch (error) {
+            console.error("[VADManager] ===== INITIALIZE FAILED =====");
             console.error("[VADManager] Failed to initialize VAD:", error);
             this.context.setters.setError(
                 `Failed to initialize voice detection: ${error.message}`
