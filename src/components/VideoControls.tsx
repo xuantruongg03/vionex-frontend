@@ -42,7 +42,7 @@ export const VideoControls = ({ isMuted, isVideoOff, onToggleMute, onToggleVideo
 
     if (!showControls) {
         return (
-            <Button variant='outline' size='icon' onClick={() => setShowControls(true)} className='absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-xl z-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 h-10 w-10'>
+            <Button variant='outline' size='icon' onClick={() => setShowControls(true)} className='absolute bottom-6 right-6 bg-white rounded-full shadow-xl z-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border dark:border-gray-600 h-10 w-10'>
                 <div className='flex items-center justify-center w-5 h-5'>
                     <Icon.ChevronUp className='dark:text-gray-300' />
                 </div>

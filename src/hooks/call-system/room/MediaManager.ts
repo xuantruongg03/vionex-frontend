@@ -363,6 +363,17 @@ export class MediaManager {
 
             // Update VAD microphone state immediately
             if (this.vadManager) {
+                // FIXED: Initialize VAD if not initialized yet when enabling microphone
+                if (enabled && !this.vadManager.getState().isInitialized) {
+                    console.log("[MediaManager] VAD not initialized, initializing now...");
+                    try {
+                        await this.vadManager.initialize();
+                        console.log("[MediaManager] ✓ VAD initialized successfully on mic enable");
+                    } catch (error) {
+                        console.error("[MediaManager] Failed to initialize VAD:", error);
+                    }
+                }
+                
                 this.vadManager.updateMicrophoneState(enabled);
                 console.log(`[MediaManager] VAD microphone updated immediately: ${enabled ? "enabled" : "disabled"}`);
             }
