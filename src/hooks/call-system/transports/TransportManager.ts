@@ -168,7 +168,6 @@ export class TransportManager {
 
         transport.on("produce", async (parameters, callback, errback) => {
             try {
-
                 this.context.refs.socketRef.current?.emit("sfu:produce", {
                     transportId: transport.id,
                     kind: parameters.kind,
@@ -180,7 +179,6 @@ export class TransportManager {
                 });
 
                 const handleProducerCreated = (data: any) => {
-
                     // Handle different response formats from server
                     const producerId = data.producerId || data.producer_id || data.id;
                     const streamId = data.streamId || data.stream_id;
@@ -235,17 +233,18 @@ export class TransportManager {
             console.log("[TransportManager] Send transport state changed:", state);
 
             if (state === "connected") {
-                console.log("[TransportManager] Send transport fully connected!");
+                console.log("[TransportManager] Send transport fully connected! Triggering publish...");
+                // NOW we can try to publish after transport is connected
+                queueMicrotask(async () => {
+                    await this.tryPublishTracks("transport-connected");
+                });
             } else if (state === "failed" || state === "disconnected") {
                 console.error("[TransportManager] Send transport state:", state);
             }
         });
 
-        // CRITICAL: Trigger initial publish attempt to start WebRTC connection
-        // This will trigger the 'produce' event which initiates DTLS handshake
-        queueMicrotask(async () => {
-            await this.tryPublishTracks("transport-setup");
-        });
+        // Note: Initial publish is triggered by 'connectionstatechange' event when transport becomes 'connected'
+        // DO NOT publish immediately here - transport needs to connect first!
     };
 
     /**
@@ -257,28 +256,42 @@ export class TransportManager {
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                // Check all conditions (but NOT transport connected - that happens AFTER we publish)
-                const transportExists = !!this.context.refs.sendTransportRef.current;
+                // Check all conditions INCLUDING transport connected state
+                const transport = this.context.refs.sendTransportRef.current;
+                const transportExists = !!transport;
+                const transportConnected = transport?.connectionState === "connected";
                 const deviceLoaded = this.context.refs.deviceRef.current?.loaded;
                 const hasLocalStream = !!this.context.refs.localStreamRef.current;
                 const noProducers = this.context.refs.producersRef.current.size === 0;
                 const notPublishing = !this.context.refs.isPublishingRef.current;
 
-                const canPublish = transportExists && deviceLoaded && hasLocalStream && noProducers && notPublishing;
+                // Additional: Check if tracks are live
+                const audioTrack = this.context.refs.localStreamRef.current?.getAudioTracks()[0];
+                const videoTrack = this.context.refs.localStreamRef.current?.getVideoTracks()[0];
+                const hasLiveAudio = audioTrack?.readyState === "live";
+                const hasLiveVideo = videoTrack?.readyState === "live";
+                const hasLiveTracks = hasLiveAudio || hasLiveVideo;
+
+                const canPublish = transportExists && transportConnected && deviceLoaded && hasLocalStream && hasLiveTracks && noProducers && notPublishing;
 
                 if (!canPublish) {
                     console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Waiting for conditions...`, {
                         transportExists,
+                        transportConnected,
+                        transportState: transport?.connectionState,
                         deviceLoaded,
                         hasLocalStream,
+                        hasLiveTracks,
+                        audioTrackState: audioTrack?.readyState,
+                        videoTrackState: videoTrack?.readyState,
                         noProducers,
                         notPublishing,
                         source,
                     });
 
-                    // Shorter wait time since we also have event-driven trigger
+                    // Wait longer for transport to connect (important for NAT traversal)
                     if (attempt < maxRetries) {
-                        await new Promise((resolve) => setTimeout(resolve, 500));
+                        await new Promise((resolve) => setTimeout(resolve, 1000)); // Increased from 500ms
                         continue;
                     } else {
                         console.warn(`[TransportManager] Conditions not met after retries (source: ${source})`);
@@ -286,8 +299,8 @@ export class TransportManager {
                     }
                 }
 
-                // Try to publish - this will trigger WebRTC connection!
-                console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Publishing tracks (will trigger connection)...`);
+                // Try to publish - transport is already connected!
+                console.log(`[TransportManager] Attempt ${attempt}/${maxRetries} - Publishing tracks on CONNECTED transport...`);
                 await this.producerManager?.publishTracks();
                 console.log("[TransportManager] Tracks published successfully!");
 
@@ -302,8 +315,8 @@ export class TransportManager {
                 console.error(`[TransportManager] Attempt ${attempt}/${maxRetries} failed:`, err);
 
                 if (attempt < maxRetries) {
-                    console.log(`[TransportManager] Retrying in 500ms...`);
-                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    console.log(`[TransportManager] Retrying in 1000ms...`);
+                    await new Promise((resolve) => setTimeout(resolve, 1000)); // Increased from 500ms
                 } else {
                     console.error("[TransportManager] Failed to publish tracks after all retries");
                 }
@@ -320,9 +333,7 @@ export class TransportManager {
         transport.on("connect", this.createTransportConnectionHandler(transport));
 
         transport.on("connectionstatechange", (state) => {
-
             if (state === "connected") {
-
                 // Mark transport as ready
                 setTimeout(() => {
                     if (!this.context.refs.isInitializedRef.current) {

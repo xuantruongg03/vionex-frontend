@@ -92,8 +92,7 @@ export class VoiceActivityDetector {
             this.mediaStream = globalAudioStream;
 
             // Create audio context with browser compatibility
-            this.audioContext = new (window.AudioContext ||
-                (window as any).webkitAudioContext)({
+            this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
                 sampleRate: this.config.sampleRate,
             });
 
@@ -104,29 +103,18 @@ export class VoiceActivityDetector {
 
             // Register audio worklet processor
             try {
-                await this.audioContext.audioWorklet.addModule(
-                    "/audio-worklet-processor.js"
-                );
+                await this.audioContext.audioWorklet.addModule("/audio-worklet-processor.js");
             } catch (workletError) {
-                console.error(
-                    "[VAD] Failed to load audio worklet:",
-                    workletError
-                );
-                throw new Error(
-                    "Audio worklet loading failed. Make sure audio-worklet-processor.js is accessible."
-                );
+                console.error("[VAD] Failed to load audio worklet:", workletError);
+                throw new Error("Audio worklet loading failed. Make sure audio-worklet-processor.js is accessible.");
             }
 
             // Create worklet node
-            this.audioWorkletNode = new AudioWorkletNode(
-                this.audioContext,
-                "audio-worklet-processor",
-                {
-                    processorOptions: {
-                        frameSize: this.config.frameSize,
-                    },
-                }
-            );
+            this.audioWorkletNode = new AudioWorkletNode(this.audioContext, "audio-worklet-processor", {
+                processorOptions: {
+                    frameSize: this.config.frameSize,
+                },
+            });
 
             // Handle processed audio data
             this.audioWorkletNode.port.onmessage = (event) => {
@@ -141,9 +129,7 @@ export class VoiceActivityDetector {
             };
 
             // Connect audio stream to worklet
-            const source = this.audioContext.createMediaStreamSource(
-                this.mediaStream
-            );
+            const source = this.audioContext.createMediaStreamSource(this.mediaStream);
             source.connect(this.audioWorkletNode);
             // Note: Don't connect to destination to avoid feedback
             // this.audioWorkletNode.connect(this.audioContext.destination);
@@ -151,9 +137,7 @@ export class VoiceActivityDetector {
             console.log("[VAD] Initialized successfully");
         } catch (error) {
             console.error("[VAD] Initialization failed:", error);
-            this.events.onError(
-                new Error(`VAD initialization failed: ${error.message}`)
-            );
+            this.events.onError(new Error(`VAD initialization failed: ${error.message}`));
             throw error;
         }
     }
@@ -163,9 +147,7 @@ export class VoiceActivityDetector {
      */
     startListening(): void {
         if (!this.audioContext || !this.microphoneEnabled) {
-            console.warn(
-                "[VAD] Cannot start listening - not initialized or mic disabled"
-            );
+            console.warn("[VAD] Cannot start listening - not initialized or mic disabled");
             return;
         }
 
@@ -207,21 +189,15 @@ export class VoiceActivityDetector {
     /**
      * Process audio frame for VAD
      */
-    private processAudioFrame(
-        audioData: Float32Array,
-        timestamp: number
-    ): void {
+    private processAudioFrame(audioData: Float32Array, timestamp: number): void {
         // Check if we should process audio
         if (!this.isListening || !this.microphoneEnabled) {
             return;
         }
 
         // Check for silence in audio data
-        const nonZeroSamples = audioData.filter(
-            (sample) => Math.abs(sample) > 0.001
-        ).length;
-        const silencePercentage =
-            ((audioData.length - nonZeroSamples) / audioData.length) * 100;
+        const nonZeroSamples = audioData.filter((sample) => Math.abs(sample) > 0.001).length;
+        const silencePercentage = ((audioData.length - nonZeroSamples) / audioData.length) * 100;
 
         if (silencePercentage > 98) {
             // Nearly complete silence - likely microphone is disabled
@@ -248,9 +224,7 @@ export class VoiceActivityDetector {
         const zcr = this.calculateZeroCrossingRate(audioData);
 
         // Enhanced VAD logic with confirmation frames
-        const isSpeech =
-            energy > this.config.energyThreshold &&
-            zcr < this.config.zcrThreshold;
+        const isSpeech = energy > this.config.energyThreshold && zcr < this.config.zcrThreshold;
 
         // Speech confirmation logic - need multiple consecutive frames
         if (isSpeech) {
@@ -259,35 +233,7 @@ export class VoiceActivityDetector {
             this.speechFrameCount = 0; // Reset on silence
         }
 
-        const confirmedSpeech =
-            this.speechFrameCount >= this.speechConfirmationFrames;
-
-        // // Enhanced debug logging - always log when energy is above minimal threshold
-        // const shouldLog =
-        //     Math.random() < 0.05 || // Increase logging frequency for debugging
-        //     energy > 0.00001 ||
-        //     isSpeech ||
-        //     confirmedSpeech;
-        // if (shouldLog) {
-        //     // Calculate additional metrics for debugging
-        //     const maxAmplitude = Math.max(
-        //         ...Array.from(audioData).map(Math.abs)
-        //     );
-        //     const rms = Math.sqrt(energy);
-        //     console.log(
-        //         `[VAD] Energy: ${energy.toFixed(8)}, RMS: ${rms.toFixed(
-        //             6
-        //         )}, Max: ${maxAmplitude.toFixed(6)}, ZCR: ${zcr.toFixed(
-        //             4
-        //         )}, Threshold: ${
-        //             this.config.energyThreshold
-        //         }, Speech: ${isSpeech}, Confirmed: ${confirmedSpeech}, Frames: ${
-        //             this.speechFrameCount
-        //         }/${this.speechConfirmationFrames}, Recording: ${
-        //             this.isRecording
-        //         }`
-        //     );
-        // }
+        const confirmedSpeech = this.speechFrameCount >= this.speechConfirmationFrames;
 
         if (confirmedSpeech) {
             this.handleSpeechDetected(audioData, timestamp);
@@ -299,10 +245,7 @@ export class VoiceActivityDetector {
     /**
      * Handle speech detection
      */
-    private handleSpeechDetected(
-        audioData: Float32Array,
-        timestamp: number
-    ): void {
+    private handleSpeechDetected(audioData: Float32Array, timestamp: number): void {
         this.lastSpeechTime = timestamp;
 
         if (!this.isRecording) {
@@ -328,17 +271,22 @@ export class VoiceActivityDetector {
     /**
      * Handle silence detection
      */
-    private handleSilenceDetected(
-        audioData: Float32Array,
-        timestamp: number
-    ): void {
+    private handleSilenceDetected(audioData: Float32Array, timestamp: number): void {
         if (this.isRecording) {
-            // Continue recording during short silences
-            this.recordedChunks.push({
-                buffer: new Float32Array(audioData),
-                timestamp,
-                duration: (audioData.length / this.config.sampleRate) * 1000,
-            });
+            // IMPROVED: Chỉ ghi silence nếu nó ngắn (< 500ms)
+            // Điều này tránh ghi quá nhiều âm thanh im lặng vào buffer
+            const silenceDurationSoFar = timestamp - this.lastSpeechTime;
+
+            // Chỉ ghi silence trong 500ms đầu tiên sau khi ngừng nói
+            // Để giữ ngữ cảnh tự nhiên giữa các từ
+            if (silenceDurationSoFar < 500) {
+                this.recordedChunks.push({
+                    buffer: new Float32Array(audioData),
+                    timestamp,
+                    duration: (audioData.length / this.config.sampleRate) * 1000,
+                });
+            }
+            // Sau 500ms silence, KHÔNG ghi nữa để tránh buffer chứa quá nhiều im lặng
 
             // Start silence timer if not already started
             if (!this.silenceTimer) {
@@ -389,15 +337,10 @@ export class VoiceActivityDetector {
         }
 
         // Check minimum speech duration
-        const totalDuration = this.recordedChunks.reduce(
-            (sum, chunk) => sum + chunk.duration,
-            0
-        );
+        const totalDuration = this.recordedChunks.reduce((sum, chunk) => sum + chunk.duration, 0);
 
         if (totalDuration < this.config.minSpeechDuration) {
-            console.log(
-                `[VAD] Recording too short (${totalDuration}ms), discarding`
-            );
+            console.log(`[VAD] Recording too short (${totalDuration}ms), discarding`);
             this.recordedChunks = [];
             return;
         }
@@ -407,9 +350,7 @@ export class VoiceActivityDetector {
         //DEBUG: Log final buffer for debugging
         console.log("Final Buffer: ", finalBuffer);
 
-        console.log(
-            `[VAD] Stopped recording - Duration: ${totalDuration}ms, Buffer size: ${finalBuffer.length} bytes`
-        );
+        console.log(`[VAD] Stopped recording - Duration: ${totalDuration}ms, Buffer size: ${finalBuffer.length} bytes`);
 
         // Send to callback
         this.events.onSpeechEnd(finalBuffer, totalDuration);
@@ -423,10 +364,7 @@ export class VoiceActivityDetector {
      */
     private combineAudioChunks(chunks: VADAudioChunk[]): Uint8Array {
         // Calculate total samples
-        const totalSamples = chunks.reduce(
-            (sum, chunk) => sum + chunk.buffer.length,
-            0
-        );
+        const totalSamples = chunks.reduce((sum, chunk) => sum + chunk.buffer.length, 0);
 
         // Create combined float array
         const combinedFloat = new Float32Array(totalSamples);
@@ -468,11 +406,7 @@ export class VoiceActivityDetector {
         // Log conversion metrics occasionally
         if (Math.random() < 0.1) {
             // 10% chance
-            console.log(
-                `[VAD PCM Conversion] Samples: ${totalSamples}, Clipped: ${clippedSamples}, Max: ${maxInputSample.toFixed(
-                    6
-                )}, Min: ${minInputSample.toFixed(6)}`
-            );
+            console.log(`[VAD PCM Conversion] Samples: ${totalSamples}, Clipped: ${clippedSamples}, Max: ${maxInputSample.toFixed(6)}, Min: ${minInputSample.toFixed(6)}`);
         }
 
         return pcmBuffer;
@@ -496,13 +430,7 @@ export class VoiceActivityDetector {
         // Log audio levels occasionally for debugging
         if (Math.random() < 0.001) {
             // 0.1% chance
-            console.log(
-                `[VAD Audio Levels] Max: ${maxSample.toFixed(
-                    6
-                )}, Min: ${minSample.toFixed(6)}, RMS: ${Math.sqrt(
-                    energy / audioData.length
-                ).toFixed(6)}`
-            );
+            console.log(`[VAD Audio Levels] Max: ${maxSample.toFixed(6)}, Min: ${minSample.toFixed(6)}, RMS: ${Math.sqrt(energy / audioData.length).toFixed(6)}`);
         }
 
         return energy / audioData.length;
