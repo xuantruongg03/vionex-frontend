@@ -1,8 +1,5 @@
 import { CallSystemContext } from "../types";
-import {
-    VoiceActivityDetector,
-    VADConfig,
-} from "../../../services/VoiceActivityDetector";
+import { VoiceActivityDetector, VADConfig } from "../../../services/VoiceActivityDetector";
 import { VADAudioProcessor } from "@/services/vad-audio-processor";
 import vadConfig from "@/configs/vadconfig";
 
@@ -18,7 +15,7 @@ export class VADManager {
     // Periodic audio sending
     private chunkStartTime: number = 0;
     private sendIntervalTimer: NodeJS.Timeout | null = null;
-    private readonly CHUNK_DURATION = 10000; // 10 seconds
+    private readonly CHUNK_DURATION = 30000; // Tăng từ 10s lên 30s để giảm tần suất gửi
 
     // Audio recordings storage for debugging (với giới hạn memory)
     private recordings: Array<{
@@ -45,7 +42,7 @@ export class VADManager {
      */
     async initialize(): Promise<void> {
         console.log("[VADManager] ===== INITIALIZE VAD =====");
-        
+
         try {
             const localStream = this.context.refs.localStreamRef.current;
 
@@ -66,8 +63,8 @@ export class VADManager {
 
             console.log("[VADManager] Audio tracks info:", {
                 count: audioTracks.length,
-                enabled: audioTracks.map(t => t.enabled),
-                labels: audioTracks.map(t => t.label),
+                enabled: audioTracks.map((t) => t.enabled),
+                labels: audioTracks.map((t) => t.label),
             });
 
             // VAD events
@@ -75,7 +72,7 @@ export class VADManager {
                 onSpeechStart: () => {
                     console.log("[VADManager] ===== SPEECH START DETECTED =====");
                     console.log("[VADManager] Timestamp:", new Date().toISOString());
-                    
+
                     // Check microphone state
                     const micEnabled = this.isMicrophoneEnabled();
                     console.log("[VADManager] Microphone state:", {
@@ -84,7 +81,7 @@ export class VADManager {
                         audioTracks: this.context.refs.localStreamRef.current?.getAudioTracks().length || 0,
                         audioTrackEnabled: this.context.refs.localStreamRef.current?.getAudioTracks()[0]?.enabled,
                     });
-                    
+
                     // Check socket state
                     const socket = this.context.refs.socketRef.current;
                     console.log("[VADManager] Socket state:", {
@@ -94,16 +91,16 @@ export class VADManager {
                         roomId: this.context.roomId,
                         username: this.context.room.username,
                     });
-                    
+
                     // Only set speaking to true if microphone is enabled
                     if (micEnabled) {
                         console.log("[VADManager] ✓ Microphone enabled - proceeding with speech start");
                         console.log("[VADManager] Setting isSpeaking to true");
                         this.context.setters.setIsSpeaking(true);
-                        
+
                         console.log("[VADManager] Calling handleSpeechStart");
                         this.handleSpeechStart();
-                        
+
                         console.log("[VADManager] Starting periodic sending");
                         this.startPeriodicSending();
                     } else {
@@ -114,11 +111,9 @@ export class VADManager {
 
                 onSpeechEnd: (audioBuffer: Uint8Array, duration: number) => {
                     console.log("[VADManager] ===== SPEECH END DETECTED =====");
-                    console.log(
-                        `[VADManager] Speech ended - Duration: ${duration}ms, Buffer: ${audioBuffer.length} bytes`
-                    );
+                    console.log(`[VADManager] Speech ended - Duration: ${duration}ms, Buffer: ${audioBuffer.length} bytes`);
                     console.log("[VADManager] Timestamp:", new Date().toISOString());
-                    
+
                     this.context.setters.setIsSpeaking(false);
 
                     // Store recording for debugging
@@ -126,11 +121,11 @@ export class VADManager {
 
                     // Stop periodic sending and send final chunk
                     this.stopPeriodicSending();
-                    
+
                     // Only send to server if mic was enabled during recording
                     const micEnabled = this.isMicrophoneEnabled();
                     console.log("[VADManager] Microphone state on speech end:", micEnabled);
-                    
+
                     if (micEnabled) {
                         console.log("[VADManager] ✓ Mic enabled - sending final audio buffer");
                         this.handleSpeechEnd(audioBuffer, duration);
@@ -144,9 +139,7 @@ export class VADManager {
 
                 onError: (error: Error) => {
                     console.error("[VADManager] VAD Error:", error);
-                    this.context.setters.setError(
-                        `VAD Error: ${error.message}`
-                    );
+                    this.context.setters.setError(`VAD Error: ${error.message}`);
                 },
             };
 
@@ -159,9 +152,7 @@ export class VADManager {
                 // Use original stream directly - matches vad-debug behavior
                 streamForVAD = localStream;
             } else {
-                console.log(
-                    "[VADManager] Using enhanced audio stream with VADAudioProcessor"
-                );
+                console.log("[VADManager] Using enhanced audio stream with VADAudioProcessor");
                 // 1. Boost volume bằng VADAudioProcessor
                 const vadProcessor = new VADAudioProcessor();
                 await vadProcessor.initialize(localStream);
@@ -171,9 +162,7 @@ export class VADManager {
                 if (enhancedStream) {
                     streamForVAD = enhancedStream;
                 } else {
-                    console.warn(
-                        "[VADManager] Failed to get enhanced stream, using original"
-                    );
+                    console.warn("[VADManager] Failed to get enhanced stream, using original");
                     streamForVAD = localStream;
                 }
             }
@@ -190,21 +179,19 @@ export class VADManager {
                 micEnabled,
                 willAutoStart: micEnabled,
             });
-            
+
             if (micEnabled) {
                 console.log("[VADManager] Auto-starting VAD listening...");
                 this.startListening();
             } else {
                 console.log("[VADManager] Microphone disabled, not auto-starting");
             }
-            
+
             console.log("[VADManager] ===== INITIALIZE COMPLETE =====");
         } catch (error) {
             console.error("[VADManager] ===== INITIALIZE FAILED =====");
             console.error("[VADManager] Failed to initialize VAD:", error);
-            this.context.setters.setError(
-                `Failed to initialize voice detection: ${error.message}`
-            );
+            this.context.setters.setError(`Failed to initialize voice detection: ${error.message}`);
             throw error;
         }
     }
@@ -214,7 +201,7 @@ export class VADManager {
      */
     startListening(): void {
         console.log("[VADManager] ===== START LISTENING CALLED =====");
-        
+
         if (!this.vadInstance || !this.isInitialized) {
             console.warn("[VADManager] ✗ VAD not initialized", {
                 hasVadInstance: !!this.vadInstance,
@@ -264,7 +251,7 @@ export class VADManager {
             currentListeningState: this.vadInstance?.getState().isListening,
             currentRecordingState: this.vadInstance?.getState().isRecording,
         });
-        
+
         if (this.vadInstance) {
             // Update VAD's internal microphone state
             this.vadInstance.setMicrophoneEnabled(enabled);
@@ -283,7 +270,7 @@ export class VADManager {
                 this.context.setters.setIsSpeaking(false);
             }
         }
-        
+
         console.log("[VADManager] Microphone state updated successfully");
     }
 
@@ -303,9 +290,7 @@ export class VADManager {
             }
 
             const recording = {
-                id:
-                    Date.now().toString() +
-                    Math.random().toString(36).substr(2, 9),
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 timestamp: Date.now(),
                 duration,
                 audioBuffer: bufferToStore,
@@ -334,6 +319,29 @@ export class VADManager {
     }
 
     /**
+     * Calculate audio energy from PCM buffer to detect actual speech
+     * PCM16 format: 2 bytes per sample, little-endian
+     */
+    private calculateAudioEnergy(audioBuffer: Uint8Array): number {
+        if (audioBuffer.length < 2) {
+            return 0;
+        }
+
+        // Convert Uint8Array to Int16Array (PCM16 format)
+        const samples = new Int16Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length / 2);
+
+        // Calculate RMS (Root Mean Square) energy
+        let sumSquares = 0;
+        for (let i = 0; i < samples.length; i++) {
+            const normalized = samples[i] / 32768.0; // Normalize to [-1, 1]
+            sumSquares += normalized * normalized;
+        }
+
+        const rms = Math.sqrt(sumSquares / samples.length);
+        return rms;
+    }
+
+    /**
      * Clear stored recordings
      */
     clearRecordings(): void {
@@ -355,12 +363,12 @@ export class VADManager {
                 roomId,
                 peerId: room.username,
             });
-            
+
             socket.emit("sfu:my-speaking", {
                 roomId,
                 peerId: room.username,
             });
-            
+
             console.log("[VADManager] sfu:my-speaking event emitted successfully");
         } else {
             console.warn("[VADManager] Cannot emit sfu:my-speaking - socket not available or not connected", {
@@ -380,18 +388,12 @@ export class VADManager {
     /**
      * Send audio buffer to server
      */
-    private sendAudioBuffer(
-        audioBuffer: Uint8Array,
-        duration: number,
-        isFinal: boolean
-    ): void {
+    private sendAudioBuffer(audioBuffer: Uint8Array, duration: number, isFinal: boolean): void {
         const socket = this.context.refs.socketRef.current;
         const { roomId, room } = this.context;
 
         if (!socket || !socket.connected) {
-            console.warn(
-                "[VADManager] Socket not connected, cannot send audio buffer"
-            );
+            console.warn("[VADManager] Socket not connected, cannot send audio buffer");
             return;
         }
 
@@ -403,18 +405,34 @@ export class VADManager {
         // For final chunks, always send even if microphone is disabled
         // (because user might have disabled mic after speaking)
         if (!isFinal && !this.isMicrophoneEnabled()) {
-            console.log(
-                "[VADManager] Microphone disabled, not sending periodic audio buffer"
-            );
+            console.log("[VADManager] Microphone disabled, not sending periodic audio buffer");
+            return;
+        }
+
+        // IMPROVED: Check audio energy level to detect actual speech vs noise/silence
+        const audioEnergy = this.calculateAudioEnergy(audioBuffer);
+        const MIN_ENERGY_THRESHOLD = 0.005; // Minimum energy to consider as real speech
+
+        console.log(`[VADManager] Audio energy check: ${audioEnergy.toFixed(6)}, threshold: ${MIN_ENERGY_THRESHOLD}, isFinal: ${isFinal}`);
+
+        // For non-final chunks, require higher energy to avoid sending background noise
+        if (!isFinal && audioEnergy < MIN_ENERGY_THRESHOLD) {
+            console.log("[VADManager] Audio energy too low (likely silence/noise), not sending");
+            return;
+        }
+
+        // For final chunks, be more lenient but still check for complete silence
+        if (isFinal && audioEnergy < MIN_ENERGY_THRESHOLD * 0.2) {
+            console.log("[VADManager] Final chunk has no audio content, not sending");
             return;
         }
 
         // Check for silence - count non-zero bytes
         const nonZeroBytes = audioBuffer.filter((b) => b !== 0).length;
-        const silencePercentage =
-            ((audioBuffer.length - nonZeroBytes) / audioBuffer.length) * 100;
+        const silencePercentage = ((audioBuffer.length - nonZeroBytes) / audioBuffer.length) * 100;
 
         if (silencePercentage > 95) {
+            console.log("[VADManager] Buffer is mostly silence (>95%), not sending");
             return;
         }
 
@@ -422,8 +440,11 @@ export class VADManager {
         // 16kHz * 2 bytes/sample * 15 seconds = 480,000 bytes max
         const MAX_BUFFER_SIZE = 480000; // ~15 seconds at 16kHz (16-bit PCM)
         if (audioBuffer.length > MAX_BUFFER_SIZE) {
+            console.warn(`[VADManager] Buffer too large (${audioBuffer.length} bytes), truncating to ${MAX_BUFFER_SIZE}`);
             audioBuffer = audioBuffer.slice(0, MAX_BUFFER_SIZE);
         }
+
+        console.log(`[VADManager] SENDING audio buffer: ${audioBuffer.length} bytes, energy: ${audioEnergy.toFixed(6)}, duration: ${duration}ms, isFinal: ${isFinal}`);
 
         // Prepare audio data for server (matching server's expected format)
         const audioData = {
@@ -442,9 +463,7 @@ export class VADManager {
         // Listen for audio errors from server
         socket.once("audio:error", (errorData) => {
             console.error("[VADManager] Server audio error:", errorData);
-            this.context.setters.setError(
-                `Audio processing error: ${errorData.message}`
-            );
+            this.context.setters.setError(`Audio processing error: ${errorData.message}`);
         });
 
         // Send audio buffer to server for processing
@@ -456,12 +475,12 @@ export class VADManager {
                 roomId,
                 peerId: room.username,
             });
-            
+
             socket.emit("sfu:my-stop-speaking", {
                 roomId,
                 peerId: room.username,
             });
-            
+
             console.log("[VADManager] sfu:my-stop-speaking event emitted successfully");
         }
     }
@@ -511,16 +530,12 @@ export class VADManager {
         const currentBuffer = this.vadInstance.getCurrentRecording();
 
         if (!currentBuffer || currentBuffer.length === 0) {
-            console.log(
-                "[VADManager] No current recording data for periodic chunk"
-            );
+            console.log("[VADManager] No current recording data for periodic chunk");
             return;
         }
 
         // Calculate actual duration from buffer size (more accurate)
-        const actualDuration = Math.round(
-            (currentBuffer.length / 2 / 16000) * 1000
-        ); // bytes ÷ 2 ÷ sampleRate * 1000
+        const actualDuration = Math.round((currentBuffer.length / 2 / 16000) * 1000); // bytes ÷ 2 ÷ sampleRate * 1000
 
         // Send the chunk with actual duration from buffer
         this.sendAudioBuffer(currentBuffer, actualDuration, false); // false = not final chunk
