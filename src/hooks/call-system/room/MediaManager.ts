@@ -148,7 +148,16 @@ export class MediaManager {
             const audioEnabled = audioProducer?.producer && !audioProducer.producer.closed && !audioProducer.producer.paused;
 
             // Update both video and audio streams with correct metadata via WebSocket
-            const streamId = this.context.refs.currentStreamIdsRef.current.primary || this.context.refs.currentStreamIdsRef.current.video || this.context.refs.currentStreamIdsRef.current.audio;
+            // Prefer streamIds that come from non-dummy producers (real media)
+            let streamId = this.context.refs.currentStreamIdsRef.current.primary || this.context.refs.currentStreamIdsRef.current.video || this.context.refs.currentStreamIdsRef.current.audio;
+
+            if (!streamId) {
+                // Try to get streamId from producers map preferring non-dummy producers
+                const nonDummyProducer = producers.find((p) => !p.appData?.isDummy && (p.kind === "video" || p.kind === "audio"));
+                if (nonDummyProducer && nonDummyProducer.streamId) {
+                    streamId = nonDummyProducer.streamId;
+                }
+            }
 
             if (streamId && this.context.refs.socketRef.current) {
                 // Use WebSocket instead of HTTP
@@ -418,10 +427,13 @@ export class MediaManager {
      */
     toggleScreenShare = async (): Promise<boolean> => {
         try {
+            // Check if already screen sharing - prevent duplicate calls
+            const isCurrentlySharing = this.context.refs.screenStreamRef.current !== null;
+
             // Stop screen sharing if currently active
-            if (this.context.setters.setIsScreenSharing && this.context.refs.screenStreamRef.current) {
+            if (isCurrentlySharing) {
                 // Stop all tracks
-                this.context.refs.screenStreamRef.current.getTracks().forEach((track) => {
+                this.context.refs.screenStreamRef.current!.getTracks().forEach((track) => {
                     track.stop();
                 });
 
@@ -460,9 +472,11 @@ export class MediaManager {
                     frameRate: { ideal: 30, max: 30 },
                 } as MediaTrackConstraints,
                 audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    sampleRate: 48000,
+                    channelCount: 2,
                 } as MediaTrackConstraints,
             });
 
@@ -472,6 +486,9 @@ export class MediaManager {
 
             this.context.refs.screenStreamRef.current = screenStream;
 
+            const hasAudio = screenStream.getAudioTracks().length > 0;
+            console.log(`[MediaManager] Screen stream captured with ${hasAudio ? "audio" : "no audio"}`);
+
             // Add to screen streams for UI (local display)
             this.context.setters.setScreenStreams((prev) => [
                 ...prev,
@@ -480,7 +497,7 @@ export class MediaManager {
                     stream: screenStream,
                     metadata: {
                         video: true,
-                        audio: screenStream.getAudioTracks().length > 0,
+                        audio: hasAudio,
                         type: "screen",
                         isScreenShare: true,
                         peerId: this.context.room.username,

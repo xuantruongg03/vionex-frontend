@@ -129,14 +129,9 @@ export class ConsumerManager {
                 const targetUserId = data.metadata?.targetUserId || publisherId;
                 uiStreamId = `remote-${targetUserId}-translated`;
             } else if (isScreenShare) {
-                // For screen share, create separate streams for video and audio
-                if (mediaType === "screen") {
-                    uiStreamId = `screen-${publisherId}`;
-                } else if (mediaType === "screen_audio") {
-                    uiStreamId = `screen-audio-${publisherId}`;
-                } else {
-                    uiStreamId = `screen-${publisherId}`;
-                }
+                // For screen share, use same ID for both video and audio
+                // This allows them to be merged into a single stream
+                uiStreamId = `screen-${publisherId}`;
             } else {
                 uiStreamId = `remote-${publisherId}-${mediaType}`;
             }
@@ -148,7 +143,12 @@ export class ConsumerManager {
                 this.context.refs.remoteStreamsMapRef.current.set(uiStreamId, mediaStream);
             }
 
-            // Add track to stream
+            // Add track to stream (check for duplicates)
+            const existingTrack = mediaStream.getTracks().find((t) => t.kind === consumer.track.kind);
+            if (existingTrack) {
+                // Replace existing track of same kind
+                mediaStream.removeTrack(existingTrack);
+            }
             mediaStream.addTrack(consumer.track);
 
             // Resume consumer

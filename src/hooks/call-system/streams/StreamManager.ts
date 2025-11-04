@@ -56,16 +56,27 @@ export class StreamManager {
         if (mediaType === "screen") {
             // Screen video stream - use separate screen streams state
             this.context.setters.setScreenStreams((prev) => {
+                // Find existing screen stream for this publisher
+                const existingStream = prev.find((s) => s.id === `screen-${publisherId}`);
+
                 // Remove any duplicate screen streams for this publisher first
                 const filteredStreams = prev.filter((s) => s.id !== `screen-${publisherId}`);
+
+                // Merge video track with existing stream if it has audio
+                let finalStream = mediaStream;
+                if (existingStream && existingStream.stream.getAudioTracks().length > 0) {
+                    // Preserve audio track from existing stream
+                    const audioTracks = existingStream.stream.getAudioTracks();
+                    finalStream = new MediaStream([...mediaStream.getVideoTracks(), ...audioTracks]);
+                }
 
                 // Always create/recreate the stream to avoid duplicates
                 const newStream = {
                     id: `screen-${publisherId}`,
-                    stream: mediaStream,
+                    stream: finalStream,
                     metadata: {
                         video: true,
-                        audio: false,
+                        audio: finalStream.getAudioTracks().length > 0,
                         type: "screen",
                         isScreenShare: true,
                         peerId: publisherId,
@@ -77,19 +88,31 @@ export class StreamManager {
                 return [...filteredStreams, newStream];
             });
         } else if (mediaType === "screen_audio") {
-            // Screen audio stream - update existing screen stream in screen streams state
+            // Screen audio stream - merge with existing screen video stream
             this.context.setters.setScreenStreams((prev) => {
+                // Find existing screen stream for this publisher
+                const existingStream = prev.find((s) => s.id === `screen-${publisherId}`);
+
                 // Remove any duplicate screen streams for this publisher first
                 const filteredStreams = prev.filter((s) => s.id !== `screen-${publisherId}`);
 
-                // Find if we have existing screen stream to preserve video
-                const existingStream = prev.find((s) => s.id === `screen-${publisherId}`);
+                // Merge audio track with existing video stream
+                let finalStream: MediaStream;
+                if (existingStream && existingStream.stream.getVideoTracks().length > 0) {
+                    // Merge video from existing + new audio
+                    const videoTracks = existingStream.stream.getVideoTracks();
+                    const audioTracks = mediaStream.getAudioTracks();
+                    finalStream = new MediaStream([...videoTracks, ...audioTracks]);
+                } else {
+                    // No video yet, just use audio stream
+                    finalStream = mediaStream;
+                }
 
                 const newStream = {
                     id: `screen-${publisherId}`,
-                    stream: mediaStream,
+                    stream: finalStream,
                     metadata: {
-                        video: existingStream?.metadata?.video || false,
+                        video: finalStream.getVideoTracks().length > 0,
                         audio: true,
                         type: "screen",
                         isScreenShare: true,

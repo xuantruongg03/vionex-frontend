@@ -33,18 +33,32 @@ export class ProducerManager {
             });
 
             // Store streamId for metadata updates
-            if (kind === "video") {
-                this.context.refs.currentStreamIdsRef.current.video = streamId;
-                // If this is the first stream, also set as primary
-                if (!this.context.refs.currentStreamIdsRef.current.primary) {
-                    this.context.refs.currentStreamIdsRef.current.primary = streamId;
+            // NOTE: Ignore dummy producers when setting current stream ids.
+            // Dummy producers are created when user joins with camera/mic OFF
+            // and are paused; their streamIds should NOT be treated as
+            // the user's primary or active stream id because they don't
+            // represent real media. This prevents downstream logic (like
+            // metadata updates or screen-share handling) from using the
+            // dummy stream as the authoritative stream.
+            const isDummy = !!data.appData?.isDummy;
+            if (!isDummy) {
+                if (kind === "video") {
+                    this.context.refs.currentStreamIdsRef.current.video = streamId;
+                    // If this is the first non-dummy stream, also set as primary
+                    if (!this.context.refs.currentStreamIdsRef.current.primary) {
+                        this.context.refs.currentStreamIdsRef.current.primary = streamId;
+                    }
+                } else if (kind === "audio") {
+                    this.context.refs.currentStreamIdsRef.current.audio = streamId;
+                    // If this is the first non-dummy stream, also set as primary
+                    if (!this.context.refs.currentStreamIdsRef.current.primary) {
+                        this.context.refs.currentStreamIdsRef.current.primary = streamId;
+                    }
                 }
-            } else if (kind === "audio") {
-                this.context.refs.currentStreamIdsRef.current.audio = streamId;
-                // If this is the first stream, also set as primary
-                if (!this.context.refs.currentStreamIdsRef.current.primary) {
-                    this.context.refs.currentStreamIdsRef.current.primary = streamId;
-                }
+            } else {
+                // Keep the dummy producer stored in producersRef but don't
+                // treat it as an active stream id.
+                console.log("[ProducerManager] Registered dummy producer (ignored for primary stream ids)", producerId, kind);
             }
         }
     };
@@ -232,8 +246,13 @@ export class ProducerManager {
         }
 
         try {
-            // Publish video track (create separate stream for screen video)
             const videoTrack = screenStream.getVideoTracks()[0];
+            const audioTrack = screenStream.getAudioTracks()[0];
+
+            let videoPublished = false;
+            let audioPublished = false;
+
+            // Publish video track (screen video)
             if (videoTrack && this.context.refs.sendTransportRef.current) {
                 try {
                     const screenVideoProducer = await this.context.refs.sendTransportRef.current.produce({
@@ -270,21 +289,25 @@ export class ProducerManager {
                         appData: screenVideoProducer.appData,
                         producer: screenVideoProducer,
                     });
+
+                    videoPublished = true;
+                    console.log("[ProducerManager] Screen video published successfully");
                 } catch (error) {
-                    console.error("[WS] Failed to produce screen video:", error);
+                    console.error("[ProducerManager] Failed to produce screen video:", error);
                     throw error;
                 }
             }
 
-            // Publish audio track if available (create separate stream for screen audio)
-            const audioTrack = screenStream.getAudioTracks()[0];
+            // Publish audio track if available (screen audio)
             if (audioTrack && this.context.refs.sendTransportRef.current) {
                 try {
                     const screenAudioProducer = await this.context.refs.sendTransportRef.current.produce({
                         track: audioTrack,
                         codecOptions: {
                             opusStereo: true,
-                            opusDtx: true,
+                            opusDtx: false,
+                            opusFec: true,
+                            opusMaxPlaybackRate: 48000,
                         },
                         appData: {
                             video: false,
@@ -301,15 +324,22 @@ export class ProducerManager {
                         appData: screenAudioProducer.appData,
                         producer: screenAudioProducer,
                     });
+
+                    audioPublished = true;
+                    console.log("[ProducerManager] Screen audio published successfully");
                 } catch (error) {
-                    console.error("[WS] Failed to produce screen audio:", error);
+                    console.error("[ProducerManager] Failed to produce screen audio:", error);
                     // Audio failure shouldn't stop screen sharing
+                    console.warn("[ProducerManager] Continuing without screen audio");
                 }
+            } else {
+                console.log("[ProducerManager] No screen audio track available");
             }
 
-            return true;
+            // Success if at least video was published
+            return videoPublished;
         } catch (error) {
-            console.error("[WS] Error publishing screen share tracks:", error);
+            console.error("[ProducerManager] Error publishing screen share tracks:", error);
             return false;
         }
     };

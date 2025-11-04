@@ -15,17 +15,17 @@ export class VADManager {
     // Periodic audio sending
     private chunkStartTime: number = 0;
     private sendIntervalTimer: NodeJS.Timeout | null = null;
-    private readonly CHUNK_DURATION = 30000; // Tăng từ 10s lên 30s để giảm tần suất gửi
+    private readonly CHUNK_DURATION = 15000; // 15 seconds
 
     // Audio recordings storage for debugging (với giới hạn memory)
-    private recordings: Array<{
-        id: string;
-        timestamp: number;
-        duration: number;
-        audioBuffer: Uint8Array;
-        sampleRate: number;
-        channels: number;
-    }> = [];
+    // private recordings: Array<{
+    //     id: string;
+    //     timestamp: number;
+    //     duration: number;
+    //     audioBuffer: Uint8Array;
+    //     sampleRate: number;
+    //     channels: number;
+    // }> = [];
     private readonly MAX_RECORDINGS = 5; // Giảm từ 5 xuống 3 để tiết kiệm memory
     private readonly MAX_RECORDING_SIZE = 48000; // Giới hạn size mỗi recording (3s at 16kHz)
 
@@ -285,9 +285,9 @@ export class VADManager {
             }
 
             // Remove oldest recordings để giới hạn memory usage
-            while (this.recordings.length >= this.MAX_RECORDINGS) {
-                this.recordings.shift();
-            }
+            // while (this.recordings.length >= this.MAX_RECORDINGS) {
+            //     this.recordings.shift();
+            // }
 
             const recording = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -298,16 +298,16 @@ export class VADManager {
                 channels: 1,
             };
 
-            this.recordings.push(recording);
+            // this.recordings.push(recording);
         }
     }
 
     /**
      * Get stored recordings for debugging
      */
-    getRecordings() {
-        return [...this.recordings]; // Return a copy
-    }
+    // getRecordings() {
+    //     return [...this.recordings]; // Return a copy
+    // }
 
     /**
      * Check if microphone is enabled
@@ -319,34 +319,11 @@ export class VADManager {
     }
 
     /**
-     * Calculate audio energy from PCM buffer to detect actual speech
-     * PCM16 format: 2 bytes per sample, little-endian
-     */
-    private calculateAudioEnergy(audioBuffer: Uint8Array): number {
-        if (audioBuffer.length < 2) {
-            return 0;
-        }
-
-        // Convert Uint8Array to Int16Array (PCM16 format)
-        const samples = new Int16Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length / 2);
-
-        // Calculate RMS (Root Mean Square) energy
-        let sumSquares = 0;
-        for (let i = 0; i < samples.length; i++) {
-            const normalized = samples[i] / 32768.0; // Normalize to [-1, 1]
-            sumSquares += normalized * normalized;
-        }
-
-        const rms = Math.sqrt(sumSquares / samples.length);
-        return rms;
-    }
-
-    /**
      * Clear stored recordings
      */
-    clearRecordings(): void {
-        this.recordings = [];
-    }
+    // clearRecordings(): void {
+    //     this.recordings = [];
+    // }
     private handleSpeechStart(): void {
         const socket = this.context.refs.socketRef.current;
         const { roomId, room } = this.context;
@@ -409,30 +386,11 @@ export class VADManager {
             return;
         }
 
-        // IMPROVED: Check audio energy level to detect actual speech vs noise/silence
-        const audioEnergy = this.calculateAudioEnergy(audioBuffer);
-        const MIN_ENERGY_THRESHOLD = 0.005; // Minimum energy to consider as real speech
-
-        console.log(`[VADManager] Audio energy check: ${audioEnergy.toFixed(6)}, threshold: ${MIN_ENERGY_THRESHOLD}, isFinal: ${isFinal}`);
-
-        // For non-final chunks, require higher energy to avoid sending background noise
-        if (!isFinal && audioEnergy < MIN_ENERGY_THRESHOLD) {
-            console.log("[VADManager] Audio energy too low (likely silence/noise), not sending");
-            return;
-        }
-
-        // For final chunks, be more lenient but still check for complete silence
-        if (isFinal && audioEnergy < MIN_ENERGY_THRESHOLD * 0.2) {
-            console.log("[VADManager] Final chunk has no audio content, not sending");
-            return;
-        }
-
         // Check for silence - count non-zero bytes
         const nonZeroBytes = audioBuffer.filter((b) => b !== 0).length;
         const silencePercentage = ((audioBuffer.length - nonZeroBytes) / audioBuffer.length) * 100;
 
         if (silencePercentage > 95) {
-            console.log("[VADManager] Buffer is mostly silence (>95%), not sending");
             return;
         }
 
@@ -440,11 +398,8 @@ export class VADManager {
         // 16kHz * 2 bytes/sample * 15 seconds = 480,000 bytes max
         const MAX_BUFFER_SIZE = 480000; // ~15 seconds at 16kHz (16-bit PCM)
         if (audioBuffer.length > MAX_BUFFER_SIZE) {
-            console.warn(`[VADManager] Buffer too large (${audioBuffer.length} bytes), truncating to ${MAX_BUFFER_SIZE}`);
             audioBuffer = audioBuffer.slice(0, MAX_BUFFER_SIZE);
         }
-
-        console.log(`[VADManager] SENDING audio buffer: ${audioBuffer.length} bytes, energy: ${audioEnergy.toFixed(6)}, duration: ${duration}ms, isFinal: ${isFinal}`);
 
         // Prepare audio data for server (matching server's expected format)
         const audioData = {
@@ -588,7 +543,7 @@ export class VADManager {
         this.stopPeriodicSending();
 
         // Clear recordings to free memory
-        this.clearRecordings();
+        // this.clearRecordings();
 
         if (this.vadInstance) {
             this.vadInstance.cleanup();
